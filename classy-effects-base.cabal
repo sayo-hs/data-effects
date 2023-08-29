@@ -18,7 +18,10 @@ author:             Yamada Ryo <ymdfield@outlook.jp>
 maintainer:         Yamada Ryo <ymdfield@outlook.jp>
 
 -- A copyright notice.
-copyright: 2023 Yamada Ryo
+copyright:
+    2023 Casper Bach Poulsen and Cas van der Rest,
+    2023 Yamada Ryo
+
 category: Control, Effect
 
 extra-source-files:
@@ -36,6 +39,8 @@ source-repository head
 
 library
     exposed-modules:
+        Control.Effect.Class
+        Control.Effect.Class.HFunctor
 
     -- Modules included in this executable, other than Main.
     -- other-modules:
