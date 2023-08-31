@@ -1,1 +1,1 @@
-# Revision history for classy-effects
+# Revision history for classy-effects-th

@@ -1,5 +1,5 @@
 cabal-version:      2.4
-name:               classy-effects
+name:               classy-effects-th
 version:            0.1.0.0
 
 -- A short (one-line) description of the package.
@@ -9,7 +9,7 @@ synopsis: <synopsis>
 description: <description>
 
 -- A URL where users can report bugs.
-bug-reports: https://github.com/ymdryo/classy-effects
+bug-reports: https://github.com/ymdryo/classy-effects-th
 
 -- The license under which the package is released.
 license:            MPL-2.0
@@ -34,7 +34,7 @@ tested-with:
 
 source-repository head
     type: git
-    location: https://github.com/ymdryo/classy-effects
+    location: https://github.com/ymdryo/classy-effects-th
 
 library
     exposed-modules:
@@ -81,7 +81,7 @@ test-suite Example
     main-is: Driver.hs
     hs-source-dirs: Example
     build-depends:
-        classy-effects,
+        classy-effects-th,
         base,
         classy-effects-base,
         tasty       ^>= 1.4,
