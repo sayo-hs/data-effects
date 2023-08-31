@@ -93,30 +93,6 @@ makeEffectDataF = makeEffectData . guardEffDataNamer FirstOrder
 makeEffectDataH :: EffectDataNamer -> MakeEmptyEffectData -> Name -> Q [Dec]
 makeEffectDataH = makeEffectData . guardEffDataNamer HigherOrder
 
-{-
-{- |
-A restriction on the order of effects.
-
-If methods are found to be trapped by the restriction, an error will occur during effect data type
-generation.
--}
-data OrderRestriction
-    = Only EffectOrder
-    | NoOrderRestriction
-
--- | Apply a restriction to the namer.
-restrictNamer :: OrderRestriction -> EffectDataNamer -> EffectDataNamer
-restrictNamer = \case
-    Only order -> guardEffDataNamer order
-    NoOrderRestriction -> id
-
-restrictOnlyFirstOrder :: EffectDataNamer -> EffectDataNamer
-restrictOnlyFirstOrder = guardEffDataNamer FirstOrder
-
-restrictOnlyHigherOrder :: EffectDataNamer -> EffectDataNamer
-restrictOnlyHigherOrder = guardEffDataNamer FirstOrder
--}
-
 -- | A configuration of whether to generate an effect data type even when the one is empty.
 data MakeEmptyEffectData
     = -- | Generate an effect data type even when the one is empty.
@@ -125,7 +101,7 @@ data MakeEmptyEffectData
       NoMakeEmptyEffectData
     deriving (Eq)
 
--- | Generate /instruction/ and /signature/ data types from an effect class, from @EffectInfo@.
+-- | Generate /instruction/ and /signature/ data types from an effect class, from 'EffectInfo'.
 generateEffectDataByEffInfo ::
     EffectDataNamer ->
     MakeEmptyEffectData ->
@@ -247,8 +223,6 @@ defaultEffectDataNamer order = namer (++ [effectOrderSymbol order])
 
 {- |
 Restrict an effect data type namer to allow only effect methods of the specified effect order.
-
-Add an @F@ or @H@ symbol indicating the order of the effect to the end of the effect class name.
 -}
 guardEffDataNamer :: EffectOrder -> EffectDataNamer -> EffectDataNamer
 guardEffDataNamer o1 effDataNamer o2 name =

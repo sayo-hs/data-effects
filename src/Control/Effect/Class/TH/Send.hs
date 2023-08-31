@@ -4,6 +4,16 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+{- |
+Copyright   :  (c) 2023 Yamada Ryo
+License     :  MPL-2.0 (see the file LICENSE)
+Maintainer  :  ymdfield@outlook.jp
+Stability   :  experimental
+Portability :  portable
+
+This module provides @TemplateHaskell@ functions to derive an instance of the effect that handles
+via 'Send'/'SendF' type classes.
+-}
 module Control.Effect.Class.TH.Send where
 
 import Control.Effect.Class (Send, SendF, SendVia (SendVia), runSendVia, send, sendF)
@@ -50,7 +60,7 @@ import Language.Haskell.TH (
     varT,
  )
 
--- | Derive an instance of the effect that handles via @Send@/@SendH@ type classes.
+-- | Derive an instance of the effect that handles via 'Send'/'SendF' type classes.
 makeEffectSend ::
     -- | The class name of the effect.
     Name ->
@@ -64,7 +74,7 @@ makeEffectSend effClsName effDataNameF effDataNameH = do
     deriveEffectSend info effDataNameF effDataNameH
 
 {- |
-Derive an instance of the effect that handles via @Send@/@SendH@ type classes, from @EffectInfo@.
+Derive an instance of the effect that handles via 'Send'/'SendF' type classes, from 'EffectInfo'.
 -}
 deriveEffectSend ::
     -- | The reified information of the effect class.
@@ -110,7 +120,7 @@ deriveEffectSend info effDataNameF effDataNameH = do
 
     return $ InstanceD Nothing (sendCxt ++ superEffCxt ++ effParamCxt) inst (concat decs)
 
--- | Generate a method implementation of the effect that handles via @Send@/@SendH@ type classes.
+-- | Generate a method implementation of the effect that handles via 'Send'/'SendF' type classes.
 effectMethodDec ::
     -- | The interface of the effect method.
     MethodInterface ->

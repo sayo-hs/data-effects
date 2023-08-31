@@ -1,8 +1,18 @@
-module Control.Effect.Class.TH where
-
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+{- |
+Copyright   :  (c) 2023 Yamada Ryo
+License     :  MPL-2.0 (see the file LICENSE)
+Maintainer  :  ymdfield@outlook.jp
+Stability   :  experimental
+Portability :  portable
+
+This module provides @TemplateHaskell@ functions to generates automatically various data types and
+instances that constitute the effect system supplied by the @classy-effects@ framework.
+-}
+module Control.Effect.Class.TH where
 
 import Control.Effect.Class.TH.HFunctor (dataName, deriveHFunctor)
 import Control.Effect.Class.TH.Send (deriveEffectSend)
@@ -20,35 +30,38 @@ import Data.Effect.Class.TH (
 import Language.Haskell.TH (Dec, Name, Q)
 
 {- |
-Generate effect data types and derive @HFunctor@ and @Send@(@H@) instances for the given effect
-class.
+Generate effect data types and derive 'Data.Comp.Multi.HFunctor.HFunctor' and
+'Control.Effect.Class.Send'/'Control.Effect.Class.SendF' instances for the given effect class.
 -}
 makeEffect :: Name -> Q [Dec]
 makeEffect = makeEffectWith defaultEffectDataNamer NoMakeEmptyEffectData
 
 {- |
-Generate only an /instruction/ data type (even if the one is empty) and a @Send@ instance for the
-given effect class.
+Generate only an /instruction/ data type (even if the one is empty) and a
+'Control.Effect.Class.SendF' instance for the given effect class.
 -}
 makeEffectF :: Name -> Q [Dec]
 makeEffectF = makeEffectWith defaultEffectDataNamer MakeEffectDataEvenIfEmpty
 
 {- |
-Generate only a /signature/ data type (even if the one is empty) and derive @HFunctor@ and a @SendH@
-instance for the given effect class.
+Generate only a /signature/ data type (even if the one is empty) and derive
+'Data.Comp.Multi.HFunctor.HFunctor' and a 'Control.Effect.Class.Send' instance for the given effect
+class.
 -}
 makeEffectH :: Name -> Q [Dec]
 makeEffectH = makeEffectWith defaultEffectDataNamer MakeEffectDataEvenIfEmpty
 
 {- |
 Generate /instruction/ and /signature/ data types (even if the one is empty) and derive
-@HFunctor@ and @Send@(@H@) instances for the given effect class.
+'Data.Comp.Multi.HFunctor.HFunctor' and 'Control.Effect.Class.Send'/'Control.Effect.Class.SendF'
+instances for the given effect class.
 -}
 makeEffectFH :: Name -> Q [Dec]
 makeEffectFH = makeEffectWith defaultEffectDataNamer MakeEffectDataEvenIfEmpty
 
 {- |
-Generate effect data types with the given naming convention, and derive @HFunctor@ and @Send@(@H@)
+Generate effect data types with the given naming convention, and derive
+'Data.Comp.Multi.HFunctor.HFunctor' and 'Control.Effect.Class.Send'/'Control.Effect.Class.SendF'
 instances, for the given effect class.
 -}
 makeEffectWith ::
