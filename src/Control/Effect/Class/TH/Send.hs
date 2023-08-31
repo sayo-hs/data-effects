@@ -120,6 +120,8 @@ deriveEffectSend info effDataNameF effDataNameH = do
 
     return $ InstanceD Nothing (sendCxt ++ superEffCxt ++ effParamCxt) inst (concat decs)
 
+-- * Internal
+
 -- | Generate a method implementation of the effect that handles via 'Send'/'SendF' type classes.
 effectMethodDec ::
     -- | The interface of the effect method.

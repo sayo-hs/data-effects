@@ -101,6 +101,8 @@ data MakeEmptyEffectData
       NoMakeEmptyEffectData
     deriving (Eq)
 
+-- * Internal
+
 -- | Generate /instruction/ and /signature/ data types from an effect class, from 'EffectInfo'.
 generateEffectDataByEffInfo ::
     EffectDataNamer ->
@@ -377,7 +379,7 @@ superEffectsWithoutBase =
 effectParamCxt :: EffectInfo -> Cxt
 effectParamCxt = fst . partitionSuperEffects
 
--- * Utility functions
+-- ** Utility functions
 
 -- | Construct a namer from a conversion function of string.
 namer :: (String -> String) -> Name -> Q (Maybe Name)

@@ -65,6 +65,8 @@ makeHFunctor fname = do
     Just dInfo <- abstractNewtype <$> reify fname
     deriveHFunctor dInfo
 
+-- * Internal
+
 {- |
 Derive an instance of 'HFunctor' for a type constructor of any higher-order
 kind taking at least two arguments, from 'DataInfo'.
@@ -107,8 +109,6 @@ deriveHFunctor (DataInfo _cxt name args constrs _deriving) = do
                 vars = vars' (\d x -> iter d [|fmap|] f `appE` x) id
             body <- foldl appE con vars
             return $ Clause [fp, pat] (NormalB body) []
-
--- * Utilify functions
 
 -- | A reified information of a datatype.
 data DataInfo flag = DataInfo
