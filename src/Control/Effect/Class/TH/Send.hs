@@ -68,10 +68,10 @@ makeEffectSend ::
     Maybe Name ->
     -- | The name of /signature/ datatype corresponding to the effect.
     Maybe Name ->
-    Q Dec
+    Q [Dec]
 makeEffectSend effClsName effDataNameF effDataNameH = do
     info <- reifyEffectInfo effClsName
-    deriveEffectSend info effDataNameF effDataNameH
+    sequence [deriveEffectSend info effDataNameF effDataNameH]
 
 {- |
 Derive an instance of the effect that handles via 'Send'/'SendF' type classes, from 'EffectInfo'.

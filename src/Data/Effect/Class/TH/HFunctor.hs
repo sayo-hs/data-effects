@@ -89,7 +89,9 @@ deriveHFunctor (DataInfo _cxt name args constrs _deriving) = do
     filterVars args_ varNs farg nonFarg = zipWith (filterVar farg nonFarg) args_ varNs
     mkCPat constr varNs = ConP constr [] $ map mkPat varNs
     mkPat = VarP
-    mkPatAndVars :: (Name, [[t]]) -> Q (Q Exp, Pat, (t -> Q Exp -> c) -> (Q Exp -> c) -> [c], Bool, [Q Exp], [(t, Name)])
+    mkPatAndVars ::
+        (Name, [[t]]) ->
+        Q (Q Exp, Pat, (t -> Q Exp -> c) -> (Q Exp -> c) -> [c], Bool, [Q Exp], [(t, Name)])
     mkPatAndVars (constr, args_) =
         do
             varNs <- newNames (length args_) "x"

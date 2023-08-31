@@ -35,7 +35,6 @@ import Language.Haskell.TH.Syntax (
     Con,
     Cxt,
     Dec (ClassD, SigD),
-    FunDep (..),
     Info (ClassI),
     Kind,
     Name,
@@ -60,8 +59,6 @@ import Language.Haskell.TH.Syntax (
     nameBase,
     reify,
  )
-
-import Data.Set qualified as Set
 
 import Control.Lens (bimap, (%~), _head)
 import Control.Monad.Writer (Any (Any), execWriterT, runWriterT, tell)
@@ -250,24 +247,15 @@ effectOrderSymbol = \case
 data EffectInfo = EffectInfo
     { effCxts :: [Type]
     , effName :: Name
-    , effParams :: [(Name, EffectParamKind)]
+    , effParamVars :: [TyVarBndr ()]
     , effMonad :: TyVarBndr ()
     , effMethods :: [MethodInterface]
     }
 
-data EffectParamKind
-    = NonCharacteristicsParam (Maybe Kind)
-    | CharacteristicsParam Kind
-
-effParamVar :: (Name, EffectParamKind) -> TyVarBndr ()
+effParamVar :: (Name, Maybe Kind) -> TyVarBndr ()
 effParamVar (n, k) = case k of
-    NonCharacteristicsParam k' -> case k' of
-        Just k'' -> KindedTV n () k''
-        Nothing -> PlainTV n ()
-    CharacteristicsParam k' -> KindedTV n () k'
-
-effParamVars :: EffectInfo -> [TyVarBndr ()]
-effParamVars = map effParamVar . effParams
+    Just k' -> KindedTV n () k'
+    Nothing -> PlainTV n ()
 
 data MethodInterface = MethodInterface
     { methodName :: Name
@@ -281,8 +269,8 @@ reifyEffectInfo :: Name -> Q EffectInfo
 reifyEffectInfo className = do
     info <- reify className
     case info of
-        ClassI (ClassD cxts name tyVars funDeps decs) _ -> do
-            (paramVars_, monad) <-
+        ClassI (ClassD cxts name tyVars _funDeps decs) _ -> do
+            (paramVars, monad) <-
                 case tyVars of
                     [] ->
                         fail $
@@ -291,21 +279,8 @@ reifyEffectInfo className = do
                                 ++ "' has no monad type variable. "
                                 ++ "It is expected to be the last type variable."
                     vs -> pure (init vs, last vs)
-            let characteristicsParams_ =
-                    foldr
-                        (Set.intersection . Set.fromList . funDepLhs)
-                        (Set.fromList $ map tyVarName paramVars_)
-                        funDeps
-            params <-
-                forM paramVars_ \pv ->
-                    if Set.member (tyVarName pv) characteristicsParams_
-                        then case pv of
-                            KindedTV n _ k -> pure (n, CharacteristicsParam k)
-                            PlainTV n _ ->
-                                (n,) . CharacteristicsParam . VarT
-                                    <$> newName ("k_" ++ nameBase n)
-                        else pure $ mkNonCharacteristicsParam pv
-            EffectInfo cxts name params monad
+
+            EffectInfo cxts name paramVars monad
                 <$> sequence
                     [ do
                         (order, paramTypes, retType) <- analyzeMethodInterface monad t
@@ -318,14 +293,6 @@ reifyEffectInfo className = do
                     ++ nameBase className
                     ++ "' is not a type class, but the following instead: "
                     ++ show other
-
-funDepLhs :: FunDep -> [Name]
-funDepLhs (FunDep lhs _) = lhs
-
-mkNonCharacteristicsParam :: TyVarBndr a -> (Name, EffectParamKind)
-mkNonCharacteristicsParam = \case
-    KindedTV n _ k -> (n, NonCharacteristicsParam $ Just k)
-    PlainTV n _ -> (n, NonCharacteristicsParam Nothing)
 
 -- | Constructs the type of an effect, i.e. the type class without its monad parameter.
 effectType :: EffectInfo -> Q Type
