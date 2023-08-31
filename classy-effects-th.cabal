@@ -21,7 +21,7 @@ maintainer:         Yamada Ryo <ymdfield@outlook.jp>
 copyright:
     Yamada Ryo, 2023
 
-category: Control
+category: Control, Effect, Template Haskell
 
 extra-source-files:
     ChangeLog.md
@@ -39,9 +39,9 @@ source-repository head
 library
     exposed-modules:
         Control.Effect.Class.TH
-        Control.Effect.Class.TH.HFunctor
         Control.Effect.Class.TH.Send
         Data.Effect.Class.TH
+        Data.Effect.Class.TH.HFunctor
 
     -- Modules included in this executable, other than Main.
     -- other-modules:

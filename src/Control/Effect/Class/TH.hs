@@ -14,7 +14,6 @@ instances that constitute the effect system supplied by the @classy-effects@ fra
 -}
 module Control.Effect.Class.TH where
 
-import Control.Effect.Class.TH.HFunctor (dataName, deriveHFunctor)
 import Control.Effect.Class.TH.Send (deriveEffectSend)
 import Control.Monad (forM_)
 import Control.Monad.Writer (execWriterT, lift, tell)
@@ -27,6 +26,7 @@ import Data.Effect.Class.TH (
     getEffDataInfoOn,
     reifyEffectInfo,
  )
+import Data.Effect.Class.TH.HFunctor (dataName, deriveHFunctor)
 import Language.Haskell.TH (Dec, Name, Q)
 
 {- |

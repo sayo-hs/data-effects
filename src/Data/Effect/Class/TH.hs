@@ -63,11 +63,11 @@ import Language.Haskell.TH.Syntax (
 
 import Data.Set qualified as Set
 
-import Control.Effect.Class.TH.HFunctor (DataInfo (DataInfo), infoToDataD, tyVarName)
 import Control.Lens (bimap, (%~), _head)
 import Control.Monad.Writer (Any (Any), execWriterT, runWriterT, tell)
 import Data.Bool (bool)
 import Data.Char (toUpper)
+import Data.Effect.Class.TH.HFunctor (DataInfo (DataInfo), infoToDataD, tyVarName)
 import Data.Either (partitionEithers)
 import Data.Function ((&))
 import Data.Functor ((<&>))

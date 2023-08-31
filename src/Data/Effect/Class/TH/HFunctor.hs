@@ -28,7 +28,7 @@ This module provides @TemplateHaskell@ functions to derive an instance of 'HFunc
 
 The definitions come from "Data.Comp.Multi.Derive" in the compdata-0.13.0 package.
 -}
-module Control.Effect.Class.TH.HFunctor where
+module Data.Effect.Class.TH.HFunctor where
 
 import Control.Effect.Class.HFunctor (HFunctor, hfmap)
 import Control.Monad (replicateM, (<=<))

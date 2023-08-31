@@ -18,7 +18,6 @@ module Control.Effect.Class.TH.Send where
 
 import Control.Effect.Class (Send, SendF, SendVia (SendVia), runSendVia, send, sendF)
 import Control.Effect.Class.HFunctor (hfmap)
-import Control.Effect.Class.TH.HFunctor (tyVarName)
 import Control.Monad (forM, replicateM)
 import Data.Effect.Class.TH (
     EffectInfo,
@@ -37,6 +36,7 @@ import Data.Effect.Class.TH (
     tyVarType,
     unkindTyVar,
  )
+import Data.Effect.Class.TH.HFunctor (tyVarName)
 import Data.Maybe (maybeToList)
 import Language.Haskell.TH (
     Dec (InstanceD),
