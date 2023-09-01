@@ -25,9 +25,6 @@ category: Control, Effect, Template Haskell
 
 extra-source-files:
     ChangeLog.md
-    README.md
-    CONTRIBUTING.md
-    CLA
 
 tested-with:
     GHC == 9.2.8
