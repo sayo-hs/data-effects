@@ -6,6 +6,10 @@
 
 module Control.Effect.Class where
 
+import Control.Applicative (Alternative)
+import Control.Monad (MonadPlus)
+import Control.Monad.Fix (MonadFix)
+import Control.Monad.IO.Class (MonadIO)
 import Data.Comp.Multi.Derive (makeHFunctor)
 import Data.Kind (Type)
 
@@ -35,3 +39,15 @@ class Send (sig :: Signature) m where
 
 class SendF (ins :: Instruction) m where
     sendF :: ins a -> m a
+
+newtype SendVia m a = SendVia {runSendVia :: m a}
+    deriving newtype
+        ( Functor
+        , Applicative
+        , Alternative
+        , Monad
+        , MonadPlus
+        , MonadFix
+        , MonadIO
+        , MonadFail
+        )
