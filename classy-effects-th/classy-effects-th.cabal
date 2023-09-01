@@ -25,6 +25,7 @@ category: Control, Effect, Template Haskell
 
 extra-source-files:
     ChangeLog.md
+    NOTICE
 
 tested-with:
     GHC == 9.2.8

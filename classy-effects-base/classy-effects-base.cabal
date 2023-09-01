@@ -26,6 +26,7 @@ category: Control, Effect
 
 extra-source-files:
     ChangeLog.md
+    NOTICE
 
 tested-with:
     GHC == 9.2.8
