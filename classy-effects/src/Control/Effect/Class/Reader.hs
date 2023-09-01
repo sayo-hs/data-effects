@@ -1,11 +1,19 @@
+{-# LANGUAGE UndecidableInstances #-}
+
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 module Control.Effect.Class.Reader where
 
-class Reader r f where
+class (Ask r f, Local r f) => Reader r f
+
+class Ask (r :: Type) f where
     ask :: f r
+
+class Local r f where
     local :: (r -> r) -> f a -> f a
 
+makeEffectF ''Ask
+makeEffectH ''Local
 makeEffect ''Reader
