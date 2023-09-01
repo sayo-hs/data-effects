@@ -84,11 +84,11 @@ makeEffectData effDataNamer makeEmptyEffData effClsName =
 
 -- | Generate only an /instruction/ data type from the effect class of the given name.
 makeEffectDataF :: EffectDataNamer -> MakeEmptyEffectData -> Name -> Q [Dec]
-makeEffectDataF = makeEffectData . guardEffDataNamer FirstOrder
+makeEffectDataF = makeEffectData . restrictEffectDataNamer FirstOrder
 
 -- | Generate only a /signature/ data type from the effect class of the given name.
 makeEffectDataH :: EffectDataNamer -> MakeEmptyEffectData -> Name -> Q [Dec]
-makeEffectDataH = makeEffectData . guardEffDataNamer HigherOrder
+makeEffectDataH = makeEffectData . restrictEffectDataNamer HigherOrder
 
 -- | A configuration of whether to generate an effect data type even when the one is empty.
 data MakeEmptyEffectData
@@ -223,8 +223,8 @@ defaultEffectDataNamer order = namer (++ [effectOrderSymbol order])
 {- |
 Restrict an effect data type namer to allow only effect methods of the specified effect order.
 -}
-guardEffDataNamer :: EffectOrder -> EffectDataNamer -> EffectDataNamer
-guardEffDataNamer o1 effDataNamer o2 name =
+restrictEffectDataNamer :: EffectOrder -> EffectDataNamer -> EffectDataNamer
+restrictEffectDataNamer o1 effDataNamer o2 name =
     (guard (o1 == o2) *>) <$> effDataNamer o2 name
 
 -- | An order of effect.

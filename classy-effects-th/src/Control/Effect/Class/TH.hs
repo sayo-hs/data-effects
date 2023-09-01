@@ -25,6 +25,7 @@ import Data.Effect.Class.TH (
     generateEffectDataByEffInfo,
     getEffDataInfoOn,
     reifyEffectInfo,
+    restrictEffectDataNamer,
  )
 import Data.Effect.Class.TH.HFunctor (dataName, deriveHFunctor)
 import Language.Haskell.TH (Dec, Name, Q)
@@ -41,7 +42,10 @@ Generate only an /instruction/ data type (even if the one is empty) and a
 'Control.Effect.Class.SendF' instance for the given effect class.
 -}
 makeEffectF :: Name -> Q [Dec]
-makeEffectF = makeEffectWith defaultEffectDataNamer MakeEffectDataEvenIfEmpty
+makeEffectF =
+    makeEffectWith
+        (restrictEffectDataNamer FirstOrder defaultEffectDataNamer)
+        MakeEffectDataEvenIfEmpty
 
 {- |
 Generate only a /signature/ data type (even if the one is empty) and derive
@@ -49,7 +53,10 @@ Generate only a /signature/ data type (even if the one is empty) and derive
 class.
 -}
 makeEffectH :: Name -> Q [Dec]
-makeEffectH = makeEffectWith defaultEffectDataNamer MakeEffectDataEvenIfEmpty
+makeEffectH =
+    makeEffectWith
+        (restrictEffectDataNamer HigherOrder defaultEffectDataNamer)
+        MakeEffectDataEvenIfEmpty
 
 {- |
 Generate /instruction/ and /signature/ data types (even if the one is empty) and derive
