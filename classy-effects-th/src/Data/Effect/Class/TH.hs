@@ -82,6 +82,7 @@ import Language.Haskell.TH (
     implBidir,
     mkName,
     patSynD,
+    pragCompleteD,
     prefixPatSyn,
     tySynD,
     varP,
@@ -278,29 +279,41 @@ Generate the pattern synonyms for instruction constructors:
     @pattern Baz ... = LiftIns (BazI ...)@
 -}
 generateLiftInsPatternSynonyms :: Name -> EffectInfo -> Q [Dec]
-generateLiftInsPatternSynonyms dataName info =
-    concat <$> forM (effMethods info) \MethodInterface{..} -> do
-        let conName = renameMethodToCon methodOrder methodName
-        newConName <- mkName <$> dropEndI (nameBase conName)
-        args <- replicateM (length methodParamTypes) (newName "x")
-        sequence
-            [ patSynSigD
-                newConName
-                ( foldr
-                    (\l r -> arrowT `appT` pure l `appT` r)
-                    [t|
-                        $(liftInsType dataName $ tyVarName <$> effParamVars info)
-                            $(varT $ tyVarName $ effMonad info)
-                            $(pure methodReturnType)
-                        |]
-                    methodParamTypes
-                )
-            , patSynD
-                newConName
-                (prefixPatSyn args)
-                implBidir
-                (conP 'LiftIns [conP conName $ varP <$> args])
-            ]
+generateLiftInsPatternSynonyms dataName info = do
+    patSyns <-
+        forM (effMethods info) \MethodInterface{..} -> do
+            let conName = renameMethodToCon methodOrder methodName
+            newConName <- mkName <$> dropEndI (nameBase conName)
+            args <- replicateM (length methodParamTypes) (newName "x")
+            a <- varT . mkName . show <$> newName "a"
+            (newConName,)
+                <$> sequence
+                    [ patSynSigD
+                        newConName
+                        -- For some reason, if I don't write constraints in this form, the type is
+                        -- not inferred properly (why?).
+                        [t|
+                            () =>
+                            ($a ~ $(pure methodReturnType)) =>
+                            $( foldr
+                                (\l r -> arrowT `appT` pure l `appT` r)
+                                [t|
+                                    $(liftInsType dataName $ tyVarName <$> effParamVars info)
+                                        $(varT $ tyVarName $ effMonad info)
+                                        $a
+                                    |]
+                                methodParamTypes
+                             )
+                            |]
+                    , patSynD
+                        newConName
+                        (prefixPatSyn args)
+                        implBidir
+                        (conP 'LiftIns [conP conName $ varP <$> args])
+                    ]
+
+    (concatMap snd patSyns ++)
+        <$> sequence [pragCompleteD (fst <$> patSyns) Nothing]
 
 {- |
 Generate the type synonym for an instruction datatype:
