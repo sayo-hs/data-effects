@@ -7,4 +7,4 @@ module Control.Effect.Class.Input where
 class Input i (f :: Type -> Type) where
     input :: f i
 
-makeEffect ''Input
+makeEffectF ''Input

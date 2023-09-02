@@ -1,6 +1,7 @@
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+{-# LANGUAGE TemplateHaskell #-}
 
 {- |
 Copyright   :  (c) 2023 Yamada Ryo
@@ -14,90 +15,246 @@ instances that constitute the effect system supplied by the @classy-effects@ fra
 -}
 module Control.Effect.Class.TH where
 
+import Control.Effect.Class (LiftIns)
+import Control.Effect.Class.HFunctor ((:+:))
 import Control.Effect.Class.TH.Send (deriveEffectSend)
-import Control.Monad (forM_)
+import Control.Monad (unless, when, (<=<))
 import Control.Monad.Writer (execWriterT, lift, tell)
 import Data.Effect.Class.TH (
-    EffectDataNamer,
-    EffectOrder (FirstOrder, HigherOrder),
-    MakeEmptyEffectData (MakeEffectDataEvenIfEmpty, NoMakeEmptyEffectData),
+    EffectInfo (
+        EffectInfo,
+        effMethods,
+        effName,
+        effParamVars
+    ),
+    EffectOrder (..),
+    applyEffPVs,
     defaultEffectDataNamer,
     generateEffectDataByEffInfo,
-    getEffDataInfoOn,
+    generateLiftInsPatternSynonyms,
+    generateLiftInsTypeSynonym,
     reifyEffectInfo,
-    restrictEffectDataNamer,
  )
-import Data.Effect.Class.TH.HFunctor (dataName, deriveHFunctor)
-import Language.Haskell.TH (Dec, Name, Q)
+import Data.Effect.Class.TH.HFunctor (deriveHFunctor, tyVarName)
+import Data.Function ((&))
+import Data.Functor ((<&>))
+import Data.Kind qualified as K
+import Language.Haskell.TH (
+    Dec,
+    Name,
+    Q,
+    TyVarBndr (PlainTV),
+    appT,
+    classD,
+    kindedTV,
+    mkName,
+    nameBase,
+    tySynD,
+    varT,
+ )
 
 {- |
-Generate effect data types and derive 'Data.Comp.Multi.HFunctor.HFunctor' and
-'Control.Effect.Class.Send'/'Control.Effect.Class.SendF' instances for the given effect class.
--}
-makeEffect :: Name -> Q [Dec]
-makeEffect = makeEffectWith defaultEffectDataNamer NoMakeEmptyEffectData
+In addition to 'makeEffectF' and 'makeEffectH',
+generate the order-unified empty effect class:
 
-{- |
-Generate only an /instruction/ data type (even if the one is empty) and a
-'Control.Effect.Class.SendF' instance for the given effect class.
--}
-makeEffectF :: Name -> Q [Dec]
-makeEffectF =
-    makeEffectWith
-        (restrictEffectDataNamer FirstOrder defaultEffectDataNamer)
-        MakeEffectDataEvenIfEmpty
+    @class (FoobarF ... f, FoobarH ... f) => Foobar ... f@
 
-{- |
-Generate only a /signature/ data type (even if the one is empty) and derive
-'Data.Comp.Multi.HFunctor.HFunctor' and a 'Control.Effect.Class.Send' instance for the given effect
-class.
--}
-makeEffectH :: Name -> Q [Dec]
-makeEffectH =
-    makeEffectWith
-        (restrictEffectDataNamer HigherOrder defaultEffectDataNamer)
-        MakeEffectDataEvenIfEmpty
+, and generate the order-unified effect data type synonym:
 
-{- |
-Generate /instruction/ and /signature/ data types (even if the one is empty) and derive
-'Data.Comp.Multi.HFunctor.HFunctor' and 'Control.Effect.Class.Send'/'Control.Effect.Class.SendF'
-instances for the given effect class.
+    @type Foobar ... = FoobarS ... :+: LiftIns (FoobarI ...)@
 -}
-makeEffectFH :: Name -> Q [Dec]
-makeEffectFH = makeEffectWith defaultEffectDataNamer MakeEffectDataEvenIfEmpty
-
-{- |
-Generate effect data types with the given naming convention, and derive
-'Data.Comp.Multi.HFunctor.HFunctor' and 'Control.Effect.Class.Send'/'Control.Effect.Class.SendF'
-instances, for the given effect class.
--}
-makeEffectWith ::
-    -- | The naming convention of effect data types.
-    EffectDataNamer ->
-    -- | Whether to generate an effect data type even when the one is empty.
-    MakeEmptyEffectData ->
-    -- | The class name of the effect.
+makeEffect ::
+    -- | A name of order-unified empty effect class generated newly
+    String ->
+    -- | The name of first-order effect class
+    Name ->
+    -- | The name of higher-order effect class
     Name ->
     Q [Dec]
-makeEffectWith effDataNamer makeEmptyEffData effClsName = do
+makeEffect clsU clsF clsH = do
+    makeEffectWith
+        clsU
+        (clsU <> "D")
+        clsF
+        (defaultEffDataNamer FirstOrder clsF)
+        clsH
+        (defaultEffDataNamer HigherOrder clsH)
+
+-- | Generate an /instruction/ data type and type and pattern synonyms for abbreviating 'LiftIns'.
+makeEffectF :: Name -> Q [Dec]
+makeEffectF = generateEffect FirstOrder <=< reifyEffectInfo
+
+-- | Generate a /signature/ data type and a 'Data.Comp.Multi.HFunctor.HFunctor' instance.
+makeEffectH :: Name -> Q [Dec]
+makeEffectH = generateEffect HigherOrder <=< reifyEffectInfo
+
+{- |
+In addition to 'makeEffectF' and 'makeEffectH',
+generate the order-unified empty effect class:
+
+    @class (FoobarF ... f, FoobarH ... f) => Foobar ... f@
+
+, and generate the order-unified effect data type synonym:
+
+    @type Foobar ... = FoobarS ... :+: LiftIns (FoobarI ...)@
+-}
+makeEffectWith ::
+    -- | A name of order-unified empty effect class generated newly
+    String ->
+    -- | A name of type synonym of order-unified effect data type generated newly
+    String ->
+    -- | The name of first-order effect class
+    Name ->
+    -- | The name of instruction data type corresponding to the first-order effect class
+    Name ->
+    -- | The name of higher-order effect class
+    Name ->
+    -- | The name of signature data type corresponding to the higher-order effect class
+    Name ->
+    Q [Dec]
+makeEffectWith clsU dataU clsF dataI clsH dataS =
+    execWriterT do
+        infoF <- reifyEffectInfo clsF & lift
+        infoH <- reifyEffectInfo clsH & lift
+
+        pvs <- unifyEffTypeParams infoF infoH & lift
+
+        generateEffectWith FirstOrder dataI infoF & lift >>= tell
+        generateEffectWith HigherOrder dataS infoH & lift >>= tell
+
+        generateOrderUnifiedEffectClass infoF infoH pvs (mkName clsU) & lift >>= tell
+
+        [generateOrderUnifiedEffDataTySyn dataI dataS pvs (mkName dataU)]
+            & lift . sequence
+            >>= tell
+
+        pure ()
+
+-- | Generate an /instruction/ data type and type and pattern synonyms for abbreviating 'LiftIns'.
+makeEffectFWith :: String -> Name -> Q [Dec]
+makeEffectFWith dataI = generateEffectWith FirstOrder (mkName dataI) <=< reifyEffectInfo
+
+-- | Generate a /signature/ data type and a 'Data.Comp.Multi.HFunctor.HFunctor' instance.
+makeEffectHWith :: String -> Name -> Q [Dec]
+makeEffectHWith dataS = generateEffectWith HigherOrder (mkName dataS) <=< reifyEffectInfo
+
+{- |
+Derive an instance of the effect, with no methods, that handles via 'Control.Effect.Class.Send'/
+'Control.Effect.Class.SendF' instances.
+-}
+makeEmptyEffect :: Name -> Q [Dec]
+makeEmptyEffect effClsName = do
     info <- reifyEffectInfo effClsName
 
+    unless (null $ effMethods info) $
+        fail ("The effect class \'" <> nameBase effClsName <> "\' is not empty.")
+
+    sequence [deriveEffectSend info Nothing]
+
+{- |
+Generate the order-unified empty effect class:
+
+    @class (FoobarF ... f, FoobarH ... f) => Foobar ... f@
+
+, and derive an instance of the effect that handles via 'Control.Effect.Class.Send'/
+'Control.Effect.Class.SendF' instances.
+-}
+makeOrderUnifiedEffectClass :: Name -> Name -> String -> Q [Dec]
+makeOrderUnifiedEffectClass clsF clsH clsU = do
+    infoF <- reifyEffectInfo clsF
+    infoH <- reifyEffectInfo clsH
+    pvs <- unifyEffTypeParams infoF infoH
+    generateOrderUnifiedEffectClass infoF infoH pvs (mkName clsU)
+
+-- * Internal
+
+generateEffect :: EffectOrder -> EffectInfo -> Q [Dec]
+generateEffect order info =
+    generateEffectWith
+        order
+        (mkName $ defaultEffectDataNamer order $ nameBase $ effName info)
+        info
+
+defaultEffDataNamer :: EffectOrder -> Name -> Name
+defaultEffDataNamer order = mkName . defaultEffectDataNamer order . nameBase
+
+generateEffectWith :: EffectOrder -> Name -> EffectInfo -> Q [Dec]
+generateEffectWith order effDataName info =
     execWriterT do
-        (genResult, effDataDecs) <-
-            lift $
-                generateEffectDataByEffInfo
-                    effDataNamer
-                    makeEmptyEffData
-                    info
-        tell effDataDecs
+        (effDataInfo, effData) <- generateEffectDataByEffInfo order effDataName info & lift
+        tell [effData]
 
-        forM_ (getEffDataInfoOn HigherOrder genResult) \effDataHInfo ->
-            tell =<< lift (deriveHFunctor effDataHInfo)
+        case order of
+            FirstOrder -> do
+                generateLiftInsPatternSynonyms effDataName info & lift >>= tell
+                [generateLiftInsTypeSynonym info effDataName] & lift . sequence >>= tell
+            HigherOrder ->
+                deriveHFunctor effDataInfo & lift >>= tell
 
-        tell =<< lift do
-            sequence
-                [ deriveEffectSend
-                    info
-                    (dataName <$> getEffDataInfoOn FirstOrder genResult)
-                    (dataName <$> getEffDataInfoOn HigherOrder genResult)
-                ]
+        [deriveEffectSend info $ Just (order, effDataName)] & lift . sequence >>= tell
+
+        pure info
+
+{- |
+Generate the order-unified empty effect class:
+
+    @class (FoobarF ... f, FoobarH ... f) => Foobar ... f@
+
+, and derive an instance of the effect that handles via 'Control.Effect.Class.Send'/
+'Control.Effect.Class.SendF' instances.
+-}
+generateOrderUnifiedEffectClass :: EffectInfo -> EffectInfo -> [Name] -> Name -> Q [Dec]
+generateOrderUnifiedEffectClass infoF infoH pvs unifiedClsName = do
+    fKind <- [t|K.Type -> K.Type|]
+    let f = mkName "f"
+        fKinded = f `kindedTV` fKind
+
+    cxt <-
+        sequence
+            [ applyEffPVs (effName infoF) pvs `appT` varT f
+            , applyEffPVs (effName infoH) pvs `appT` varT f
+            ]
+    let pvs' = pvs <&> (`PlainTV` ())
+
+    sequence
+        [ classD
+            (pure cxt)
+            unifiedClsName
+            (pvs' ++ [fKinded])
+            []
+            []
+        , deriveEffectSend
+            ( EffectInfo
+                cxt
+                unifiedClsName
+                pvs'
+                fKinded
+                []
+            )
+            Nothing
+        ]
+
+{- |
+Generate the order-unified effect data type synonym:
+
+    @type Foobar ... = FoobarS ... :+: LiftIns (FoobarI ...)@
+-}
+generateOrderUnifiedEffDataTySyn :: Name -> Name -> [Name] -> Name -> Q Dec
+generateOrderUnifiedEffDataTySyn dataI dataS pvs tySynName = do
+    tySynD
+        tySynName
+        ((`PlainTV` ()) <$> pvs)
+        [t|$(applyEffPVs dataS pvs) :+: LiftIns $(applyEffPVs dataI pvs)|]
+
+unifyEffTypeParams :: EffectInfo -> EffectInfo -> Q [Name]
+unifyEffTypeParams infoF infoH = do
+    let pvF = nameBase . tyVarName <$> effParamVars infoF
+        pvH = nameBase . tyVarName <$> effParamVars infoH
+
+    when (pvF /= pvH) $
+        fail $
+            "The type parameter lists for the first and higher-order effect classes do not match:\n"
+                <> (nameBase (effName infoF) <> ": " <> show pvF <> "\n")
+                <> (nameBase (effName infoH) <> ": " <> show pvH <> "\n")
+
+    pure $ mkName <$> pvH

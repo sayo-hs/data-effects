@@ -64,14 +64,12 @@ import Language.Haskell.TH (
 makeEffectSend ::
     -- | The class name of the effect.
     Name ->
-    -- | The name of /instruction/ datatype corresponding to the effect.
-    Maybe Name ->
-    -- | The name of /signature/ datatype corresponding to the effect.
-    Maybe Name ->
+    -- | The name and order of effect data type corresponding to the effect.
+    Maybe (EffectOrder, Name) ->
     Q [Dec]
-makeEffectSend effClsName effDataNameF effDataNameH = do
+makeEffectSend effClsName effDataNameAndOrder = do
     info <- reifyEffectInfo effClsName
-    sequence [deriveEffectSend info effDataNameF effDataNameH]
+    sequence [deriveEffectSend info effDataNameAndOrder]
 
 {- |
 Derive an instance of the effect that handles via 'Send'/'SendF' type classes, from 'EffectInfo'.
@@ -79,12 +77,10 @@ Derive an instance of the effect that handles via 'Send'/'SendF' type classes, f
 deriveEffectSend ::
     -- | The reified information of the effect class.
     EffectInfo ->
-    -- | The name of /instruction/ datatype corresponding to the effect.
-    Maybe Name ->
-    -- | The name of /signature/ datatype corresponding to the effect.
-    Maybe Name ->
+    -- | The name and order of effect data type corresponding to the effect.
+    Maybe (EffectOrder, Name) ->
     Q Dec
-deriveEffectSend info effDataNameF effDataNameH = do
+deriveEffectSend info effDataNameAndOrder = do
     let f = varT $ tyVarName $ effMonad info
 
     let pvs = effParamVars info
@@ -92,17 +88,17 @@ deriveEffectSend info effDataNameF effDataNameH = do
 
         carrier = [t|SendVia $f|]
 
-    sendCxt <- do
-        let effSendClsAndDataNames =
-                flip
-                    foldMap
-                    [(effDataNameF, ''SendF), (effDataNameH, ''Send)]
-                    \(effDataName, sendCls) ->
-                        maybeToList $ (conT sendCls,) <$> effDataName
+    sendCxt <-
+        maybeToList
+            <$> forM effDataNameAndOrder \(order, effDataName) -> do
+                let sendCls =
+                        conT case order of
+                            FirstOrder -> ''SendF
+                            HigherOrder -> ''Send
 
-        forM effSendClsAndDataNames \(sendCls, effDataName) -> do
-            let effData = foldl appT (conT effDataName) paramTypes
-            [t|$sendCls $effData $f|]
+                    effData = foldl appT (conT effDataName) paramTypes
+
+                [t|$sendCls $effData $f|]
 
     let effParamCxt = effectParamCxt info
     superEffCxt <- forM (superEffects info) ((`appT` carrier) . pure)
@@ -113,8 +109,8 @@ deriveEffectSend info effDataNameF effDataNameH = do
 
     decs <- do
         let methods =
-                [ (sig, renameMethodToCon methodName)
-                | sig@MethodInterface{methodName} <- effMethods info
+                [ (sig, renameMethodToCon methodOrder methodName)
+                | sig@MethodInterface{methodName, methodOrder} <- effMethods info
                 ]
         mapM (uncurry effectMethodDec) methods
 

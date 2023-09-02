@@ -6,14 +6,10 @@
 
 module Control.Effect.Class.Reader where
 
-class (Ask r f, Local r f) => Reader r f
-
 class Ask (r :: Type) f where
     ask :: f r
 
 class Local r f where
     local :: (r -> r) -> f a -> f a
 
-makeEffectF ''Ask
-makeEffectH ''Local
-makeEffect ''Reader
+makeEffect "Reader" ''Ask ''Local

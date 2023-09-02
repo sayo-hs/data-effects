@@ -7,4 +7,4 @@ module Control.Effect.Class.Coroutine where
 class Coroutine a b f where
     yield :: a -> (b -> c) -> f c
 
-makeEffect ''Coroutine
+makeEffectF ''Coroutine

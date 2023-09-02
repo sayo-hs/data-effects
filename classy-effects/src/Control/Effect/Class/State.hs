@@ -8,4 +8,4 @@ class State s f where
     get :: f s
     put :: s -> f ()
 
-makeEffect ''State
+makeEffectF ''State

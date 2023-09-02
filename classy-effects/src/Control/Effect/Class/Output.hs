@@ -7,4 +7,4 @@ module Control.Effect.Class.Output where
 class Output o f where
     output :: o -> f ()
 
-makeEffect ''Output
+makeEffectF ''Output

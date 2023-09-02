@@ -20,14 +20,15 @@ This module provides @TemplateHaskell@ functions to generate the effect data typ
 -}
 module Data.Effect.Class.TH where
 
-import Control.Monad (forM, forM_, guard, unless, when)
+import Control.Monad (forM, replicateM, unless, when, (<=<))
 import Control.Monad.IO.Class (MonadIO)
-import Data.List (intercalate, partition)
+import Data.List (intercalate)
 import Data.Maybe (isNothing, mapMaybe)
 
 import Language.Haskell.TH.Lib (
     appT,
     conT,
+    patSynSigD,
     sigT,
     varT,
  )
@@ -60,137 +61,154 @@ import Language.Haskell.TH.Syntax (
     reify,
  )
 
-import Control.Lens (bimap, (%~), _head)
-import Control.Monad.Writer (Any (Any), execWriterT, runWriterT, tell)
+import Control.Effect.Class (LiftIns (LiftIns))
+import Control.Lens ((%~), (^?), _head, _last)
+import Control.Monad.Writer (Any (Any), runWriterT, tell)
 import Data.Bool (bool)
 import Data.Char (toUpper)
 import Data.Effect.Class.TH.HFunctor (DataInfo (DataInfo), infoToDataD, tyVarName)
 import Data.Either (partitionEithers)
 import Data.Function ((&))
 import Data.Functor ((<&>))
-import Data.Monoid (Last (Last))
+import Data.List qualified as L
+import Data.List.Extra (dropEnd)
 import Language.Haskell.TH (
     Bang (Bang),
     Con (GadtC),
     SourceStrictness (NoSourceStrictness),
     SourceUnpackedness (NoSourceUnpackedness),
+    arrowT,
+    conP,
+    implBidir,
     mkName,
+    patSynD,
+    prefixPatSyn,
+    tySynD,
+    varP,
  )
 
 -- | Generate /instruction/ and /signature/ data types from the effect class of the given name.
-makeEffectData :: EffectDataNamer -> MakeEmptyEffectData -> Name -> Q [Dec]
-makeEffectData effDataNamer makeEmptyEffData effClsName =
-    fmap snd . generateEffectDataByEffInfo effDataNamer makeEmptyEffData =<< reifyEffectInfo effClsName
+makeEffectDataWith ::
+    -- | An effect order of an effect data type to generate.
+    EffectOrder ->
+    -- | A name of an effect data type to generate.
+    String ->
+    -- | The name of the effect class.
+    Name ->
+    Q [Dec]
+makeEffectDataWith order effDataName effClsName =
+    fmap (L.singleton . snd)
+        . generateEffectDataByEffInfo order (mkName effDataName)
+        =<< reifyEffectInfo effClsName
 
 -- | Generate only an /instruction/ data type from the effect class of the given name.
-makeEffectDataF :: EffectDataNamer -> MakeEmptyEffectData -> Name -> Q [Dec]
-makeEffectDataF = makeEffectData . restrictEffectDataNamer FirstOrder
+makeInstructionWith :: String -> Name -> Q [Dec]
+makeInstructionWith = makeEffectDataWith FirstOrder
 
 -- | Generate only a /signature/ data type from the effect class of the given name.
-makeEffectDataH :: EffectDataNamer -> MakeEmptyEffectData -> Name -> Q [Dec]
-makeEffectDataH = makeEffectData . restrictEffectDataNamer HigherOrder
+makeSignatureWith :: String -> Name -> Q [Dec]
+makeSignatureWith = makeEffectDataWith HigherOrder
 
--- | A configuration of whether to generate an effect data type even when the one is empty.
-data MakeEmptyEffectData
-    = -- | Generate an effect data type even when the one is empty.
-      MakeEffectDataEvenIfEmpty
-    | -- | Doesn't generate an effect data type when the one is empty.
-      NoMakeEmptyEffectData
-    deriving (Eq)
+-- | Generate /instruction/ and /signature/ data types from the effect class of the given name.
+makeEffectData :: EffectOrder -> Name -> Q [Dec]
+makeEffectData order effClsName =
+    makeEffectDataWith
+        order
+        (defaultEffectDataNamer order $ nameBase effClsName)
+        effClsName
+
+-- | Generate only an /instruction/ data type from the effect class of the given name.
+makeInstruction :: Name -> Q [Dec]
+makeInstruction = makeEffectData FirstOrder
+
+-- | Generate only a /signature/ data type from the effect class of the given name.
+makeSignature :: Name -> Q [Dec]
+makeSignature = makeEffectData HigherOrder
+
+{- |
+Generate the pattern synonyms for instruction constructors:
+@
+    pattern Foobar x y = LiftIns (FoobarI x y)
+@ .
+-}
+makeLiftInsPatternSynonyms :: Name -> Name -> Q [Dec]
+makeLiftInsPatternSynonyms dataName = generateLiftInsPatternSynonyms dataName <=< reifyEffectInfo
 
 -- * Internal
 
 -- | Generate /instruction/ and /signature/ data types from an effect class, from 'EffectInfo'.
 generateEffectDataByEffInfo ::
-    EffectDataNamer ->
-    MakeEmptyEffectData ->
+    -- | An effect order of an effect data type to generate.
+    EffectOrder ->
+    -- | A name of an effect data type to generate.
+    Name ->
     EffectInfo ->
-    Q (EffDataInfo, [Dec])
-generateEffectDataByEffInfo effDataNamer makeEmptyEffData info = do
-    let pvs = effParamVars info
+    Q (DataInfo (), Dec)
+generateEffectDataByEffInfo order effDataName info = do
+    effDataInfo <- do
+        let pvs = effParamVars info
 
-    nameF <- effDataNamer FirstOrder $ effName info
-    nameH <- effDataNamer HigherOrder $ effName info
+        additionalTypeParams <- do
+            a <- do
+                a <- newName "a"
+                pure $ KindedTV a () StarT
 
-    (consH, consF) <- do
-        let paramTypes = fmap (tyVarType . unkindTyVar) pvs
-            applyParamTypes effDataName = foldl appT (conT effDataName) paramTypes
-        insType <- mapM applyParamTypes nameF
-        sigType <- mapM applyParamTypes nameH
+            pure case order of
+                FirstOrder -> [a]
+                HigherOrder -> [unkindTyVar $ effMonad info, a]
 
-        consM <-
-            forM (effMethods info) \method ->
-                (methodName method,)
-                    <$> interfaceToCon info (bool insType sigType . isHigherOrder) method
+        cons <- do
+            (errorMethods, cons) <- do
+                consWithMethodInfo <- do
+                    effData <- do
+                        let paramTypes = fmap (tyVarType . unkindTyVar) pvs
+                        foldl appT (conT effDataName) paramTypes
 
-        let (errorMethods, cons) =
-                partitionEithers $
-                    consM <&> \(methodName, (order, conM)) ->
-                        case conM of
-                            Nothing -> Left (order, nameBase methodName)
-                            Just con -> Right (order, con)
+                    forM (effMethods info) \method ->
+                        (methodName method,)
+                            <$> interfaceToCon info effData method
 
-        unless (null errorMethods) $
-            fail $
-                "Unexpected order of effect methods: "
-                    <> intercalate
-                        ", "
-                        ( errorMethods <&> \(order, name) ->
-                            name <> " [" <> [effectOrderSymbol order] <> "]"
-                        )
+                pure . partitionEithers $
+                    consWithMethodInfo <&> \(methodName, (methodOrder, con)) ->
+                        if methodOrder == order
+                            then Right con
+                            else Left (methodOrder, nameBase methodName)
 
-        pure $ bimap (snd <$>) (snd <$>) $ partition (isHigherOrder . fst) cons
+            unless (null errorMethods) $
+                fail $
+                    "Unexpected order of effect methods: "
+                        <> intercalate
+                            ", "
+                            ( errorMethods <&> \(methodOrder, name) ->
+                                name <> " [" <> [fst $ effectOrderSymbol methodOrder] <> "]"
+                            )
 
-    a <- do
-        a <- newName "a"
-        pure $ KindedTV a () StarT
+            pure cons
 
-    let makeEffData nameM additionalTypeParams cons order =
-            forM_ nameM \name ->
-                when (makeEmptyEffData == MakeEffectDataEvenIfEmpty || not (null cons)) $
-                    let dataInfo = DataInfo [] name (pvs ++ additionalTypeParams) cons []
-                     in tell (effDataGenResult dataInfo order, [infoToDataD dataInfo])
+        pure $ DataInfo [] effDataName (pvs ++ additionalTypeParams) cons []
 
-    execWriterT do
-        makeEffData nameF [a] consF FirstOrder
-        makeEffData nameH [unkindTyVar $ effMonad info, a] consH HigherOrder
-        pure ()
-
-newtype EffDataInfo = EffDataInfo
-    {getEffDataInfo :: (Maybe (DataInfo ()), Maybe (DataInfo ()))}
-    deriving (Semigroup, Monoid) via (Last (DataInfo ()), Last (DataInfo ()))
-
-effDataGenResult :: DataInfo () -> EffectOrder -> EffDataInfo
-effDataGenResult dInfo = \case
-    FirstOrder -> EffDataInfo (Just dInfo, Nothing)
-    HigherOrder -> EffDataInfo (Nothing, Just dInfo)
-
-getEffDataInfoOn :: EffectOrder -> EffDataInfo -> Maybe (DataInfo ())
-getEffDataInfoOn =
-    (. getEffDataInfo) . \case
-        FirstOrder -> fst
-        HigherOrder -> snd
+    pure (effDataInfo, infoToDataD effDataInfo)
 
 -- | Convert an effect method interface to a constructor of the effect data type.
 interfaceToCon ::
     EffectInfo ->
-    (EffectOrder -> Maybe Type) ->
+    Type ->
     MethodInterface ->
-    Q (EffectOrder, Maybe Con)
-interfaceToCon info toEffData MethodInterface{..} =
-    (methodOrder,) <$> forM (toEffData methodOrder) \effData -> do
+    Q (EffectOrder, Con)
+interfaceToCon info effData MethodInterface{..} = do
+    (methodOrder,) <$> do
         effData' <- case methodOrder of
             FirstOrder -> pure effData
             HigherOrder -> pure effData `appT` (unkindType <$> tyVarType (effMonad info))
         pure $
             GadtC
-                [renameMethodToCon methodName]
+                [renameMethodToCon methodOrder methodName]
                 (methodParamTypes & map (Bang NoSourceUnpackedness NoSourceStrictness,))
                 (AppT effData' methodReturnType)
 
 {- |
-Decompose an effect method interface type to get the effect order, the list
-of argument types, and the return type.
+Decompose an effect method interface type to get the effect order, the list of argument types, and
+the return type.
 -}
 analyzeMethodInterface :: TyVarBndr () -> Type -> Q (EffectOrder, [Type], Type)
 analyzeMethodInterface m interface = do
@@ -205,27 +223,18 @@ analyzeMethodInterface m interface = do
         VarT n `AppT` a | n == tyVarName m -> pure (a, [])
         other -> fail $ "Expected a pure type of the form 'm a', but encountered: " ++ show other
 
--- | Convert a lower-camel-cased method name to an upper-camel-cased constructor name.
-renameMethodToCon :: Name -> Name
-renameMethodToCon = mkName . (_head %~ toUpper) . nameBase
-
--- | A naming convention of effect data types.
-type EffectDataNamer = EffectOrder -> Name -> Q (Maybe Name)
-
 {- |
-A default naming convention of effect data types.
+Convert a lower-camel-cased method name to an upper-camel-cased constructor name.
 
-Add an @F@ or @H@ symbol indicating the order of the effect to the end of the effect class name.
+Additionally, when the method is first-order, append the symbol letter 'F' to the end.
 -}
-defaultEffectDataNamer :: EffectDataNamer
-defaultEffectDataNamer order = namer (++ [effectOrderSymbol order])
-
-{- |
-Restrict an effect data type namer to allow only effect methods of the specified effect order.
--}
-restrictEffectDataNamer :: EffectOrder -> EffectDataNamer -> EffectDataNamer
-restrictEffectDataNamer o1 effDataNamer o2 name =
-    (guard (o1 == o2) *>) <$> effDataNamer o2 name
+renameMethodToCon :: EffectOrder -> Name -> Name
+renameMethodToCon order =
+    mkName . markOnFirstOrder . (_head %~ toUpper) . nameBase
+  where
+    markOnFirstOrder = case order of
+        FirstOrder -> (++ ['I'])
+        _ -> id
 
 -- | An order of effect.
 data EffectOrder = FirstOrder | HigherOrder
@@ -237,11 +246,94 @@ isHigherOrder = \case
     FirstOrder -> False
     HigherOrder -> True
 
--- | The letter of the symbol of the order of effect.
-effectOrderSymbol :: EffectOrder -> Char
+{- |
+The default naming convention of effect data types.
+
+Add an @I@ or @S@ symbol indicating the order of the effect to the end of the effect class name.
+
+If the name of the effect class ends in @F@ or @H@, depending on its order, replace @F@ or @H@ with
+@I@ or @S@.
+-}
+defaultEffectDataNamer :: EffectOrder -> String -> String
+defaultEffectDataNamer order clsName =
+    effNameBase ++ [dataOrderSym]
+  where
+    (clsOrderSym, dataOrderSym) = effectOrderSymbol order
+    effNameBase =
+        if clsName ^? _last == Just clsOrderSym
+            then dropEnd 1 clsName
+            else clsName
+
+-- | Symbol letters representing the order of the effect.
+effectOrderSymbol :: EffectOrder -> (Char, Char)
 effectOrderSymbol = \case
-    FirstOrder -> 'F'
-    HigherOrder -> 'H'
+    FirstOrder -> ('F', 'I')
+    HigherOrder -> ('H', 'S')
+
+-- ** Generating Synonyms about LiftIns
+
+{- |
+Generate the pattern synonyms for instruction constructors:
+
+    @pattern Baz ... = LiftIns (BazI ...)@
+-}
+generateLiftInsPatternSynonyms :: Name -> EffectInfo -> Q [Dec]
+generateLiftInsPatternSynonyms dataName info =
+    concat <$> forM (effMethods info) \MethodInterface{..} -> do
+        let conName = renameMethodToCon methodOrder methodName
+        newConName <- mkName <$> dropEndI (nameBase conName)
+        args <- replicateM (length methodParamTypes) (newName "x")
+        sequence
+            [ patSynSigD
+                newConName
+                ( foldr
+                    (\l r -> arrowT `appT` pure l `appT` r)
+                    [t|
+                        $(liftInsType dataName $ tyVarName <$> effParamVars info)
+                            $(varT $ tyVarName $ effMonad info)
+                            $(pure methodReturnType)
+                        |]
+                    methodParamTypes
+                )
+            , patSynD
+                newConName
+                (prefixPatSyn args)
+                implBidir
+                (conP 'LiftIns [conP conName $ varP <$> args])
+            ]
+
+{- |
+Generate the type synonym for an instruction datatype:
+
+    @type (FoobarS ...) = LiftIns (FoobarI ...)@
+-}
+generateLiftInsTypeSynonym :: EffectInfo -> Name -> Q Dec
+generateLiftInsTypeSynonym info dataName = do
+    nameS <- mkName <$> renameI2S (nameBase dataName)
+    tySynD
+        nameS
+        (pvs <&> (`PlainTV` ()))
+        (liftInsType dataName pvs)
+  where
+    pvs = tyVarName <$> effParamVars info
+
+renameI2S :: String -> Q String
+renameI2S name = dropEndI name <&> (++ "S")
+
+dropEndI :: String -> Q String
+dropEndI name =
+    if name ^? _last == Just 'I'
+        then pure $ dropEnd 1 name
+        else fail $ "The name doesn't end in 'I': \"" <> name <> "\"."
+
+liftInsType :: Name -> [Name] -> Q Type
+liftInsType dataName pvs =
+    conT ''LiftIns `appT` foldl appT (conT dataName) (varT <$> pvs)
+
+applyEffPVs :: Name -> [Name] -> Q Type
+applyEffPVs effClsName = foldl appT (conT effClsName) . fmap varT
+
+-- ** Reification of Effect Class
 
 -- | Information about effect type classes.
 data EffectInfo = EffectInfo
@@ -349,8 +441,8 @@ effectParamCxt = fst . partitionSuperEffects
 -- ** Utility functions
 
 -- | Construct a namer from a conversion function of string.
-namer :: (String -> String) -> Name -> Q (Maybe Name)
-namer f = pure . Just . mkName . f . nameBase
+pureNamer :: (String -> String) -> Name -> Q Name
+pureNamer f = pure . mkName . f . nameBase
 
 -- | Throws away all kind information from a type.
 unkindType :: Type -> Type

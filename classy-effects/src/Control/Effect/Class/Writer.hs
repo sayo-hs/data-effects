@@ -6,8 +6,6 @@
 
 module Control.Effect.Class.Writer where
 
-class (Tell w f, WriterH w f) => Writer w f
-
 class Monoid w => Tell w f where
     tell :: w -> f ()
 
@@ -15,6 +13,4 @@ class Monoid w => WriterH w f where
     listen :: f a -> f (a, w)
     cencor :: (w -> w) -> f a -> f a
 
-makeEffectF ''Tell
-makeEffectH ''WriterH
-makeEffect ''Writer
+makeEffect "Writer" ''Tell ''WriterH

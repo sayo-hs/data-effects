@@ -55,7 +55,8 @@ library
         lens,
         mtl,
         transformers,
-        these
+        these,
+        extra
 
     hs-source-dirs:   src
     ghc-options:      -Wall

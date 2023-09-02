@@ -6,14 +6,10 @@
 
 module Control.Effect.Class.Except where
 
-class (Throw e f, Catch e f) => Except e f
-
 class Throw e (f :: Type -> Type) where
     throw :: e -> f a
 
 class Catch e f where
     catch :: f a -> (e -> f a) -> f a
 
-makeEffectF ''Throw
-makeEffectH ''Catch
-makeEffect ''Except
+makeEffect "Except" ''Throw ''Catch
