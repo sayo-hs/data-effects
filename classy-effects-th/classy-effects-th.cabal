@@ -37,9 +37,13 @@ source-repository head
 library
     exposed-modules:
         Control.Effect.Class.Machinery.TH
+        Control.Effect.Class.Machinery.TH.Internal
         Control.Effect.Class.Machinery.TH.Send
+        Control.Effect.Class.Machinery.TH.Send.Internal
         Data.Effect.Class.TH
+        Data.Effect.Class.TH.Internal
         Data.Effect.Class.TH.HFunctor
+        Data.Effect.Class.TH.HFunctor.Internal
 
     -- Modules included in this executable, other than Main.
     -- other-modules:

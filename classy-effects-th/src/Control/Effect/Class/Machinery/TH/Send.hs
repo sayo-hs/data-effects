@@ -16,10 +16,11 @@ via 'SendIns'/'SendSig' type classes.
 -}
 module Control.Effect.Class.Machinery.TH.Send where
 
-import Control.Effect.Class (SendIns, SendSig, SendVia (SendVia), runSendVia, sendIns, sendSig)
-import Control.Effect.Class.Machinery.HFunctor (hfmap)
-import Control.Monad (forM, replicateM)
-import Data.Effect.Class.TH (
+import Control.Effect.Class (SendIns, SendSig, SendVia)
+import Control.Effect.Class.Machinery.TH.Send.Internal (effectMethodDec)
+import Control.Monad (forM)
+import Data.Effect.Class.TH.HFunctor.Internal (tyVarName)
+import Data.Effect.Class.TH.Internal (
     EffectInfo,
     EffectOrder (FirstOrder, HigherOrder),
     MethodInterface (MethodInterface, methodName),
@@ -28,35 +29,20 @@ import Data.Effect.Class.TH (
     effName,
     effParamVars,
     effectParamCxt,
-    methodOrder,
-    methodParamTypes,
     reifyEffectInfo,
     renameMethodToCon,
     superEffects,
     tyVarType,
     unkindTyVar,
  )
-import Data.Effect.Class.TH.HFunctor (tyVarName)
 import Data.Maybe (maybeToList)
 import Language.Haskell.TH (
     Dec (InstanceD),
-    Inline (Inline),
     Name,
-    Phases (AllPhases),
     Q,
-    RuleMatch (FunLike),
     Type (ConT),
-    appE,
     appT,
-    clause,
-    conE,
     conT,
-    funD,
-    newName,
-    normalB,
-    pragInlD,
-    varE,
-    varP,
     varT,
  )
 
@@ -116,28 +102,3 @@ deriveEffectSend info effDataNameAndOrder = do
         mapM (uncurry effectMethodDec) methods
 
     return $ InstanceD Nothing (sendCxt ++ superEffCxt ++ effParamCxt) inst (concat decs)
-
--- * Internal
-
-{- |
-Generate a method implementation of the effect that handles via 'SendIns'/'SendSig' type classes.
--}
-effectMethodDec ::
-    -- | The interface of the effect method.
-    MethodInterface ->
-    -- | The name of effect data constructor corresponding to the method.
-    Name ->
-    Q [Dec]
-effectMethodDec MethodInterface{..} conName = do
-    methodParams <- replicateM (length methodParamTypes) (newName "x")
-
-    let ins = foldl appE (conE conName) (varE <$> methodParams)
-        sendMethod = case methodOrder of
-            FirstOrder -> [|sendIns|]
-            HigherOrder -> [|sendSig . hfmap runSendVia|]
-        body = [|SendVia $ $sendMethod $ins|]
-
-    funDef <- funD methodName [clause (fmap varP methodParams) (normalB body) []]
-    funInline <- pragInlD methodName Inline FunLike AllPhases
-
-    return [funDef, funInline]
