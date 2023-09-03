@@ -34,11 +34,11 @@ newtype LiftIns (ins :: Instruction) (f :: Type -> Type) a = LiftIns {unliftIns 
 
 makeHFunctor ''LiftIns
 
-class Send (sig :: Signature) m where
-    send :: sig m a -> m a
+class SendSig (sig :: Signature) m where
+    sendSig :: sig m a -> m a
 
-class SendF (ins :: Instruction) m where
-    sendF :: ins a -> m a
+class SendIns (ins :: Instruction) m where
+    sendIns :: ins a -> m a
 
 newtype SendVia m a = SendVia {runSendVia :: m a}
     deriving newtype

@@ -12,11 +12,11 @@ Stability   :  experimental
 Portability :  portable
 
 This module provides @TemplateHaskell@ functions to derive an instance of the effect that handles
-via 'Send'/'SendF' type classes.
+via 'SendIns'/'SendSig' type classes.
 -}
 module Control.Effect.Class.TH.Send where
 
-import Control.Effect.Class (Send, SendF, SendVia (SendVia), runSendVia, send, sendF)
+import Control.Effect.Class (SendIns, SendSig, SendVia (SendVia), runSendVia, sendIns, sendSig)
 import Control.Effect.Class.HFunctor (hfmap)
 import Control.Monad (forM, replicateM)
 import Data.Effect.Class.TH (
@@ -60,7 +60,7 @@ import Language.Haskell.TH (
     varT,
  )
 
--- | Derive an instance of the effect that handles via 'Send'/'SendF' type classes.
+-- | Derive an instance of the effect that handles via 'SendIns'/'SendSig' type classes.
 makeEffectSend ::
     -- | The class name of the effect.
     Name ->
@@ -72,7 +72,8 @@ makeEffectSend effClsName effDataNameAndOrder = do
     sequence [deriveEffectSend info effDataNameAndOrder]
 
 {- |
-Derive an instance of the effect that handles via 'Send'/'SendF' type classes, from 'EffectInfo'.
+Derive an instance of the effect that handles via 'SendIns'/'SendSig' type classes, from
+'EffectInfo'.
 -}
 deriveEffectSend ::
     -- | The reified information of the effect class.
@@ -93,8 +94,8 @@ deriveEffectSend info effDataNameAndOrder = do
             <$> forM effDataNameAndOrder \(order, effDataName) -> do
                 let sendCls =
                         conT case order of
-                            FirstOrder -> ''SendF
-                            HigherOrder -> ''Send
+                            FirstOrder -> ''SendIns
+                            HigherOrder -> ''SendSig
 
                     effData = foldl appT (conT effDataName) paramTypes
 
@@ -118,7 +119,9 @@ deriveEffectSend info effDataNameAndOrder = do
 
 -- * Internal
 
--- | Generate a method implementation of the effect that handles via 'Send'/'SendF' type classes.
+{- |
+Generate a method implementation of the effect that handles via 'SendIns'/'SendSig' type classes.
+-}
 effectMethodDec ::
     -- | The interface of the effect method.
     MethodInterface ->
@@ -130,8 +133,8 @@ effectMethodDec MethodInterface{..} conName = do
 
     let ins = foldl appE (conE conName) (varE <$> methodParams)
         sendMethod = case methodOrder of
-            FirstOrder -> [|sendF|]
-            HigherOrder -> [|send . hfmap runSendVia|]
+            FirstOrder -> [|sendIns|]
+            HigherOrder -> [|sendSig . hfmap runSendVia|]
         body = [|SendVia $ $sendMethod $ins|]
 
     funDef <- funD methodName [clause (fmap varP methodParams) (normalB body) []]

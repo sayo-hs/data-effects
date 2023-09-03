@@ -4,7 +4,7 @@
 
 module Control.Effect.Class.Provider where
 
-import Control.Effect.Class (Send, SendVia (SendVia), runSendVia, send, type (~>))
+import Control.Effect.Class (SendSig, SendVia (SendVia), runSendVia, sendSig, type (~>))
 import Control.Effect.Class.HFunctor (HFunctor, hfmap)
 import Data.Effect.Class.TH (
     makeSignature,
@@ -18,6 +18,6 @@ makeSignature ''Provider
 instance HFunctor (ProviderS c i g) where
     hfmap phi (Provide i f) = Provide i \l -> f $ l . phi
 
-instance Send (ProviderS c i g) f => Provider c i g (SendVia f) where
+instance SendSig (ProviderS c i g) f => Provider c i g (SendVia f) where
     {-# INLINE provide #-}
-    provide i f = SendVia $ send $ hfmap runSendVia $ Provide @_ @c i f
+    provide i f = SendVia $ sendSig $ hfmap runSendVia $ Provide @_ @c i f

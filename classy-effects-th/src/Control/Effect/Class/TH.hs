@@ -139,8 +139,8 @@ makeEffectHWith :: String -> Name -> Q [Dec]
 makeEffectHWith dataS = generateEffectWith HigherOrder (mkName dataS) <=< reifyEffectInfo
 
 {- |
-Derive an instance of the effect, with no methods, that handles via 'Control.Effect.Class.Send'/
-'Control.Effect.Class.SendF' instances.
+Derive an instance of the effect, with no methods, that handles via 'Control.Effect.Class.SendIns'/
+'Control.Effect.Class.SendSig' instances.
 -}
 makeEmptyEffect :: Name -> Q [Dec]
 makeEmptyEffect effClsName = do
@@ -156,8 +156,8 @@ Generate the order-unified empty effect class:
 
     @class (FoobarF ... f, FoobarH ... f) => Foobar ... f@
 
-, and derive an instance of the effect that handles via 'Control.Effect.Class.Send'/
-'Control.Effect.Class.SendF' instances.
+, and derive an instance of the effect that handles via 'Control.Effect.Class.SendIns'/
+'Control.Effect.Class.SendSig' instances.
 -}
 makeOrderUnifiedEffectClass :: Name -> Name -> String -> Q [Dec]
 makeOrderUnifiedEffectClass clsF clsH clsU = do
@@ -200,8 +200,8 @@ Generate the order-unified empty effect class:
 
     @class (FoobarF ... f, FoobarH ... f) => Foobar ... f@
 
-, and derive an instance of the effect that handles via 'Control.Effect.Class.Send'/
-'Control.Effect.Class.SendF' instances.
+, and derive an instance of the effect that handles via 'Control.Effect.Class.SendIns'/
+'Control.Effect.Class.SendSig' instances.
 -}
 generateOrderUnifiedEffectClass :: EffectInfo -> EffectInfo -> [Name] -> Name -> Q [Dec]
 generateOrderUnifiedEffectClass infoF infoH pvs unifiedClsName = do
