@@ -36,8 +36,8 @@ source-repository head
 
 library
     exposed-modules:
-        Control.Effect.Class.TH
-        Control.Effect.Class.TH.Send
+        Control.Effect.Class.Machinery.TH
+        Control.Effect.Class.Machinery.TH.Send
         Data.Effect.Class.TH
         Data.Effect.Class.TH.HFunctor
 

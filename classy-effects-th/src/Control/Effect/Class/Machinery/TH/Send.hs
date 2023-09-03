@@ -14,10 +14,10 @@ Portability :  portable
 This module provides @TemplateHaskell@ functions to derive an instance of the effect that handles
 via 'SendIns'/'SendSig' type classes.
 -}
-module Control.Effect.Class.TH.Send where
+module Control.Effect.Class.Machinery.TH.Send where
 
 import Control.Effect.Class (SendIns, SendSig, SendVia (SendVia), runSendVia, sendIns, sendSig)
-import Control.Effect.Class.HFunctor (hfmap)
+import Control.Effect.Class.Machinery.HFunctor (hfmap)
 import Control.Monad (forM, replicateM)
 import Data.Effect.Class.TH (
     EffectInfo,

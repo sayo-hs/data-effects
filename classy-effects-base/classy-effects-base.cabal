@@ -38,7 +38,7 @@ source-repository head
 library
     exposed-modules:
         Control.Effect.Class
-        Control.Effect.Class.HFunctor
+        Control.Effect.Class.Machinery.HFunctor
 
     -- Modules included in this executable, other than Main.
     -- other-modules:

@@ -8,7 +8,7 @@
 The code before modification is BSD3 licensed, (c) 2010-2011 Patrick Bahr.
 
 This fork was made to work around the problem that the
-'Control.Effect.Class.TH.makeEffect' function that generates multiple
+'Control.Effect.Class.Machinery.TH.makeEffect' function that generates multiple
 definitions at once for convenience is not possible with only the original
 'Data.Comp.Multi.Derive.makeHFunctor' function due to TH limitations,
 because the original function takes the name of the data type as an argument,
@@ -30,7 +30,7 @@ The definitions come from "Data.Comp.Multi.Derive" in the compdata-0.13.0 packag
 -}
 module Data.Effect.Class.TH.HFunctor where
 
-import Control.Effect.Class.HFunctor (HFunctor, hfmap)
+import Control.Effect.Class.Machinery.HFunctor (HFunctor, hfmap)
 import Control.Monad (replicateM, (<=<))
 import Data.Maybe (catMaybes)
 import Language.Haskell.TH (

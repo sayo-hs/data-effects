@@ -7,7 +7,7 @@
 
 module DeriveHFunctor where
 
-import Control.Effect.Class.TH (makeEffect)
+import Control.Effect.Class.Machinery.TH (makeEffect)
 
 class Except e f where
     throw :: e -> f a

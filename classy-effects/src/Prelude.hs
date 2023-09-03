@@ -6,6 +6,6 @@
 
 module Prelude (module Prelude, makeEffect, makeEffectF, makeEffectH, Type) where
 
-import Control.Effect.Class.TH (makeEffect, makeEffectF, makeEffectH)
+import Control.Effect.Class.Machinery.TH (makeEffect, makeEffectF, makeEffectH)
 import Data.Kind (Type)
 import "base" Prelude

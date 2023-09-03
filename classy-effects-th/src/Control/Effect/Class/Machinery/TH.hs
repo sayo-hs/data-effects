@@ -13,11 +13,11 @@ Portability :  portable
 This module provides @TemplateHaskell@ functions to generates automatically various data types and
 instances that constitute the effect system supplied by the @classy-effects@ framework.
 -}
-module Control.Effect.Class.TH where
+module Control.Effect.Class.Machinery.TH where
 
 import Control.Effect.Class (LiftIns)
-import Control.Effect.Class.HFunctor ((:+:))
-import Control.Effect.Class.TH.Send (deriveEffectSend)
+import Control.Effect.Class.Machinery.HFunctor ((:+:))
+import Control.Effect.Class.Machinery.TH.Send (deriveEffectSend)
 import Control.Monad (unless, when, (<=<))
 import Control.Monad.Writer (execWriterT, lift, tell)
 import Data.Effect.Class.TH (

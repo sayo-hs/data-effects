@@ -5,7 +5,7 @@
 module Control.Effect.Class.Provider where
 
 import Control.Effect.Class (SendSig, SendVia (SendVia), runSendVia, sendSig, type (~>))
-import Control.Effect.Class.HFunctor (HFunctor, hfmap)
+import Control.Effect.Class.Machinery.HFunctor (HFunctor, hfmap)
 import Data.Effect.Class.TH (
     makeSignature,
  )
