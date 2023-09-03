@@ -203,7 +203,7 @@ interfaceToCon info effData MethodInterface{..} = do
             HigherOrder -> pure effData `appT` (unkindType <$> tyVarType (effMonad info))
         pure $
             GadtC
-                [renameMethodToCon methodOrder methodName]
+                [renameMethodToCon methodName]
                 (methodParamTypes & map (Bang NoSourceUnpackedness NoSourceStrictness,))
                 (AppT effData' methodReturnType)
 
@@ -224,18 +224,9 @@ analyzeMethodInterface m interface = do
         VarT n `AppT` a | n == tyVarName m -> pure (a, [])
         other -> fail $ "Expected a pure type of the form 'm a', but encountered: " ++ show other
 
-{- |
-Convert a lower-camel-cased method name to an upper-camel-cased constructor name.
-
-Additionally, when the method is first-order, append the symbol letter 'F' to the end.
--}
-renameMethodToCon :: EffectOrder -> Name -> Name
-renameMethodToCon order =
-    mkName . markOnFirstOrder . (_head %~ toUpper) . nameBase
-  where
-    markOnFirstOrder = case order of
-        FirstOrder -> (++ ['I'])
-        _ -> id
+-- | Convert a lower-camel-cased method name to an upper-camel-cased constructor name.
+renameMethodToCon :: Name -> Name
+renameMethodToCon = mkName . (_head %~ toUpper) . nameBase
 
 -- | An order of effect.
 data EffectOrder = FirstOrder | HigherOrder
@@ -276,14 +267,14 @@ effectOrderSymbol = \case
 {- |
 Generate the pattern synonyms for instruction constructors:
 
-    @pattern Baz ... = LiftIns (BazI ...)@
+    @pattern BazS ... = LiftIns (Baz ...)@
 -}
 generateLiftInsPatternSynonyms :: Name -> EffectInfo -> Q [Dec]
 generateLiftInsPatternSynonyms dataName info = do
     patSyns <-
         forM (effMethods info) \MethodInterface{..} -> do
-            let conName = renameMethodToCon methodOrder methodName
-            newConName <- mkName <$> dropEndI (nameBase conName)
+            let conName = renameMethodToCon methodName
+                newConName = mkName $ nameBase conName ++ "S"
             args <- replicateM (length methodParamTypes) (newName "x")
             a <- varT . mkName . show <$> newName "a"
             (newConName,)

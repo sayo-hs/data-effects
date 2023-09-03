@@ -109,8 +109,8 @@ deriveEffectSend info effDataNameAndOrder = do
 
     decs <- do
         let methods =
-                [ (sig, renameMethodToCon methodOrder methodName)
-                | sig@MethodInterface{methodName, methodOrder} <- effMethods info
+                [ (sig, renameMethodToCon methodName)
+                | sig@MethodInterface{methodName} <- effMethods info
                 ]
         mapM (uncurry effectMethodDec) methods
 
