@@ -9,3 +9,9 @@ class State s f where
     put :: s -> f ()
 
 makeEffectF ''State
+
+gets :: (State s f, Functor f) => (s -> a) -> f a
+gets f = f <$> get
+
+modify :: (State s m, Monad m) => (s -> s) -> m ()
+modify f = put . f =<< get

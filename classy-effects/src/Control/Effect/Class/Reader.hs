@@ -13,3 +13,6 @@ class Local r f where
     local :: (r -> r) -> f a -> f a
 
 makeEffect "Reader" ''Ask ''Local
+
+asks :: (Ask r f, Functor f) => (r -> a) -> f a
+asks f = f <$> ask
