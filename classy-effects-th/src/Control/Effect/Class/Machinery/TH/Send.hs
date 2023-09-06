@@ -16,7 +16,7 @@ via 'SendIns'/'SendSig' type classes.
 -}
 module Control.Effect.Class.Machinery.TH.Send where
 
-import Control.Effect.Class (SendIns, SendSig, SendVia)
+import Control.Effect.Class (EffectDataHandler, EffectsVia, SendIns, SendSig)
 import Control.Effect.Class.Machinery.TH.Send.Internal (effectMethodDec)
 import Control.Monad (forM)
 import Data.Effect.Class.TH.HFunctor.Internal (tyVarName)
@@ -73,7 +73,7 @@ deriveEffectSend info effDataNameAndOrder = do
     let pvs = effParamVars info
         paramTypes = fmap (tyVarType . unkindTyVar) pvs
 
-        carrier = [t|SendVia $f|]
+        carrier = [t|EffectsVia EffectDataHandler $f|]
 
     sendCxt <-
         maybeToList

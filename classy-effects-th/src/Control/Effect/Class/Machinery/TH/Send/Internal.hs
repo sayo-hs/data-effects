@@ -6,7 +6,13 @@
 
 module Control.Effect.Class.Machinery.TH.Send.Internal where
 
-import Control.Effect.Class (SendVia (SendVia), runSendVia, sendIns, sendSig)
+import Control.Effect.Class (
+    EffectDataHandler,
+    EffectsVia (EffectsVia),
+    runEffectsVia,
+    sendIns,
+    sendSig,
+ )
 import Control.Effect.Class.Machinery.HFunctor (hfmap)
 import Control.Monad (replicateM)
 import Data.Effect.Class.TH.Internal (
@@ -49,8 +55,8 @@ effectMethodDec MethodInterface{..} conName = do
     let ins = foldl appE (conE conName) (varE <$> methodParams)
         sendMethod = case methodOrder of
             FirstOrder -> [|sendIns|]
-            HigherOrder -> [|sendSig . hfmap runSendVia|]
-        body = [|SendVia $ $sendMethod $ins|]
+            HigherOrder -> [|sendSig . hfmap runEffectsVia|]
+        body = [|EffectsVia @EffectDataHandler $ $sendMethod $ins|]
 
     funDef <- funD methodName [clause (fmap varP methodParams) (normalB body) []]
     funInline <- pragInlD methodName Inline FunLike AllPhases
