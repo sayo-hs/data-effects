@@ -45,6 +45,10 @@ class SendIns (ins :: Instruction) f where
 class SendSig (sig :: Signature) f where
     sendSig :: sig f a -> f a
 
+instance SendIns ins f => SendSig (LiftIns ins) f where
+    sendSig = sendIns . unliftIns
+    {-# INLINE sendSig #-}
+
 newtype EffectsVia handlerSystem (f :: Type -> Type) a = EffectsVia {runEffectsVia :: f a}
     deriving newtype
         ( Functor
@@ -120,3 +124,11 @@ instance
             . TH @tag
             . hfmap coerce
     {-# INLINE sendSig #-}
+
+class Nop (f :: Type -> Type)
+instance Nop f
+
+data NopI (a :: Type)
+    deriving stock (Functor, Foldable, Traversable)
+
+type NopS = LiftIns NopI

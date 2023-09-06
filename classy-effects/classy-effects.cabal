@@ -43,6 +43,7 @@ library
         Control.Effect.Class.Input
         Control.Effect.Class.Output
         Control.Effect.Class.Provider
+        Control.Effect.Class.Embed
 
     reexported-modules:
         Control.Effect.Class,
