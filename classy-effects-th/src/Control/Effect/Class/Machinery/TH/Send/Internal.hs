@@ -20,6 +20,7 @@ import Data.Effect.Class.TH.Internal (
     MethodInterface (MethodInterface, methodName),
     methodOrder,
     methodParamTypes,
+    methodReturnType,
  )
 import Language.Haskell.TH (
     Dec,
@@ -29,6 +30,7 @@ import Language.Haskell.TH (
     Q,
     RuleMatch (FunLike),
     appE,
+    appTypeE,
     clause,
     conE,
     funD,
@@ -37,6 +39,7 @@ import Language.Haskell.TH (
     pragInlD,
     varE,
     varP,
+    varT,
  )
 
 {- |
@@ -44,19 +47,24 @@ Generate a method implementation of the effect that handles via 'Control.Effect.
 'Control.Effect.Class.SendSig' type classes.
 -}
 effectMethodDec ::
+    -- | The type parameters of the effect.
+    [Name] ->
     -- | The interface of the effect method.
     MethodInterface ->
     -- | The name of effect data constructor corresponding to the method.
     Name ->
     Q [Dec]
-effectMethodDec MethodInterface{..} conName = do
+effectMethodDec effTyVars MethodInterface{..} conName = do
     methodParams <- replicateM (length methodParamTypes) (newName "x")
 
-    let ins = foldl appE (conE conName) (varE <$> methodParams)
+    let con = foldl appTypeE (conE conName) (varT <$> effTyVars)
+
+        effData = foldl appE con (varE <$> methodParams)
+
         sendMethod = case methodOrder of
             FirstOrder -> [|sendIns|]
             HigherOrder -> [|sendSig . hfmap runEffectsVia|]
-        body = [|EffectsVia @EffectDataHandler $ $sendMethod $ins|]
+        body = [|EffectsVia @EffectDataHandler $ $sendMethod $effData|]
 
     funDef <- funD methodName [clause (fmap varP methodParams) (normalB body) []]
     funInline <- pragInlD methodName Inline FunLike AllPhases

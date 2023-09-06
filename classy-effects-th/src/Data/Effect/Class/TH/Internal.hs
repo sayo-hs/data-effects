@@ -8,9 +8,7 @@ module Data.Effect.Class.TH.Internal where
 
 import Control.Monad (forM, replicateM, unless, when)
 import Control.Monad.IO.Class (MonadIO)
-import Data.List (intercalate)
-import Data.Maybe (isNothing, mapMaybe)
-
+import Data.List (intercalate, nub)
 import Language.Haskell.TH.Lib (
     appT,
     conT,
@@ -57,11 +55,13 @@ import Data.Either (partitionEithers)
 import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.List.Extra (dropEnd)
+import Data.Maybe (isNothing, mapMaybe)
 import Language.Haskell.TH (
     Bang (Bang),
-    Con (GadtC),
+    Con (ForallC, GadtC),
     SourceStrictness (NoSourceStrictness),
     SourceUnpackedness (NoSourceUnpackedness),
+    Specificity (SpecifiedSpec),
     arrowT,
     conP,
     implBidir,
@@ -72,6 +72,7 @@ import Language.Haskell.TH (
     tySynD,
     varP,
  )
+import Language.Haskell.TH.Datatype (freeVariables)
 
 -- | Generate /instruction/ and /signature/ data types from an effect class, from 'EffectInfo'.
 generateEffectDataByEffInfo ::
@@ -132,16 +133,24 @@ interfaceToCon ::
     Type ->
     MethodInterface ->
     Q (EffectOrder, Con)
-interfaceToCon info effData MethodInterface{..} = do
+interfaceToCon info effData MethodInterface{..} =
     (methodOrder,) <$> do
-        effData' <- case methodOrder of
+        effDataFunctor <- case methodOrder of
             FirstOrder -> pure effData
             HigherOrder -> pure effData `appT` (unkindType <$> tyVarType (effMonad info))
+
+        let vars =
+                foldl
+                    (\acc t -> nub $ acc ++ freeVariables t)
+                    (tyVarName <$> effParamVars info)
+                    (methodParamTypes ++ [methodReturnType])
+
         pure $
-            GadtC
-                [renameMethodToCon methodName]
-                (methodParamTypes & map (Bang NoSourceUnpackedness NoSourceStrictness,))
-                (AppT effData' methodReturnType)
+            ForallC ((`PlainTV` SpecifiedSpec) <$> vars) [] $
+                GadtC
+                    [renameMethodToCon methodName]
+                    (methodParamTypes & map (Bang NoSourceUnpackedness NoSourceStrictness,))
+                    (AppT effDataFunctor methodReturnType)
 
 {- |
 Decompose an effect method interface type to get the effect order, the list of argument types, and

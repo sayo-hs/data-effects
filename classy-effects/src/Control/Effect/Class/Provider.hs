@@ -36,4 +36,4 @@ instance
         EffectsVia
             . sendSig
             . hfmap (runEffectsVia @EffectDataHandler)
-            $ Provide @_ @c i f
+            $ Provide @c i f
