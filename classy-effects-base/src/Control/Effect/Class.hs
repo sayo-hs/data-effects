@@ -88,6 +88,11 @@ tag ::
 tag = coerce
 {-# INLINE tag #-}
 
+type family Tagged f tag where
+    Tagged (EffectsVia handlerSystem f) tag = EffectsVia handlerSystem (ViaTag handlerSystem tag f)
+
+type f @# tag = Tagged f tag
+
 newtype Tag (ins :: Instruction) tag a = Tag {getTag :: ins a}
     deriving stock (Functor, Foldable, Traversable)
 
