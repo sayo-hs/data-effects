@@ -155,10 +155,10 @@ If the effect class name follows the naming convention in CEP-01, where `F` or `
 
 * Example:
     ```haskell
-    class Tell w f where
+    class Monoid w => Tell w f where
         tell :: w -> f ()
 
-    class WriterH w f where
+    class Monoid w => WriterH w f where
         listen :: f a -> f (w, a)
         censor :: (w -> w) -> f a -> f a
 
