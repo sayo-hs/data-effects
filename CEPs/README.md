@@ -17,3 +17,6 @@ The `classy-effects-th` library provides functionality for Template Haskell to d
 Using this automatic derivation, you are automatically compliant with CEPs and basically do not need to be aware of CEPs.
 
 The `classy-effects` library provides standard effects (`Reader`, `Writer`, `State`, ...) defined in a CEPs-compliant manner.
+
+## License
+All files located under the CEPs directory where this README.md file is placed are licensed under CC BY-SA 4.0.
