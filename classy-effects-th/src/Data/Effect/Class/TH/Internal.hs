@@ -146,7 +146,7 @@ interfaceToCon info effData MethodInterface{..} =
                     (methodParamTypes ++ [methodReturnType])
 
         pure $
-            ForallC ((`PlainTV` SpecifiedSpec) <$> vars) [] $
+            ForallC ((`PlainTV` SpecifiedSpec) <$> vars) methodCxt $
                 GadtC
                     [renameMethodToCon methodName]
                     (methodParamTypes & map (Bang NoSourceUnpackedness NoSourceStrictness,))
@@ -156,17 +156,19 @@ interfaceToCon info effData MethodInterface{..} =
 Decompose an effect method interface type to get the effect order, the list of argument types, and
 the return type.
 -}
-analyzeMethodInterface :: TyVarBndr () -> Type -> Q (EffectOrder, [Type], Type)
+analyzeMethodInterface :: TyVarBndr () -> Type -> Q (EffectOrder, [Type], Type, Cxt)
 analyzeMethodInterface m interface = do
-    ((resultType, paramTypes), Any isHigherOrderMethod) <- runWriterT $ go interface
-    pure (bool FirstOrder HigherOrder isHigherOrderMethod, paramTypes, resultType)
+    ((resultType, cxt, paramTypes), Any isHigherOrderMethod) <- runWriterT $ go interface
+    pure (bool FirstOrder HigherOrder isHigherOrderMethod, paramTypes, resultType, cxt)
   where
     go = \case
         ArrowT `AppT` l `AppT` r -> do
             when (tyVarName m `occurs` l) $ tell $ Any True
             fmap (l :) <$> go r
-        ForallT _ _ u -> go u
-        VarT n `AppT` a | n == tyVarName m -> pure (a, [])
+        ForallT _ cxt u -> do
+            (r, c, p) <- go u
+            return (r, cxt ++ c, p)
+        VarT n `AppT` a | n == tyVarName m -> pure (a, [], [])
         other -> fail $ "Expected a pure type of the form 'm a', but encountered: " ++ show other
 
 -- | Convert a lower-camel-cased method name to an upper-camel-cased constructor name.
@@ -303,6 +305,7 @@ data MethodInterface = MethodInterface
     , methodOrder :: EffectOrder
     , methodParamTypes :: [Type]
     , methodReturnType :: Type
+    , methodCxt :: Cxt
     }
 
 -- | Given a type class name, extracts infos about an effect.
@@ -324,8 +327,8 @@ reifyEffectInfo className = do
             EffectInfo cxts name paramVars monad
                 <$> sequence
                     [ do
-                        (order, paramTypes, retType) <- analyzeMethodInterface monad t
-                        pure $ MethodInterface n order paramTypes retType
+                        (order, paramTypes, retType, cxt) <- analyzeMethodInterface monad t
+                        pure $ MethodInterface n order paramTypes retType cxt
                     | SigD n t <- decs
                     ]
         other ->
