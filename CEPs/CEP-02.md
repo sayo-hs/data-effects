@@ -50,6 +50,7 @@ The methods and constructors (effect data) of an effect class, present in both t
     * Note: This ordering is important when using the `TypeApplications` extension.
 
     The `forall` inserted between the effect method types (see the "Separation of First-order and Higher-order Effects" section in CEP-01) is simply ignored.
+    Constraints of the effect method are converted to the constraints of the constructor in the order they appear.
 
 * Examples:
     1. When the name of the effect class data-type of State is `StateI`, the State effect class:
