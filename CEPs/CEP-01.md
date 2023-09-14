@@ -131,7 +131,7 @@ If possible (if there's no need to depend on the elements contained in the mecha
     * Note: This is because, by polymorphizing the carrier type `f` and expressing the constraints with the CEP-compliant effect type class, it becomes possible to handle effectful functions in various effect system backend implementations without being locked into a specific effect system library implementation.
         * Also, the possibility of generalizing not only to monads but also to applicative effects arises.
 
-## Naming Rules
+## Naming Conventions
 For effects where first-order effects and higher-order effects were originally mixed to form a single effect class, when separating, naming SHOULD be done as follows:
 
 1. For those where one first-order effect and one higher-order effect combined to form a single effect class, the name of the effect for each order remains as the effect class name.

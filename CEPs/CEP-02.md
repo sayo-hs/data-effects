@@ -92,7 +92,7 @@ The methods and constructors (effect data) of an effect class, present in both t
 ## Sending Effect Data to the Carrier
 All effect class data-types MUST have an instance in the form where the data type `(EffectsVia EffectDataHandler f)` is substituted for the carrier type variable. In this instance, the implementation of each method MUST simply delegate the implementation to the `SendIns` type class for first-order effect class data-types and the `SendSig` type class for higher-order effect class data-types, respectively. Also, the constraints of the instance MUST consist only of these `SendIns`, `SendSig`, and constraints on effect type parameters in the effect type class. `EffectsVia`, `EffectDataHandler`, `SendIns`, and `SendSig` are provided from the `classy-effects-base` package. Refer to the `classy-effects-base` documentation.
 
-* First-oder example:
+* First-order example:
 
     ```haskell
     class State s f where
