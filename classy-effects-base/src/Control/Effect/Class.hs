@@ -42,8 +42,12 @@ makeHFunctor ''LiftIns
 class SendIns (ins :: Instruction) f where
     sendIns :: ins a -> f a
 
+type (<:) = SendIns
+
 class SendSig (sig :: Signature) f where
     sendSig :: sig f a -> f a
+
+type (<<:) = SendIns
 
 instance SendIns ins f => SendSig (LiftIns ins) f where
     sendSig = sendIns . unliftIns
