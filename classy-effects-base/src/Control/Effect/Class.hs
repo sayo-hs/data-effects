@@ -85,15 +85,18 @@ instance SendIns ins f => SendIns ins (EffectsVia EffectDataHandler f) where
 instance (SendSig sig f, HFunctor sig) => SendSig sig (EffectsVia EffectDataHandler f) where
     sendSig = EffectsVia . sendSig . hfmap runEffectsVia
 
-tag ::
-    forall tag handlerSystem f a.
-    EffectsVia handlerSystem (ViaTag handlerSystem tag f) a ->
-    EffectsVia handlerSystem f a
-tag = coerce
-{-# INLINE tag #-}
+class Taggable f where
+    type Tagged f tag :: Type -> Type
+    unTagged :: Tagged f tag a -> f a
 
-type family Tagged f tag where
-    Tagged (EffectsVia handlerSystem f) tag = EffectsVia handlerSystem (ViaTag handlerSystem tag f)
+instance Taggable (EffectsVia handlerSystem f) where
+    type Tagged (EffectsVia handlerSystem f) tag = EffectsVia handlerSystem (ViaTag handlerSystem tag f)
+    unTagged = coerce
+    {-# INLINE unTagged #-}
+
+tag :: forall tag f a. Taggable f => Tagged f tag a -> f a
+tag = unTagged @_ @tag
+{-# INLINE tag #-}
 
 type f @# tag = Tagged f tag
 
