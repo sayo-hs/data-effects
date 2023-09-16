@@ -19,21 +19,40 @@ import Data.Effect.Class.TH (
     makeSignature,
  )
 
-class Provider c i g (f :: Type -> Type) where
-    provide :: i -> (forall h. c h => (f ~> h) -> h a) -> f (g a)
+class Provider c e i g (f :: Type -> Type) where
+    provide :: i -> (forall h. (c h, e h) => (f ~> h) -> h a) -> f (g a)
 
 makeSignature ''Provider
 
-instance HFunctor (ProviderS c i g) where
+instance HFunctor (ProviderS c e i g) where
     hfmap phi (Provide i f) = Provide i \l -> f $ l . phi
 
 instance
-    SendSig (ProviderS c i g) f =>
-    Provider c i g (EffectsVia EffectDataHandler f)
+    SendSig (ProviderS c e i g) f =>
+    Provider c e i g (EffectsVia EffectDataHandler f)
     where
     {-# INLINE provide #-}
     provide i f =
         EffectsVia
             . sendSig
             . hfmap (runEffectsVia @EffectDataHandler)
-            $ Provide @c i f
+            $ Provide @c @e i f
+
+type MonadProvider = Provider Monad
+type ApplicativeProvider = Provider Applicative
+
+mprovide ::
+    MonadProvider e i g f =>
+    i ->
+    (forall h. (Monad h, e h) => (f ~> h) -> h a) ->
+    f (g a)
+mprovide = provide
+{-# INLINE mprovide #-}
+
+aprovide ::
+    ApplicativeProvider e i g f =>
+    i ->
+    (forall h. (Applicative h, e h) => (f ~> h) -> h a) ->
+    f (g a)
+aprovide = provide
+{-# INLINE aprovide #-}
