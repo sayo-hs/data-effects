@@ -3,10 +3,23 @@ name:               classy-effects
 version:            0.1.0.0
 
 -- A short (one-line) description of the package.
-synopsis: <synopsis>
+synopsis: An interface for a handler-independent, typeclass-based effect system.
 
 -- A longer description of the package.
-description: <description>
+description:
+    This library provides definitions for CEPs (classy-effects protocols) to standardize and unify
+    the definition of effects in Haskell in a backend-library-agnostic manner. It also includes
+    several standard effect definitions defined in compliance with CEPs, and Template Haskell
+    functions to automatically make type classes conform to CEPs as effect classes.
+
+    Please refer
+    to [CEPs](https://github.com/sayo-hs/classy-effects/blob/master/CEPs/README.md) for details.
+
+    The Template Haskell functions are re-exported
+    from the [@classy-effects-th@](https://hackage.haskell.org/package/classy-effects-th) package,
+    while the fundamental definitions are re-exported
+    from the [@classy-effects-base@](https://hackage.haskell.org/package/classy-effects-base)
+    package.
 
 -- A URL where users can report bugs.
 bug-reports: https://github.com/ymdryo/classy-effects

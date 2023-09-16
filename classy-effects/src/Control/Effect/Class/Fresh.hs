@@ -4,6 +4,13 @@
 
 module Control.Effect.Class.Fresh where
 
+{- |
+Copyright   :  (c) 2023 Yamada Ryo
+License     :  MPL-2.0 (see the file LICENSE)
+Maintainer  :  ymdfield@outlook.jp
+Stability   :  experimental
+Portability :  portable
+-}
 class Fresh (i :: Type) f where
     fresh :: f i
 
