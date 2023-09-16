@@ -17,7 +17,7 @@ Portability :  portable
 
 This module provides the essential definitions required for CEPs compliance, forming the foundation
 of classy-effects.
-Please refer to [CEPs](https://github.com/sayo-hs/classy-effects/blob/master/CEPs/) for details.
+Please refer to [CEPs](https://github.com/sayo-hs/classy-effects/blob/master/CEPs/README.md) for details.
 -}
 module Control.Effect.Class where
 
