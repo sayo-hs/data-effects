@@ -7,6 +7,18 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+{- |
+Copyright   :  (c) 2023 Yamada Ryo
+               (c) 2023 Casper Bach Poulsen and Cas van der Rest
+License     :  MPL-2.0 (see the file LICENSE)
+Maintainer  :  ymdfield@outlook.jp
+Stability   :  experimental
+Portability :  portable
+
+This module provides the essential definitions required for CEPs compliance, forming the foundation
+of classy-effects.
+Please refer to [CEPs](https://github.com/sayo-hs/classy-effects/blob/master/CEPs/) for details.
+-}
 module Control.Effect.Class where
 
 import Control.Applicative (Alternative)
@@ -18,16 +30,16 @@ import Data.Coerce (coerce)
 import Data.Comp.Multi.Derive (makeHFunctor)
 import Data.Kind (Type)
 
--- | A kind of /signature/ (a datatype of higher-order effect).
+-- | A kind of /signature class/ (a datatype of higher-order effect).
 type Signature = (Type -> Type) -> (Type -> Type)
 
--- | A kind of /instruction/ (a datatype of first-order effect).
+-- | A kind of /instruction class/ (a datatype of first-order effect).
 type Instruction = Type -> Type
 
 -- | A natural transformation.
 type f ~> g = forall x. f x -> g x
 
-{- | Lift an /instruction/ to a /signature/.
+{- | Lift an /instruction class/ to a /signature class/.
 
      Come from [heft-lang\/POPL2023\/haskell\/src\/Elab.hs]
     (https://github.com/heft-lang/POPL2023/blob/74afe1d5ce0b491cffe40cc5c73a2a5ee6a94d9c/haskell/src/Elab.hs#L9-L10).
@@ -39,20 +51,27 @@ newtype LiftIns (ins :: Instruction) (f :: Type -> Type) a = LiftIns {unliftIns 
 
 makeHFunctor ''LiftIns
 
+-- | A type class that represents the ability to send an /instruction/ @ins@ to carrier @f@.
 class SendIns (ins :: Instruction) f where
+    -- | Send an /instruction/ @ins@ to carrier @f@.
     sendIns :: ins a -> f a
 
+-- | The operator version of `SendIns`.
 type (<:) = SendIns
 
+-- | A type class that represents the ability to send a /signature/ @sig@ to carrier @f@.
 class SendSig (sig :: Signature) f where
+    -- | Send a /signature/ @sig@ to carrier @f@.
     sendSig :: sig f a -> f a
 
+-- | The operator version of `SendSig`.
 type (<<:) = SendIns
 
 instance SendIns ins f => SendSig (LiftIns ins) f where
     sendSig = sendIns . unliftIns
     {-# INLINE sendSig #-}
 
+-- | A wrapper data type to integrate a backend handler system into the classy-effects framework.
 newtype EffectsVia handlerSystem (f :: Type -> Type) a = EffectsVia {runEffectsVia :: f a}
     deriving newtype
         ( Functor
@@ -65,6 +84,7 @@ newtype EffectsVia handlerSystem (f :: Type -> Type) a = EffectsVia {runEffectsV
         , MonadFail
         )
 
+-- | A wrapper data type to represent sending an effect to the carrier @f@ with the specified tag.
 newtype ViaTag handlerSystem tag (f :: Type -> Type) a = ViaTag {runViaTag :: f a}
     deriving newtype
         ( Functor
@@ -77,6 +97,10 @@ newtype ViaTag handlerSystem tag (f :: Type -> Type) a = ViaTag {runViaTag :: f 
         , MonadFail
         )
 
+{- |
+A backend identifier type tag to represent the mechanism of sending effects to a carrier using
+`SendIns`/`SendSig` based on CEP-02.
+-}
 data EffectDataHandler
 
 instance SendIns ins f => SendIns ins (EffectsVia EffectDataHandler f) where
@@ -85,8 +109,12 @@ instance SendIns ins f => SendIns ins (EffectsVia EffectDataHandler f) where
 instance (SendSig sig f, HFunctor sig) => SendSig sig (EffectsVia EffectDataHandler f) where
     sendSig = EffectsVia . sendSig . hfmap runEffectsVia
 
+-- | A type class representing the carrier @f@ capable of sending tagged effects.
 class Taggable f where
+    -- | A wrapper type to send to carrier `f` with the specified tag.
     type Tagged f tag :: Type -> Type
+
+    -- | Send all effects within the scope, tagged, to carrier `f`.
     unTagged :: Tagged f tag a -> f a
 
 instance Taggable (EffectsVia handlerSystem f) where
@@ -94,27 +122,35 @@ instance Taggable (EffectsVia handlerSystem f) where
     unTagged = coerce
     {-# INLINE unTagged #-}
 
+-- | Send all effects within the scope, tagged, to carrier `f`.
 tag :: forall tag f a. Taggable f => Tagged f tag a -> f a
 tag = unTagged @_ @tag
 {-# INLINE tag #-}
 
+-- | A wrapper type to send to carrier `f` with the specified tag.
 type f @# tag = Tagged f tag
 
+-- | Tagged /instruction class/.
 newtype Tag (ins :: Instruction) tag a = Tag {getTag :: ins a}
     deriving stock (Functor, Foldable, Traversable)
 
+-- | Tagged /instruction class/.
 type (#) = Tag
 
+-- | Tagged /instruction class/.
 pattern T :: forall tag ins a. ins a -> Tag ins tag a
 pattern T e = Tag e
 {-# INLINE T #-}
 
+-- | Tagged /signature class/.
 newtype TagH (sig :: Signature) tag f a = TagH {getTagH :: sig f a}
     deriving stock (Functor, Foldable, Traversable)
     deriving newtype (HFunctor)
 
+-- | Tagged /signature class/.
 type (##) = TagH
 
+-- | Tagged /signature class/.
 pattern TH :: forall tag sig f a. sig f a -> TagH sig tag f a
 pattern TH e = TagH e
 
@@ -137,10 +173,14 @@ instance
             . hfmap coerce
     {-# INLINE sendSig #-}
 
+-- | An /effect class/ with no effects.
 class Nop (f :: Type -> Type)
+
 instance Nop f
 
+-- | An /instruction class/ with no effects.
 data NopI (a :: Type)
     deriving stock (Functor, Foldable, Traversable)
 
+-- | A /signature class/ with no effects.
 type NopS = LiftIns NopI
