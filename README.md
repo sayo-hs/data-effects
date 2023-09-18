@@ -1,5 +1,7 @@
 # classy-effects
 
+[![Hackage](https://img.shields.io/hackage/v/classy-effects.svg)](https://hackage.haskell.org/package/classy-effects)
+
 This repository is for **CEPs** and its associated Haskell library.
 
 CEPs (Classy-Effects Protocols) are a collection of protocols for expressing and defining effects in Haskell, aimed at the fist objective in the [Sayo Project](https://github.com/sayo-hs):
