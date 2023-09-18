@@ -1,8 +1,8 @@
 # CEPs
 
-CEPs (Classy-Effects Protocols) are a collection of protocols for expressing and defining effects in Haskell, aimed at the second objective in the sayo-project:
+CEPs (Classy-Effects Protocols) are a collection of protocols for expressing and defining effects in Haskell, aimed at the first objective in the [Sayo Project](https://github.com/sayo-hs):
 
-> Exploring methods to improve the interoperability of the proliferating Haskell effect system libraries.
+> Exploring ways to improve interoperability among the myriad Haskell effect system libraries
 
 CEP-01 is at the core of these protocols. Each CEP is independent, and some are extensions (optional).
 
