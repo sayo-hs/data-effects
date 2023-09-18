@@ -18,5 +18,8 @@ First, for the representation of effects, there is the GADTs encoding typical in
 
 [^1]: In the future, we might also consider implementing the derivation of type classes from GADTs.
 
+## Examples
+Examples of using classy-effects combined with the Heftia effect handler backend can be found [here](https://github.com/sayo-hs/heftia/blob/master/docs/examples/01%20First-order.md).
+
 ## Your contributions are welcome!
 Please see [CONTRIBUTING.md](CONTRIBUTING.md).
