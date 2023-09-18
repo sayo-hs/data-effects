@@ -62,14 +62,11 @@ library
     build-depends:
         base                   ^>= 4.16.4.0,
         classy-effects-base    ^>= 0.1,
-        containers,
-        template-haskell,
-        th-abstraction,
-        lens,
-        mtl,
-        transformers,
-        these,
-        extra
+        template-haskell ^>= 2.18,
+        th-abstraction ^>= 0.6,
+        lens ^>= 5.2.3,
+        mtl ^>= 2.2.2,
+        extra ^>= 1.7.14
 
     hs-source-dirs:   src
     ghc-options:      -Wall
