@@ -111,10 +111,10 @@ instance (SendSig sig f, HFunctor sig) => SendSig sig (EffectsVia EffectDataHand
 
 -- | A type class representing the carrier @f@ capable of sending tagged effects.
 class Taggable f where
-    -- | A wrapper type to send to carrier `f` with the specified tag.
+    -- | A wrapper type to send to carrier @f@ with the specified tag.
     type Tagged f tag :: Type -> Type
 
-    -- | Send all effects within the scope, tagged, to carrier `f`.
+    -- | Send all effects within the scope, tagged, to carrier @f@.
     unTagged :: Tagged f tag a -> f a
 
 instance Taggable (EffectsVia handlerSystem f) where
@@ -122,12 +122,12 @@ instance Taggable (EffectsVia handlerSystem f) where
     unTagged = coerce
     {-# INLINE unTagged #-}
 
--- | Send all effects within the scope, tagged, to carrier `f`.
+-- | Send all effects within the scope, tagged, to carrier @f@.
 tag :: forall tag f a. Taggable f => Tagged f tag a -> f a
 tag = unTagged @_ @tag
 {-# INLINE tag #-}
 
--- | A wrapper type to send to carrier `f` with the specified tag.
+-- | A wrapper type to send to carrier @f@ with the specified tag.
 type f @# tag = Tagged f tag
 
 -- | Tagged /instruction class/.
