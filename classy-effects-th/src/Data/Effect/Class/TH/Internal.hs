@@ -4,6 +4,17 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+-- The code before modification is BSD3 licensed, (c) 2020 Michael Szvetits.
+-- <https://github.com/typedbyte/effet/blob/master/src/Control/Effect/Machinery/TH.hs>
+
+{- |
+Copyright   :  (c) 2020 Michael Szvetits
+               (c) 2023 Yamada Ryo
+License     :  MPL-2.0 (see the file LICENSE)
+Maintainer  :  ymdfield@outlook.jp
+Stability   :  experimental
+Portability :  portable
+-}
 module Data.Effect.Class.TH.Internal where
 
 import Control.Monad (forM, replicateM, unless, when)

@@ -2,21 +2,9 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-{-
-The code before modification is BSD3 licensed, (c) 2010-2011 Patrick Bahr.
-
-This fork was made to work around the problem that the
-'Control.Effect.Class.Machinery.TH.makeEffect' function that generates multiple
-definitions at once for convenience is not possible with only the original
-'Data.Comp.Multi.Derive.makeHFunctor' function due to TH limitations,
-because the original function takes the name of the data type as an argument,
-but there is no version that takes 'DataInfo' as an argument (the data type
-reification and the HFunctor derivation process are not separated as functions).
--}
-
 {- |
-Copyright   :  (c) 2010-2011 Patrick Bahr
-               (c) 2023 Yamada Ryo
+Copyright   :  (c) 2023 Yamada Ryo
+               (c) 2010-2011 Patrick Bahr
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental

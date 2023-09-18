@@ -28,13 +28,16 @@ maintainer:         Yamada Ryo <ymdfield@outlook.jp>
 
 -- A copyright notice.
 copyright:
-    Yamada Ryo, 2023
+    2023 Yamada Ryo,
+    2020 Michael Szvetits,
+    2010-2011 Patrick Bahr
 
 category: Control, Effect, Template Haskell
 
 extra-source-files:
     ChangeLog.md
     NOTICE
+    README.md
 
 tested-with:
     GHC == 9.2.8
@@ -42,6 +45,8 @@ tested-with:
 source-repository head
     type: git
     location: https://github.com/sayo-hs/classy-effects
+    tag: v0.1.0
+    subdir: classy-effects-th
 
 library
     exposed-modules:
