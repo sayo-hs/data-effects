@@ -18,7 +18,7 @@ description:
     package, which offers standard effect definitions compliant with CEPs.
 
 -- A URL where users can report bugs.
-bug-reports: https://github.com/ymdryo/classy-effects-th
+bug-reports: https://github.com/ymdryo/classy-effects
 
 -- The license under which the package is released.
 license:            MPL-2.0
@@ -41,7 +41,7 @@ tested-with:
 
 source-repository head
     type: git
-    location: https://github.com/ymdryo/classy-effects-th
+    location: https://github.com/ymdryo/classy-effects
 
 library
     exposed-modules:
