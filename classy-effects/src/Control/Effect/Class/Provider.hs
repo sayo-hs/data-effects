@@ -26,9 +26,7 @@ import Control.Effect.Class (
     type (~>),
  )
 import Control.Effect.Class.Machinery.HFunctor (HFunctor, hfmap)
-import Data.Effect.Class.TH (
-    makeSignature,
- )
+import Data.Effect.Class.TH (makeSignature)
 
 class Provider c e i g (f :: Type -> Type) where
     provide :: i -> (forall h. (c h, e h) => (f ~> h) -> h a) -> f (g a)
