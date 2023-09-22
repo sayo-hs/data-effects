@@ -444,7 +444,7 @@ paramCount = \case
 -- | Checks if a name m appears somewhere in a type.
 occurs :: Name -> Type -> Bool
 occurs m = \case
-    ForallT _ _ t -> m `occurs` t
+    ForallT _ cxt t -> m `occurs` t || any (m `occurs`) cxt
     AppT l r -> m `occurs` l || m `occurs` r
     SigT t _ -> m `occurs` t
     VarT n -> n == m
