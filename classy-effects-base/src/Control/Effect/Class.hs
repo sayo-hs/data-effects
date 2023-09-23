@@ -70,7 +70,7 @@ class SendSig (sig :: Signature) f where
     sendSig :: sig f a -> f a
 
 -- | The operator version of `SendSig`.
-type (<<:) = SendIns
+type (<<:) = SendSig
 
 instance SendIns ins f => SendSig (LiftIns ins) f where
     sendSig = sendIns . unliftIns
