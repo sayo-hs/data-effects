@@ -24,8 +24,13 @@ module Control.Effect.Class where
 import Control.Applicative (Alternative)
 import Control.Effect.Class.Machinery.HFunctor (HFunctor, hfmap)
 import Control.Monad (MonadPlus)
+import Control.Monad.Except (MonadError)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.RWS (MonadRWS)
+import Control.Monad.Reader (MonadReader)
+import Control.Monad.State (MonadState)
+import Control.Monad.Writer (MonadWriter)
 import Data.Coerce (coerce)
 import Data.Comp.Multi.Derive (makeHFunctor)
 import Data.Kind (Type)
@@ -82,6 +87,11 @@ newtype EffectsVia handlerSystem (f :: Type -> Type) a = EffectsVia {runEffectsV
         , MonadFix
         , MonadIO
         , MonadFail
+        , MonadReader r
+        , MonadWriter w
+        , MonadState s
+        , MonadRWS r w s
+        , MonadError e
         )
 
 -- | A wrapper data type to represent sending an effect to the carrier @f@ with the specified tag.
@@ -95,6 +105,11 @@ newtype ViaTag handlerSystem tag (f :: Type -> Type) a = ViaTag {runViaTag :: f 
         , MonadFix
         , MonadIO
         , MonadFail
+        , MonadReader r
+        , MonadWriter w
+        , MonadState s
+        , MonadRWS r w s
+        , MonadError e
         )
 
 {- |

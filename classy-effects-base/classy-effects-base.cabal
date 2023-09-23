@@ -60,6 +60,7 @@ library
     build-depends:
         base                          ^>= 4.16.4.0,
         compdata                      ^>= 0.13,
+        mtl                           ^>= 2.2,
 
     hs-source-dirs:   src
     ghc-options:      -Wall
