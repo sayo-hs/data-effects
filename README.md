@@ -1,6 +1,8 @@
 # classy-effects
 
-[![Hackage](https://img.shields.io/hackage/v/classy-effects.svg)](https://hackage.haskell.org/package/classy-effects)
+[![Hackage](https://img.shields.io/hackage/v/classy-effects.svg?logo=haskell&label=classy-effects)](https://hackage.haskell.org/package/classy-effects)
+[![Hackage](https://img.shields.io/hackage/v/classy-effects-th.svg?logo=haskell&label=classy-effects-th)](https://hackage.haskell.org/package/classy-effects-th)
+[![Hackage](https://img.shields.io/hackage/v/classy-effects-base.svg?logo=haskell&label=classy-effects-base)](https://hackage.haskell.org/package/classy-effects-base)
 
 This repository is for **CEPs** and its associated Haskell library.
 
