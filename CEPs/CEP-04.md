@@ -17,7 +17,7 @@ Here, if `<TI>` follows the naming convention in CEP-02 where it ends with `I`, 
 All first-order effect classes that conform to CEP-04 MUST define together a pattern synonym of the following form for their instruction `<Ins>`:
 
 ```haskell
-pattern <InsS> x1 x2 ... xn = LiftIns (<Ins> x1 x2 ... xn)
+pattern <InsFS> x1 x2 ... xn = LiftIns (<Ins> x1 x2 ... xn)
 ```
 
-Here, `<InsS>` MUST be the name of `<Ins>` with an `S` added to the end.
+Here, `<InsFS>` MUST be the name of `<Ins>` with an `FS` added to the end.

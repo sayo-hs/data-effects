@@ -15,7 +15,6 @@ instances that constitute the effect system supplied by the @classy-effects@ fra
 module Control.Effect.Class.Machinery.TH where
 
 import Control.Effect.Class.Machinery.TH.Internal (
-    defaultEffDataNamer,
     generateEffect,
     generateEffectWith,
     generateOrderUnifiedEffDataTySyn,
@@ -27,6 +26,7 @@ import Control.Monad (unless, (<=<))
 import Control.Monad.Writer (execWriterT, lift, tell)
 import Data.Effect.Class.TH.Internal (
     EffectOrder (FirstOrder, HigherOrder),
+    defaultEffectDataNamer,
     effMethods,
     reifyEffectInfo,
  )
@@ -56,9 +56,9 @@ makeEffect clsU clsF clsH = do
         clsU
         (clsU <> "D")
         clsF
-        (defaultEffDataNamer FirstOrder clsF)
+        (defaultEffectDataNamer FirstOrder $ nameBase clsF)
         clsH
-        (defaultEffDataNamer HigherOrder clsH)
+        (defaultEffectDataNamer HigherOrder $ nameBase clsH)
 
 {- |
 Generate an /instruction/ data type and type and pattern synonyms for abbreviating
@@ -89,25 +89,28 @@ makeEffectWith ::
     -- | The name of first-order effect class
     Name ->
     -- | The name of instruction data type corresponding to the first-order effect class
-    Name ->
+    String ->
     -- | The name of higher-order effect class
     Name ->
     -- | The name of signature data type corresponding to the higher-order effect class
-    Name ->
+    String ->
     Q [Dec]
 makeEffectWith clsU dataU clsF dataI clsH dataS =
     execWriterT do
+        let dataI' = mkName dataI
+            dataS' = mkName dataS
+
         infoF <- reifyEffectInfo clsF & lift
         infoH <- reifyEffectInfo clsH & lift
 
         pvs <- unifyEffTypeParams infoF infoH & lift
 
-        generateEffectWith FirstOrder dataI infoF & lift >>= tell
-        generateEffectWith HigherOrder dataS infoH & lift >>= tell
+        generateEffectWith FirstOrder dataI' infoF & lift >>= tell
+        generateEffectWith HigherOrder dataS' infoH & lift >>= tell
 
         generateOrderUnifiedEffectClass infoF infoH pvs (mkName clsU) & lift >>= tell
 
-        [generateOrderUnifiedEffDataTySyn dataI dataS pvs (mkName dataU)]
+        [generateOrderUnifiedEffDataTySyn dataI' dataS' pvs (mkName dataU)]
             & lift . sequence
             >>= tell
 

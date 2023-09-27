@@ -267,11 +267,11 @@ generateLiftInsPatternSynonyms dataName info = do
 {- |
 Generate the type synonym for an instruction datatype:
 
-    @type (FoobarS ...) = LiftIns (FoobarI ...)@
+    @type (FoobarFS ...) = LiftIns (FoobarI ...)@
 -}
 generateLiftInsTypeSynonym :: EffectInfo -> Name -> Q Dec
 generateLiftInsTypeSynonym info dataName = do
-    nameS <- mkName <$> renameI2S (nameBase dataName)
+    nameS <- mkName <$> renameI2FS (nameBase dataName)
     tySynD
         nameS
         (pvs <&> (`PlainTV` ()))
@@ -279,8 +279,8 @@ generateLiftInsTypeSynonym info dataName = do
   where
     pvs = tyVarName <$> effParamVars info
 
-renameI2S :: String -> Q String
-renameI2S name = dropEndI name <&> (++ "S")
+renameI2FS :: String -> Q String
+renameI2FS name = dropEndI name <&> (++ "FS")
 
 dropEndI :: String -> Q String
 dropEndI name =

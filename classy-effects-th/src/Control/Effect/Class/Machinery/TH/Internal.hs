@@ -45,9 +45,6 @@ generateEffect order info =
         (mkName $ defaultEffectDataNamer order $ nameBase $ effName info)
         info
 
-defaultEffDataNamer :: EffectOrder -> Name -> Name
-defaultEffDataNamer order = mkName . defaultEffectDataNamer order . nameBase
-
 generateEffectWith :: EffectOrder -> Name -> EffectInfo -> Q [Dec]
 generateEffectWith order effDataName info =
     execWriterT do
