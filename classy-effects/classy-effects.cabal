@@ -63,6 +63,7 @@ library
         Control.Effect.Class.Fail
         Control.Effect.Class.Cont
         Control.Effect.Class.Chronicle
+        Control.Effect.Class.Resource
 
     reexported-modules:
         Control.Effect.Class,
