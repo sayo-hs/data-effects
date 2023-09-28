@@ -8,7 +8,7 @@ module Control.Effect.Class.Machinery.TH.Internal where
 
 import Control.Effect.Class (LiftIns)
 import Control.Effect.Class.Machinery.HFunctor ((:+:))
-import Control.Effect.Class.Machinery.TH.Send (deriveEffectSend)
+import Control.Effect.Class.Machinery.TH.Send.Internal (deriveEffectSend)
 import Control.Monad (when)
 import Control.Monad.Writer (execWriterT, lift, tell)
 import Data.Effect.Class.TH.HFunctor.Internal (deriveHFunctor, tyVarName)
