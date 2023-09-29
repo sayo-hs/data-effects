@@ -4,10 +4,45 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-{-
-The code before modification is BSD3 licensed, (c) 2010-2011 Patrick Bahr.
-<https://github.com/pa-ba/compdata/blob/master/src/Data/Comp/Multi/Derive/HFunctor.hs>
+{-  The code before modification is licensed under the BSD3 License as
+    shown in [1].  The modified code, in its entirety, is licensed under
+    MPL 2.0. When redistributing, please ensure that you do not remove
+    the BSD3 License text as indicated in [1].
+    <https://github.com/pa-ba/compdata/blob/master/src/Data/Comp/Multi/Derive/HFunctor.hs>
 
+    [1] Copyright (c) 2010--2011 Patrick Bahr, Tom Hvitved
+
+        All rights reserved.
+
+        Redistribution and use in source and binary forms, with or without
+        modification, are permitted provided that the following conditions
+        are met:
+
+        1. Redistributions of source code must retain the above copyright
+        notice, this list of conditions and the following disclaimer.
+
+        2. Redistributions in binary form must reproduce the above copyright
+        notice, this list of conditions and the following disclaimer in the
+        documentation and/or other materials provided with the distribution.
+
+        3. Neither the name of the author nor the names of his contributors
+        may be used to endorse or promote products derived from this software
+        without specific prior written permission.
+
+        THIS SOFTWARE IS PROVIDED BY THE AUTHORS ``AS IS'' AND ANY EXPRESS OR
+        IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+        WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+        DISCLAIMED.  IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE FOR
+        ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+        DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+        OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+        HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+        STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+        ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+        POSSIBILITY OF SUCH DAMAGE.
+-}
+
+{-
 This fork was made to work around the problem that the
 'Control.Effect.Class.Machinery.TH.makeEffect' function that generates multiple
 definitions at once for convenience is not possible with only the original
@@ -18,7 +53,7 @@ reification and the HFunctor derivation process are not separated as functions).
 -}
 
 {- |
-Copyright   :  (c) 2010-2011 Patrick Bahr
+Copyright   :  (c) 2010-2011 Patrick Bahr, Tom Hvitved
                (c) 2023 Yamada Ryo
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
