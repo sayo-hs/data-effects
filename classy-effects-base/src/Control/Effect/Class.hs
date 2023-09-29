@@ -213,6 +213,30 @@ instance
             . hfmap coerce
     {-# INLINE sendSig #-}
 
+{- |
+A wrapper data type to transfer the effect data sent by the `SendIns`/`SendSig` instance to the
+lower carrier @f@ in an non effect-data format.
+
+@EffectsVia EffectDataHandler@ inverse version. Convert the context based on CEP-02 to one based on
+CEP-01.
+-}
+newtype EffectDataToClass (f :: Type -> Type) a = EffectDataToClass {effectDataToClass :: f a}
+    deriving newtype
+        ( Functor
+        , Applicative
+        , Alternative
+        , Monad
+        , MonadPlus
+        , MonadFix
+        , MonadIO
+        , MonadFail
+        , MonadReader r
+        , MonadWriter w
+        , MonadState s
+        , MonadRWS r w s
+        , MonadError e
+        )
+
 -- | An /effect class/ with no effects.
 class Nop (f :: Type -> Type)
 

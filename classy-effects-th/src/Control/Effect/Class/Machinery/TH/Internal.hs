@@ -8,7 +8,7 @@ module Control.Effect.Class.Machinery.TH.Internal where
 
 import Control.Effect.Class (LiftIns)
 import Control.Effect.Class.Machinery.HFunctor ((:+:))
-import Control.Effect.Class.Machinery.TH.Send.Internal (deriveEffectSend)
+import Control.Effect.Class.Machinery.TH.Send.Internal (deriveEffectRecv, deriveEffectSend)
 import Control.Monad (when)
 import Control.Monad.Writer (execWriterT, lift, tell)
 import Data.Effect.Class.TH.HFunctor.Internal (deriveHFunctor, tyVarName)
@@ -59,6 +59,7 @@ generateEffectWith order effDataName info =
                 deriveHFunctor effDataInfo & lift >>= tell
 
         [deriveEffectSend info $ Just (order, effDataName)] & lift . sequence >>= tell
+        [deriveEffectRecv info order effDataName] & lift . sequence >>= tell
 
         pure info
 
