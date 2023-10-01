@@ -68,6 +68,7 @@ library
     reexported-modules:
         Control.Effect.Class,
         Control.Effect.Class.Machinery.HFunctor,
+        Control.Effect.Class.Machinery.DepParam,
         Control.Effect.Class.Machinery.TH,
         Control.Effect.Class.Machinery.TH.Send,
         Data.Effect.Class.TH,
