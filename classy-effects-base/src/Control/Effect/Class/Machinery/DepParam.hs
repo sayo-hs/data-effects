@@ -86,13 +86,13 @@ type family
 type family EffectClassIdentifierOf (e :: Instruction) :: EffectClassIdentifier
 
 -- | Obtain the dependent parameters portion of the instruction class.
-type family DepParamsOf (e :: Instruction) :: DepParams (EffectClassIdentifierOf e)
+type family DepParamsOf (e :: Instruction) :: k
 
 -- | Obtain the identifier of the signature class.
 type family EffectClassIdentifierOfH (e :: Signature) :: EffectClassIdentifier
 
 -- | Obtain the dependent parameters portion of the instruction class.
-type family DepParamsOfH (e :: Signature) :: DepParams (EffectClassIdentifierOfH e)
+type family DepParamsOfH (e :: Signature) :: k
 
 -- | A version of t`Control.Effect.Class.SendIns` that supports functional dependency.
 class
