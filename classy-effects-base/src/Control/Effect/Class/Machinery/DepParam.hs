@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -13,7 +14,18 @@ Portability :  portable
 -}
 module Control.Effect.Class.Machinery.DepParam where
 
-import Control.Effect.Class (Instruction, LiftIns, SendIns, SendSig, Signature)
+import Control.Effect.Class (
+    EffectDataHandler,
+    EffectsVia,
+    Instruction,
+    LiftIns,
+    SendIns,
+    SendSig,
+    Signature,
+    Tag,
+    TagH,
+    ViaTag,
+ )
 import Data.Kind (Constraint, Type)
 
 -- | Kind of the effect class.
@@ -59,7 +71,7 @@ type family DepParams (eci :: EffectClassIdentifier) :: Type
 type family
     EffectClassOf
         (eci :: EffectClassIdentifier)
-        (dps :: DepParams eci) ::
+        (dps :: k) ::
         EffectClass
 
 {- |
@@ -69,7 +81,7 @@ parameters.
 type family
     InsClassOf
         (eci :: EffectClassIdentifier)
-        (dps :: DepParams eci) ::
+        (dps :: k) ::
         Instruction
 
 {- |
@@ -79,7 +91,7 @@ parameters, and tuple of dependent parameters.
 type family
     SigClassOf
         (eci :: EffectClassIdentifier)
-        (dps :: DepParams eci) ::
+        (dps :: k) ::
         Signature
 
 -- | Obtain the identifier of the instruction class.
@@ -102,7 +114,22 @@ type family EffectClassIdentifierOfH (e :: Signature) :: EffectClassIdentifier
 -- Regarding the kind annotation, it is as mentioned in @DepParamsOf@.
 type family DepParamsOfH (e :: Signature) :: k
 
+type instance EffectClassIdentifierOfH (LiftIns e) = EffectClassIdentifierOf e
 type instance DepParamsOfH (LiftIns e) = DepParamsOf e
+
+-- | Effect class identifier for tagged effect classes.
+data I'Tag (eci :: EffectClassIdentifier) tag
+
+-- | Effect class identifier for tagged effect classes.
+type (#-) = I'Tag
+
+type instance DepParams (I'Tag eci tag) = DepParams eci
+type instance InsClassOf (I'Tag eci tag) dps = Tag (InsClassOf eci dps) tag
+type instance SigClassOf (I'Tag eci tag) dps = TagH (SigClassOf eci dps) tag
+type instance EffectClassIdentifierOf (Tag e tag) = I'Tag (EffectClassIdentifierOf e) tag
+type instance EffectClassIdentifierOfH (TagH e tag) = I'Tag (EffectClassIdentifierOfH e) tag
+type instance DepParamsOf (Tag e tag) = DepParamsOf e
+type instance DepParamsOfH (TagH e tag) = DepParamsOfH e
 
 {- |
 Obtain the dependent parameters uniquely associated with the effect class identifier within the
@@ -110,12 +137,17 @@ carrier @f@.
 -}
 type family DepParamsFor (eci :: EffectClassIdentifier) (f :: Type -> Type) :: k
 
+type instance DepParamsFor eci (EffectsVia EffectDataHandler f) = DepParamsFor eci f
+type instance DepParamsFor eci (ViaTag EffectDataHandler tag f) = DepParamsFor (I'Tag eci tag) f
+
 -- | A version of t`Control.Effect.Class.SendIns` that supports functional dependency.
-class
-    SendIns (InsClassOf eci (DepParamsFor eci f)) f =>
-    SendInsDep eci f
+type SendInsDep eci f = SendIns (InsClassOf eci (DepParamsFor eci f :: DepParams eci)) f
+
+-- | The operator version of `SendInsDep`.
+type eci <:- f = SendInsDep eci f
 
 -- | A version of t`Control.Effect.Class.SendSig` that supports functional dependency.
-class
-    SendSig (SigClassOf eci (DepParamsFor eci f)) f =>
-    SendSigDep eci f
+type SendSigDep eci f = SendSig (SigClassOf eci (DepParamsFor eci f :: DepParams eci)) f
+
+-- | The operator version of `SendSigDep`.
+type eci <<:- f = SendSigDep eci f
