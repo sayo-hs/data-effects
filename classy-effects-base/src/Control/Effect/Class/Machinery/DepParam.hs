@@ -13,7 +13,7 @@ Portability :  portable
 -}
 module Control.Effect.Class.Machinery.DepParam where
 
-import Control.Effect.Class (Instruction, SendIns, SendSig, Signature)
+import Control.Effect.Class (Instruction, LiftIns, SendIns, SendSig, Signature)
 import Data.Kind (Constraint, Type)
 
 -- | Kind of the effect class.
@@ -86,28 +86,36 @@ type family
 type family EffectClassIdentifierOf (e :: Instruction) :: EffectClassIdentifier
 
 -- | Obtain the dependent parameters portion of the instruction class.
+
+{-
+Ideally, this should be @DepParams (EffectClassIdentifierOf e)@ instead of @k@. However, it seems
+that kind inference on the handler side isn't working well, so the kind annotation is intentionally
+weakened here.
+-}
 type family DepParamsOf (e :: Instruction) :: k
 
 -- | Obtain the identifier of the signature class.
 type family EffectClassIdentifierOfH (e :: Signature) :: EffectClassIdentifier
 
 -- | Obtain the dependent parameters portion of the instruction class.
+
+-- Regarding the kind annotation, it is as mentioned in @DepParamsOf@.
 type family DepParamsOfH (e :: Signature) :: k
+
+type instance DepParamsOfH (LiftIns e) = DepParamsOf e
+
+{- |
+Obtain the dependent parameters uniquely associated with the effect class identifier within the
+carrier @f@.
+-}
+type family DepParamsFor (eci :: EffectClassIdentifier) (f :: Type -> Type) :: k
 
 -- | A version of t`Control.Effect.Class.SendIns` that supports functional dependency.
 class
-    SendIns (InsClassOf eci dps) f =>
-    SendInsDep
-        (eci :: EffectClassIdentifier)
-        (dps :: DepParams eci)
-        f
-        | eci f -> dps
+    SendIns (InsClassOf eci (DepParamsFor eci f)) f =>
+    SendInsDep eci f
 
--- | A versi:n of t`Control.Effect.Class.SendSig` that supports functional dependency.
+-- | A version of t`Control.Effect.Class.SendSig` that supports functional dependency.
 class
-    SendSig (SigClassOf eci dps) f =>
-    SendSigDep
-        (eci :: EffectClassIdentifier)
-        (dps :: DepParams eci)
-        f
-        | eci f -> dps
+    SendSig (SigClassOf eci (DepParamsFor eci f)) f =>
+    SendSigDep eci f

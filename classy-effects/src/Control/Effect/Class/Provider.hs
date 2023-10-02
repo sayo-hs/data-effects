@@ -25,7 +25,7 @@ import Control.Effect.Class (
     sendSig,
     type (~>),
  )
-import Control.Effect.Class.Machinery.DepParam (DepParams, SendSigDep, SigClassOf)
+import Control.Effect.Class.Machinery.DepParam (DepParams, DepParamsFor, SendSigDep, SigClassOf)
 import Control.Effect.Class.Machinery.HFunctor (HFunctor, hfmap, makeHFunctor)
 import Data.Effect.Class.TH (makeSignature)
 import Data.Tuple (Solo (Solo))
@@ -79,7 +79,10 @@ makeHFunctor ''CatchDepS
 
 type instance SigClassOf I'CatchDep ('Solo e) = CatchDepS e
 
-instance (SendSigDep I'CatchDep ('Solo e) f) => CatchDep e (EffectsVia EffectDataHandler f) where
+instance
+    (SendSigDep I'CatchDep f, 'Solo e ~ DepParamsFor I'CatchDep f) =>
+    CatchDep e (EffectsVia EffectDataHandler f)
+    where
     catchDep x1 x2 =
         EffectsVia
             . sendSig
