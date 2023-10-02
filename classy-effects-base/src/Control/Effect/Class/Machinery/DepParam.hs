@@ -82,11 +82,17 @@ type family
         (dps :: DepParams eci) ::
         Signature
 
--- | Obtain the identifier of the effect class.
-type family EffectClassIdentifierOf (e :: EffectClass) :: EffectClassIdentifier
+-- | Obtain the identifier of the instruction class.
+type family EffectClassIdentifierOf (e :: Instruction) :: EffectClassIdentifier
 
--- | Obtain the dependent parameters portion of the effect class.
-type family DepParamsOf (e :: EffectClass) :: DepParams (EffectClassIdentifierOf e)
+-- | Obtain the dependent parameters portion of the instruction class.
+type family DepParamsOf (e :: Instruction) :: DepParams (EffectClassIdentifierOf e)
+
+-- | Obtain the identifier of the signature class.
+type family EffectClassIdentifierOfH (e :: Signature) :: EffectClassIdentifier
+
+-- | Obtain the dependent parameters portion of the instruction class.
+type family DepParamsOfH (e :: Signature) :: DepParams (EffectClassIdentifierOfH e)
 
 -- | A version of t`Control.Effect.Class.SendIns` that supports functional dependency.
 class
