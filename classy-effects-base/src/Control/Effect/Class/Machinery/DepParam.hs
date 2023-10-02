@@ -16,6 +16,7 @@ module Control.Effect.Class.Machinery.DepParam where
 
 import Control.Effect.Class (
     EffectDataHandler,
+    EffectDataToClass,
     EffectsVia,
     Instruction,
     LiftIns,
@@ -26,7 +27,9 @@ import Control.Effect.Class (
     TagH,
     ViaTag,
  )
+import Data.Functor.Identity (Identity)
 import Data.Kind (Constraint, Type)
+import GHC.TypeLits (ErrorMessage (ShowType, Text, (:<>:)), TypeError)
 
 -- | Kind of the effect class.
 type EffectClass = (Type -> Type) -> Constraint
@@ -67,6 +70,13 @@ type instance DepParams I'E = (Int -> Type, String)
 -}
 type family DepParams (eci :: EffectClassIdentifier) :: Type
 
+{-
+- Regarding the Kind of Dependent Parameters
+
+    Ideally, the kind should be @DepParams (EffectClassIdentifierOf e)@ instead of @k@. However, it
+    seems that kind inference isn't working well, so the kind annotation is intentionally weakened.
+-}
+
 -- | Obtain the effect class from the effect class identifier and tuple of dependent parameters.
 type family
     EffectClassOf
@@ -98,20 +108,12 @@ type family
 type family EffectClassIdentifierOf (e :: Instruction) :: EffectClassIdentifier
 
 -- | Obtain the dependent parameters portion of the instruction class.
-
-{-
-Ideally, this should be @DepParams (EffectClassIdentifierOf e)@ instead of @k@. However, it seems
-that kind inference on the handler side isn't working well, so the kind annotation is intentionally
-weakened here.
--}
 type family DepParamsOf (e :: Instruction) :: k
 
 -- | Obtain the identifier of the signature class.
 type family EffectClassIdentifierOfH (e :: Signature) :: EffectClassIdentifier
 
 -- | Obtain the dependent parameters portion of the instruction class.
-
--- Regarding the kind annotation, it is as mentioned in @DepParamsOf@.
 type family DepParamsOfH (e :: Signature) :: k
 
 type instance EffectClassIdentifierOfH (LiftIns e) = EffectClassIdentifierOf e
@@ -134,11 +136,40 @@ type instance DepParamsOfH (TagH e tag) = DepParamsOfH e
 {- |
 Obtain the dependent parameters uniquely associated with the effect class identifier within the
 carrier @f@.
--}
-type family DepParamsFor (eci :: EffectClassIdentifier) (f :: Type -> Type) :: k
 
-type instance DepParamsFor eci (EffectsVia EffectDataHandler f) = DepParamsFor eci f
-type instance DepParamsFor eci (ViaTag EffectDataHandler tag f) = DepParamsFor (I'Tag eci tag) f
+If the carrier @f@ does not handle the effect class corresponding to the effect class identifier
+@eci@, @'Nothing@ is returned.
+-}
+type family QueryDepParamsFor (eci :: EffectClassIdentifier) (f :: Type -> Type) :: Maybe k
+
+type family
+    FromJustDepParams
+        (mDPS :: Maybe k)
+        (eci :: EffectClassIdentifier)
+        (f :: Type -> Type)
+    where
+    FromJustDepParams ('Just dps) _ _ = dps
+    FromJustDepParams 'Nothing eci f =
+        TypeError
+            ( 'Text "The carrier "
+                ':<>: 'ShowType f
+                ':<>: 'Text " does not handle the effect class corresponding to the effect class identifier "
+                ':<>: 'ShowType eci
+                ':<>: 'Text "."
+            )
+
+{- |
+Obtain the dependent parameters uniquely associated with the effect class identifier within the
+carrier @f@.
+-}
+type DepParamsFor eci f = FromJustDepParams (QueryDepParamsFor eci f) eci f :: k
+
+type instance QueryDepParamsFor eci (EffectsVia EffectDataHandler f) = QueryDepParamsFor eci f
+type instance QueryDepParamsFor eci (ViaTag EffectDataHandler tag f) = QueryDepParamsFor (I'Tag eci tag) f
+type instance QueryDepParamsFor eci (EffectDataToClass f) = QueryDepParamsFor eci f
+
+type instance QueryDepParamsFor _ Identity = 'Nothing
+type instance QueryDepParamsFor _ IO = 'Nothing
 
 -- | A version of t`Control.Effect.Class.SendIns` that supports functional dependency.
 type SendInsDep eci f = SendIns (InsClassOf eci (DepParamsFor eci f :: DepParams eci)) f
