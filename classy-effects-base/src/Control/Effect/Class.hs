@@ -248,3 +248,47 @@ data NopI (a :: Type)
 
 -- | A /signature class/ with no effects.
 type NopS = LiftIns NopI
+
+newtype Embed f (a :: Type) = Embed {unEmbed :: f a}
+    deriving stock (Functor, Foldable, Traversable)
+
+instance SendIns f g => SendIns (Embed f) g where
+    sendIns = sendIns . unEmbed
+    {-# INLINE sendIns #-}
+
+newtype ViaEmbed handlerSystem g (f :: Type -> Type) a = ViaEmbed {runViaEmbed :: f a}
+    deriving newtype
+        ( Functor
+        , Applicative
+        , Alternative
+        , Monad
+        , MonadPlus
+        , MonadFix
+        , MonadIO
+        , MonadFail
+        , MonadReader r
+        , MonadWriter w
+        , MonadState s
+        , MonadRWS r w s
+        , MonadError e
+        )
+
+class Embeddable f where
+    type Embedded f g :: Type -> Type
+    unEmbedded :: Embedded f g a -> f a
+
+instance Embeddable (EffectsVia handlerSystem f) where
+    type Embedded (EffectsVia handlerSystem f) tag = EffectsVia handlerSystem (ViaEmbed handlerSystem tag f)
+    unEmbedded = coerce
+    {-# INLINE unEmbedded #-}
+
+embed :: forall g f a. Embeddable f => Embedded f g a -> f a
+embed = unEmbedded @_ @g
+{-# INLINE embed #-}
+
+instance
+    SendIns (Embed g) (EffectsVia EffectDataHandler f) =>
+    SendIns g (ViaEmbed EffectDataHandler tag f)
+    where
+    sendIns = ViaEmbed . runEffectsVia @EffectDataHandler . sendIns . Embed
+    {-# INLINE sendIns #-}

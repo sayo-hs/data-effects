@@ -18,6 +18,7 @@ import Control.Effect.Class (
     EffectDataHandler,
     EffectDataToClass,
     EffectsVia,
+    Embed,
     Instruction,
     LiftIns,
     SendIns,
@@ -132,6 +133,12 @@ type instance EffectClassIdentifierOf (Tag e tag) = I'Tag (EffectClassIdentifier
 type instance EffectClassIdentifierOfH (TagH e tag) = I'Tag (EffectClassIdentifierOfH e) tag
 type instance DepParamsOf (Tag e tag) = DepParamsOf e
 type instance DepParamsOfH (TagH e tag) = DepParamsOfH e
+
+data I'Embed f
+type instance DepParams (I'Embed f) = ()
+type instance InsClassOf (I'Embed f) '() = Embed f
+type instance EffectClassIdentifierOf (Embed f) = I'Embed f
+type instance DepParamsOf (Embed f) = '()
 
 {- |
 Obtain the dependent parameters uniquely associated with the effect class identifier within the
