@@ -30,7 +30,7 @@ import Control.Effect.Class (
  )
 import Data.Functor.Identity (Identity)
 import Data.Kind (Constraint, Type)
-import GHC.TypeLits (ErrorMessage (ShowType, Text, (:<>:)), TypeError)
+import GHC.TypeLits (ErrorMessage (ShowType, Text, (:$$:), (:<>:)), TypeError)
 
 -- | Kind of the effect class.
 type EffectClass = (Type -> Type) -> Constraint
@@ -158,11 +158,9 @@ type family
     FromJustDepParams ('Just dps) _ _ = dps
     FromJustDepParams 'Nothing eci f =
         TypeError
-            ( 'Text "The carrier "
-                ':<>: 'ShowType f
-                ':<>: 'Text " does not handle the effect class corresponding to the effect class identifier "
-                ':<>: 'ShowType eci
-                ':<>: 'Text "."
+            ( 'Text "The carrier: " ':<>: 'ShowType f
+                ':$$: 'Text " does not handle the effect class corresponding to the effect class identifier:"
+                ':$$: 'Text "    " ':<>: 'ShowType eci
             )
 
 {- |
