@@ -17,10 +17,17 @@ import Control.Effect.Class (
     sendIns,
     sendSig,
  )
+import Control.Effect.Class.Machinery.DepParams (DepParamsFor, SendInsDep, SendSigDep)
 import Control.Effect.Class.Machinery.HFunctor (hfmap)
+import Control.Effect.Class.Machinery.TH.DepParams.Internal (
+    depParamsIn,
+    eciNamer,
+    effectClassIdentifier,
+    indepParamsIn,
+    mkDepParamTuple,
+ )
 import Control.Exception (assert)
 import Control.Monad (forM, replicateM)
-import Data.Effect.Class.TH.HFunctor.Internal (tyVarName)
 import Data.Effect.Class.TH.Internal (
     EffectInfo,
     EffectOrder (FirstOrder, HigherOrder),
@@ -35,11 +42,12 @@ import Data.Effect.Class.TH.Internal (
     methodReturnType,
     renameMethodToCon,
     superEffects,
+    tyVarName,
     tyVarType,
     unkindTyVar,
  )
+import Data.Foldable (fold)
 import Data.Functor ((<&>))
-import Data.Maybe (maybeToList)
 import Language.Haskell.TH (
     Dec (InstanceD),
     Inline (Inline),
@@ -80,7 +88,7 @@ deriveEffectSend info effDataNameAndOrder = do
     let f = varT $ tyVarName $ effMonad info
 
         pvs = effParamVars info
-        paramTypes = fmap (tyVarType . unkindTyVar) pvs
+        paramTypes = fmap (tyVarType . unkindTyVar . fst) pvs
 
         carrier = [t|EffectsVia EffectDataHandler $f|]
 
@@ -90,27 +98,44 @@ deriveEffectSend info effDataNameAndOrder = do
             ]
 
     sendCxt <-
-        maybeToList
+        fold
             <$> forM effDataNameAndOrder \(order, effDataName) ->
                 assert (not $ null methods) do
-                    let sendCls =
-                            conT case order of
-                                FirstOrder -> ''SendIns
-                                HigherOrder -> ''SendSig
+                    let depParams = depParamsIn pvs
+                    if null depParams
+                        then do
+                            let sendCls =
+                                    conT case order of
+                                        FirstOrder -> ''SendIns
+                                        HigherOrder -> ''SendSig
 
-                        effData = foldl appT (conT effDataName) paramTypes
+                                effData = foldl appT (conT effDataName) paramTypes
 
-                    [t|$sendCls $effData $f|]
+                            sequence [[t|$sendCls $effData $f|]]
+                        else do
+                            let sendCls =
+                                    conT case order of
+                                        FirstOrder -> ''SendInsDep
+                                        HigherOrder -> ''SendSigDep
 
-    let effParamCxt = effectParamCxt info
+                                eciName = eciNamer $ effName info
+                                eci = effectClassIdentifier eciName (indepParamsIn pvs)
+                                depParamTuple = mkDepParamTuple depParams
+
+                            sequence
+                                [ [t|$sendCls $eci $f|]
+                                , [t|$depParamTuple ~ DepParamsFor $eci $f|]
+                                ]
 
     superEffCxt <- forM (superEffects info) ((`appT` carrier) . pure)
+
+    let effParamCxt = effectParamCxt info
 
     effDataC <- do
         let eff = pure $ ConT $ effName info
         [t|$(foldl appT eff paramTypes) $carrier|]
 
-    decs <- mapM (uncurry $ effectMethodDec $ tyVarName <$> pvs) methods
+    decs <- mapM (uncurry $ effectMethodDec $ tyVarName . fst <$> pvs) methods
 
     return $ InstanceD Nothing (sendCxt ++ superEffCxt ++ effParamCxt) effDataC (concat decs)
 
@@ -156,7 +181,7 @@ deriveEffectRecv info order effDataName = do
     let f = varT $ tyVarName $ effMonad info
 
         pvs = effParamVars info
-        paramTypes = fmap (tyVarType . unkindTyVar) pvs
+        paramTypes = fmap (tyVarType . unkindTyVar . fst) pvs
 
         carrier = [t|EffectDataToClass $f|]
 
@@ -193,7 +218,7 @@ deriveEffectRecv info order effDataName = do
             caseE hfmapped $
                 methods <&> \(MethodInterface{..}, conName) -> do
                     effParams <- replicateM (length methodParamTypes) (newName "x")
-                    let method = foldl appTypeE (varE methodName) (varT . tyVarName <$> pvs)
+                    let method = foldl appTypeE (varE methodName) (varT . tyVarName . fst <$> pvs)
                     let methodCall = foldl appE method (varE <$> effParams)
                     match
                         (conP conName $ map varP effParams)

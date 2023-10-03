@@ -54,6 +54,8 @@ library
         Control.Effect.Class.Machinery.TH.Internal
         Control.Effect.Class.Machinery.TH.Send
         Control.Effect.Class.Machinery.TH.Send.Internal
+        Control.Effect.Class.Machinery.TH.DepParams
+        Control.Effect.Class.Machinery.TH.DepParams.Internal
         Data.Effect.Class.TH
         Data.Effect.Class.TH.Internal
         Data.Effect.Class.TH.HFunctor
@@ -71,7 +73,8 @@ library
         th-abstraction >= 0.4 && < 0.7,
         lens ^>= 5.2.3,
         mtl ^>= 2.2.2,
-        extra ^>= 1.7.14
+        extra ^>= 1.7.14,
+        containers
 
     hs-source-dirs:   src
     ghc-options:      -Wall

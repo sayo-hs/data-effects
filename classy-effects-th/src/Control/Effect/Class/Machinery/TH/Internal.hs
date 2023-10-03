@@ -6,29 +6,32 @@
 
 module Control.Effect.Class.Machinery.TH.Internal where
 
+import Control.Arrow (first)
 import Control.Effect.Class (LiftIns)
 import Control.Effect.Class.Machinery.HFunctor ((:+:))
+import Control.Effect.Class.Machinery.TH.DepParams.Internal (generateEffectInfoTypeInstances)
 import Control.Effect.Class.Machinery.TH.Send.Internal (deriveEffectRecv, deriveEffectSend)
 import Control.Monad (when)
 import Control.Monad.Writer (execWriterT, lift, tell)
-import Data.Effect.Class.TH.HFunctor.Internal (deriveHFunctor, tyVarName)
+import Data.Effect.Class.TH.HFunctor.Internal (deriveHFunctor)
 import Data.Effect.Class.TH.Internal (
     EffectInfo (EffectInfo, effName, effParamVars),
     EffectOrder (FirstOrder, HigherOrder),
+    IsDepParam,
     applyEffPVs,
     defaultEffectDataNamer,
     generateEffectDataByEffInfo,
     generateLiftInsPatternSynonyms,
     generateLiftInsTypeSynonym,
+    tyVarName,
  )
 import Data.Function ((&))
-import Data.Functor ((<&>))
 import Data.Kind qualified as K
 import Language.Haskell.TH (
     Dec,
     Name,
     Q,
-    TyVarBndr (PlainTV),
+    TyVarBndr,
     appT,
     classD,
     kindedTV,
@@ -58,6 +61,7 @@ generateEffectWith order effDataName info =
             HigherOrder ->
                 deriveHFunctor effDataInfo & lift >>= tell
 
+        generateEffectInfoTypeInstances info (Just (order, effDataName)) & lift >>= tell
         [deriveEffectSend info $ Just (order, effDataName)] & lift . sequence >>= tell
         [deriveEffectRecv info order effDataName] & lift . sequence >>= tell
 
@@ -71,7 +75,8 @@ Generate the order-unified empty effect class:
 , and derive an instance of the effect that handles via 'Control.Effect.Class.SendIns'/
 'Control.Effect.Class.SendSig' instances.
 -}
-generateOrderUnifiedEffectClass :: EffectInfo -> EffectInfo -> [Name] -> Name -> Q [Dec]
+generateOrderUnifiedEffectClass ::
+    EffectInfo -> EffectInfo -> [(TyVarBndr (), IsDepParam)] -> Name -> Q [Dec]
 generateOrderUnifiedEffectClass infoF infoH pvs unifiedClsName = do
     fKind <- [t|K.Type -> K.Type|]
     let f = mkName "f"
@@ -79,23 +84,22 @@ generateOrderUnifiedEffectClass infoF infoH pvs unifiedClsName = do
 
     cxt <-
         sequence
-            [ applyEffPVs (effName infoF) pvs `appT` varT f
-            , applyEffPVs (effName infoH) pvs `appT` varT f
+            [ applyEffPVs (effName infoF) (fst <$> pvs) `appT` varT f
+            , applyEffPVs (effName infoH) (fst <$> pvs) `appT` varT f
             ]
-    let pvs' = pvs <&> (`PlainTV` ())
 
     sequence
         [ classD
             (pure cxt)
             unifiedClsName
-            (pvs' ++ [fKinded])
+            ((fst <$> pvs) ++ [fKinded])
             []
             []
         , deriveEffectSend
             ( EffectInfo
                 cxt
                 unifiedClsName
-                pvs'
+                pvs
                 fKinded
                 []
             )
@@ -107,17 +111,18 @@ Generate the order-unified effect data type synonym:
 
     @type Foobar ... = FoobarS ... :+: LiftIns (FoobarI ...)@
 -}
-generateOrderUnifiedEffDataTySyn :: Name -> Name -> [Name] -> Name -> Q Dec
+generateOrderUnifiedEffDataTySyn :: Name -> Name -> [TyVarBndr ()] -> Name -> Q Dec
 generateOrderUnifiedEffDataTySyn dataI dataS pvs tySynName = do
     tySynD
         tySynName
-        ((`PlainTV` ()) <$> pvs)
+        pvs
         [t|$(applyEffPVs dataS pvs) :+: LiftIns $(applyEffPVs dataI pvs)|]
 
-unifyEffTypeParams :: EffectInfo -> EffectInfo -> Q [Name]
+unifyEffTypeParams :: EffectInfo -> EffectInfo -> Q [(TyVarBndr (), IsDepParam)]
 unifyEffTypeParams infoF infoH = do
-    let pvF = nameBase . tyVarName <$> effParamVars infoF
-        pvH = nameBase . tyVarName <$> effParamVars infoH
+    let pvH_ = effParamVars infoH
+        pvF = first (nameBase . tyVarName) <$> effParamVars infoF
+        pvH = first (nameBase . tyVarName) <$> pvH_
 
     when (pvF /= pvH) $
         fail $
@@ -125,4 +130,4 @@ unifyEffTypeParams infoF infoH = do
                 <> (nameBase (effName infoF) <> ": " <> show pvF <> "\n")
                 <> (nameBase (effName infoH) <> ": " <> show pvH <> "\n")
 
-    pure $ mkName <$> pvH
+    pure pvH_

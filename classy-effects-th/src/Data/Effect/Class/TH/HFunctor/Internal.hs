@@ -64,6 +64,7 @@ module Data.Effect.Class.TH.HFunctor.Internal where
 
 import Control.Effect.Class.Machinery.HFunctor (HFunctor, hfmap)
 import Control.Monad (replicateM, (<=<))
+import Data.Effect.Class.TH.Internal (DataInfo (DataInfo), tyVarName)
 import Data.Maybe (catMaybes)
 import Language.Haskell.TH (
     Body (NormalB),
@@ -71,14 +72,12 @@ import Language.Haskell.TH (
     Con (ForallC, GadtC, InfixC, NormalC, RecC),
     Cxt,
     Dec (DataD, InstanceD, NewtypeD),
-    DerivClause,
     Exp,
     Info (TyConI),
     Name,
     Pat (ConP, VarP, WildP),
     Q,
     Quote (..),
-    TyVarBndr (..),
     Type (AppT, ConT, ForallT, SigT, VarT),
     appE,
     conE,
@@ -132,15 +131,6 @@ deriveHFunctor (DataInfo _cxt name args constrs _deriving) = do
             body <- foldl appE con vars
             return $ Clause [fp, pat] (NormalB body) []
 
--- | A reified information of a datatype.
-data DataInfo flag = DataInfo
-    { dataCxt :: Cxt
-    , dataName :: Name
-    , dataTyVars :: [TyVarBndr flag]
-    , dataCons :: [Con]
-    , dataDerivings :: [DerivClause]
-    }
-
 {- |
 This function abstracts away @newtype@ declaration, it turns them into
 @data@ declarations.
@@ -150,10 +140,6 @@ abstractNewtype = \case
     TyConI (NewtypeD cxt name args _ constr derive) -> Just (DataInfo cxt name args [constr] derive)
     TyConI (DataD cxt name args _ constrs derive) -> Just (DataInfo cxt name args constrs derive)
     _ -> Nothing
-
--- | Convert the reified information of the datatype to a definition.
-infoToDataD :: DataInfo () -> Dec
-infoToDataD (DataInfo cxt name args cons deriv) = DataD cxt name args Nothing cons deriv
 
 {- |
 This function provides the name and the arity of the given data
@@ -207,8 +193,3 @@ newNames n name = replicateM n (newName name)
 iter :: (Eq t, Num t, Quote m) => t -> m Exp -> m Exp -> m Exp
 iter 0 _ e = e
 iter n f e = iter (n - 1) f (f `appE` e)
-
--- | pures the name of a type variable.
-tyVarName :: TyVarBndr a -> Name
-tyVarName (PlainTV n _) = n
-tyVarName (KindedTV n _ _) = n

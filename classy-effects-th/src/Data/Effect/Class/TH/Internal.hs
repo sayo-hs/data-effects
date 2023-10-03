@@ -96,15 +96,19 @@ import Control.Lens ((%~), (^?), _head, _last)
 import Control.Monad.Writer (Any (Any), runWriterT, tell)
 import Data.Bool (bool)
 import Data.Char (toUpper)
-import Data.Effect.Class.TH.HFunctor.Internal (DataInfo (DataInfo), infoToDataD, tyVarName)
 import Data.Either (partitionEithers)
 import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.List.Extra (dropEnd)
 import Data.Maybe (isNothing, mapMaybe)
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Language.Haskell.TH (
     Bang (Bang),
     Con (ForallC, GadtC),
+    Dec (DataD),
+    DerivClause,
+    FunDep (FunDep),
     SourceStrictness (NoSourceStrictness),
     SourceUnpackedness (NoSourceUnpackedness),
     Specificity (SpecifiedSpec),
@@ -130,7 +134,7 @@ generateEffectDataByEffInfo ::
     Q (DataInfo (), Dec)
 generateEffectDataByEffInfo order effDataName info = do
     effDataInfo <- do
-        let pvs = effParamVars info
+        let pvs = fst <$> effParamVars info
 
         additionalTypeParams <- do
             a <- do
@@ -173,6 +177,19 @@ generateEffectDataByEffInfo order effDataName info = do
 
     pure (effDataInfo, infoToDataD effDataInfo)
 
+-- | A reified information of a datatype.
+data DataInfo flag = DataInfo
+    { dataCxt :: Cxt
+    , dataName :: Name
+    , dataTyVars :: [TyVarBndr flag]
+    , dataCons :: [Con]
+    , dataDerivings :: [DerivClause]
+    }
+
+-- | Convert the reified information of the datatype to a definition.
+infoToDataD :: DataInfo () -> Dec
+infoToDataD (DataInfo cxt name args cons deriv) = DataD cxt name args Nothing cons deriv
+
 -- | Convert an effect method interface to a constructor of the effect data type.
 interfaceToCon ::
     EffectInfo ->
@@ -188,7 +205,7 @@ interfaceToCon info effData MethodInterface{..} =
         let vars =
                 foldl
                     (\acc t -> nub $ acc ++ freeVariables t)
-                    (tyVarName <$> effParamVars info)
+                    (tyVarName . fst <$> effParamVars info)
                     (methodParamTypes ++ [methodReturnType])
 
         pure $
@@ -282,7 +299,7 @@ generateLiftInsPatternSynonyms dataName info = do
                             $( foldr
                                 (\l r -> arrowT `appT` pure l `appT` r)
                                 [t|
-                                    $(liftInsType dataName $ tyVarName <$> effParamVars info)
+                                    $(liftInsType dataName $ tyVarName . fst <$> effParamVars info)
                                         $(varT $ tyVarName $ effMonad info)
                                         $a
                                     |]
@@ -312,7 +329,7 @@ generateLiftInsTypeSynonym info dataName = do
         (pvs <&> (`PlainTV` ()))
         (liftInsType dataName pvs)
   where
-    pvs = tyVarName <$> effParamVars info
+    pvs = tyVarName . fst <$> effParamVars info
 
 renameI2FS :: String -> Q String
 renameI2FS name = dropEndI name <&> (++ "FS")
@@ -327,8 +344,8 @@ liftInsType :: Name -> [Name] -> Q Type
 liftInsType dataName pvs =
     conT ''LiftIns `appT` foldl appT (conT dataName) (varT <$> pvs)
 
-applyEffPVs :: Name -> [Name] -> Q Type
-applyEffPVs effClsName = foldl appT (conT effClsName) . fmap varT
+applyEffPVs :: Name -> [TyVarBndr ()] -> Q Type
+applyEffPVs effClsName = foldl appT (conT effClsName) . fmap tyVarType
 
 -- ** Reification of Effect Class
 
@@ -336,10 +353,13 @@ applyEffPVs effClsName = foldl appT (conT effClsName) . fmap varT
 data EffectInfo = EffectInfo
     { effCxts :: [Type]
     , effName :: Name
-    , effParamVars :: [TyVarBndr ()]
+    , effParamVars :: [(TyVarBndr (), IsDepParam)]
     , effMonad :: TyVarBndr ()
     , effMethods :: [MethodInterface]
     }
+
+newtype IsDepParam = IsDepParam {isDepParam :: Bool}
+    deriving stock (Eq, Show)
 
 effParamVar :: (Name, Maybe Kind) -> TyVarBndr ()
 effParamVar (n, k) = case k of
@@ -359,8 +379,8 @@ reifyEffectInfo :: Name -> Q EffectInfo
 reifyEffectInfo className = do
     info <- reify className
     case info of
-        ClassI (ClassD cxts name tyVars _funDeps decs) _ -> do
-            (paramVars, monad) <-
+        ClassI (ClassD cxts name tyVars funDeps decs) _ -> do
+            (paramVars, carrier) <-
                 case tyVars of
                     [] ->
                         fail $
@@ -370,10 +390,15 @@ reifyEffectInfo className = do
                                 ++ "It is expected to be the last type variable."
                     vs -> pure (init vs, last vs)
 
-            EffectInfo cxts name paramVars monad
+            depParams <- scanFunDeps paramVars carrier funDeps
+            let paramVars' =
+                    paramVars <&> \pv ->
+                        (pv, IsDepParam $ tyVarName pv `Set.member` depParams)
+
+            EffectInfo cxts name paramVars' carrier
                 <$> sequence
                     [ do
-                        (order, paramTypes, retType, cxt) <- analyzeMethodInterface monad t
+                        (order, paramTypes, retType, cxt) <- analyzeMethodInterface carrier t
                         pure $ MethodInterface n order paramTypes retType cxt
                     | SigD n t <- decs
                     ]
@@ -384,13 +409,35 @@ reifyEffectInfo className = do
                     ++ "' is not a type class, but the following instead: "
                     ++ show other
 
+scanFunDeps :: [TyVarBndr ()] -> TyVarBndr () -> [FunDep] -> Q (Set Name)
+scanFunDeps paramVars carrier = \case
+    [] -> pure Set.empty
+    [FunDep lhs rhs]
+        | carrier' `Set.member` lhs'
+            && Set.delete carrier' lhs' `Set.union` rhs' == paramVars'
+            && Set.disjoint lhs' rhs' ->
+            pure rhs'
+      where
+        lhs' = Set.fromList lhs
+        rhs' = Set.fromList rhs
+        paramVars' = Set.fromList $ tyVarName <$> paramVars
+        carrier' = tyVarName carrier
+    fds ->
+        fail $
+            "Unsupported form of functional dependencies: "
+                <> intercalate
+                    ", "
+                    ( fds <&> \(FunDep lhs rhs) ->
+                        unwords (show <$> lhs) <> " -> " <> unwords (show <$> rhs)
+                    )
+
 -- | Constructs the type of an effect, i.e. the type class without its monad parameter.
 effectType :: EffectInfo -> Q Type
 effectType info =
     foldl
         appT
         (conT $ effName info)
-        (fmap tyVarType (effParamVars info))
+        (fmap tyVarType (fst <$> effParamVars info))
 
 partitionSuperEffects :: EffectInfo -> (Cxt, [Type])
 partitionSuperEffects info =
@@ -468,6 +515,11 @@ tyVarType (KindedTV n _ k) = sigT (varT n) k
 tyVarKind :: TyVarBndr a -> Q Type
 tyVarKind (KindedTV _ _ k) = pure k
 tyVarKind (PlainTV _ _) = fail "The type variable has no kind."
+
+-- | pures the name of a type variable.
+tyVarName :: TyVarBndr a -> Name
+tyVarName (PlainTV n _) = n
+tyVarName (KindedTV n _ _) = n
 
 -- | Counts the parameters of a type.
 paramCount :: Type -> Int

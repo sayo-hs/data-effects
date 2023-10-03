@@ -110,7 +110,7 @@ makeEffectWith clsU dataU clsF dataI clsH dataS =
 
         generateOrderUnifiedEffectClass infoF infoH pvs (mkName clsU) & lift >>= tell
 
-        [generateOrderUnifiedEffDataTySyn dataI' dataS' pvs (mkName dataU)]
+        [generateOrderUnifiedEffDataTySyn dataI' dataS' (fst <$> pvs) (mkName dataU)]
             & lift . sequence
             >>= tell
 

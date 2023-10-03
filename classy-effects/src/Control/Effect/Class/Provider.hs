@@ -25,10 +25,8 @@ import Control.Effect.Class (
     sendSig,
     type (~>),
  )
-import Control.Effect.Class.Machinery.DepParam (DepParams, DepParamsFor, SendSigDep, SigClassOf)
-import Control.Effect.Class.Machinery.HFunctor (HFunctor, hfmap, makeHFunctor)
+import Control.Effect.Class.Machinery.HFunctor (HFunctor, hfmap)
 import Data.Effect.Class.TH (makeSignature)
-import Data.Tuple (Solo (Solo))
 
 class Provider c e i g (f :: Type -> Type) where
     provide :: i -> (forall h. (c h, e h) => (f ~> h) -> h a) -> f (g a)
@@ -67,24 +65,3 @@ aprovide ::
     f (g a)
 aprovide = provide
 {-# INLINE aprovide #-}
-
-class CatchDep e (f :: Type -> Type) | f -> e where
-    catchDep :: f a -> (e -> f a) -> f a
-
-data I'CatchDep
-type instance DepParams I'CatchDep = Solo Type
-
-makeSignature ''CatchDep
-makeHFunctor ''CatchDepS
-
-type instance SigClassOf I'CatchDep ('Solo e) = CatchDepS e
-
-instance
-    (SendSigDep I'CatchDep f, 'Solo e ~ DepParamsFor I'CatchDep f) =>
-    CatchDep e (EffectsVia EffectDataHandler f)
-    where
-    catchDep x1 x2 =
-        EffectsVia
-            . sendSig
-            . hfmap runEffectsVia
-            $ CatchDep x1 x2

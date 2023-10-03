@@ -64,13 +64,15 @@ library
         Control.Effect.Class.Cont
         Control.Effect.Class.Chronicle
         Control.Effect.Class.Resource
+        Control.Effect.Class.Concurrent.Thread
 
     reexported-modules:
         Control.Effect.Class,
         Control.Effect.Class.Machinery.HFunctor,
-        Control.Effect.Class.Machinery.DepParam,
+        Control.Effect.Class.Machinery.DepParams,
         Control.Effect.Class.Machinery.TH,
         Control.Effect.Class.Machinery.TH.Send,
+        Control.Effect.Class.Machinery.TH.DepParams,
         Data.Effect.Class.TH,
         Data.Effect.Class.TH.HFunctor,
 

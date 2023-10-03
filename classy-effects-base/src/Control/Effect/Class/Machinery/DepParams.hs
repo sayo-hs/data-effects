@@ -12,7 +12,7 @@ Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
 -}
-module Control.Effect.Class.Machinery.DepParam where
+module Control.Effect.Class.Machinery.DepParams where
 
 import Control.Effect.Class (
     EffectDataHandler,
@@ -72,9 +72,9 @@ type instance DepParams I'E = (Int -> Type, String)
 type family DepParams (eci :: EffectClassIdentifier) :: Type
 
 {-
-- Regarding the Kind of Dependent Parameters
+- Regarding the Kinds of Dependent Parameters
 
-    Ideally, the kind should be @DepParams (EffectClassIdentifierOf e)@ instead of @k@. However, it
+    Ideally, the kinds should be @DepParams (EffectClassIdentifierOf e)@ instead of @k@. However, it
     seems that kind inference isn't working well, so the kind annotation is intentionally weakened.
 -}
 
@@ -84,6 +84,12 @@ type family
         (eci :: EffectClassIdentifier)
         (dps :: k) ::
         EffectClass
+
+-- | Obtain the identifier of the effect class.
+type family EffectClassIdentifierOfC (e :: EffectClass) :: EffectClassIdentifier
+
+-- | Obtain the dependent parameters portion of the effect class.
+type family DepParamsOfC (e :: EffectClass) :: k
 
 {- |
 Obtain the /instruction class/ data type from the effect class identifier and tuple of dependent
