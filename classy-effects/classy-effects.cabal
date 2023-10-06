@@ -59,6 +59,7 @@ library
         Control.Effect.Class.Input
         Control.Effect.Class.Output
         Control.Effect.Class.Provider
+        Control.Effect.Class.Provider.Implicit
         Control.Effect.Class.Fix
         Control.Effect.Class.Fail
         Control.Effect.Class.Cont

@@ -17,51 +17,37 @@ in the @effectful@ package.
 -}
 module Control.Effect.Class.Provider where
 
-import Control.Effect.Class (
-    EffectDataHandler,
-    EffectsVia (EffectsVia),
-    SendSig,
-    runEffectsVia,
-    sendSig,
-    type (~>),
- )
+import Control.Effect.Class (type (~>))
 import Control.Effect.Class.Machinery.HFunctor (HFunctor, hfmap)
 import Data.Effect.Class.TH (makeSignature)
 
-class Provider c e i g (f :: Type -> Type) where
-    provide :: i -> (forall h. (c h, e h) => (f ~> h) -> h a) -> f (g a)
+class Provider c i ctx e (f :: Type -> Type) | i ctx f -> c e where
+    provide :: i -> (forall g. (c g, e g) => (f ~> g) -> g a) -> f (ctx a)
 
 makeSignature ''Provider
+makeEffectInfoTypeInstances ''Provider (Just (HigherOrder, ''ProviderS))
+makeEffectSend ''Provider (Just (HigherOrder, ''ProviderS))
 
-instance HFunctor (ProviderS c e i g) where
-    hfmap phi (Provide i f) = Provide i \l -> f $ l . phi
-
-instance
-    SendSig (ProviderS c e i g) f =>
-    Provider c e i g (EffectsVia EffectDataHandler f)
-    where
-    {-# INLINE provide #-}
-    provide i f =
-        EffectsVia
-            . sendSig
-            . hfmap (runEffectsVia @EffectDataHandler)
-            $ Provide @c @e i f
+instance HFunctor (ProviderS c i ctx e) where
+    hfmap phi (Provide i f) = Provide i \emb -> f $ emb . phi
 
 type MonadProvider = Provider Monad
 type ApplicativeProvider = Provider Applicative
 
 mprovide ::
-    MonadProvider e i g f =>
+    forall e i ctx f a.
+    MonadProvider i ctx e f =>
     i ->
-    (forall h. (Monad h, e h) => (f ~> h) -> h a) ->
-    f (g a)
+    (forall g. (Monad g, e g) => (f ~> g) -> g a) ->
+    f (ctx a)
 mprovide = provide
 {-# INLINE mprovide #-}
 
 aprovide ::
-    ApplicativeProvider e i g f =>
+    forall e i ctx f a.
+    ApplicativeProvider i ctx e f =>
     i ->
     (forall h. (Applicative h, e h) => (f ~> h) -> h a) ->
-    f (g a)
+    f (ctx a)
 aprovide = provide
 {-# INLINE aprovide #-}

@@ -6,10 +6,9 @@
 
 module Prelude (
     module Prelude,
-    makeEffect,
-    makeEffectF,
-    makeEffectH,
-    makeEmptyEffect,
+    module Control.Effect.Class.Machinery.TH,
+    module Control.Effect.Class.Machinery.TH.Send,
+    module Control.Effect.Class.Machinery.TH.DepParams,
     Type,
 ) where
 
@@ -18,6 +17,13 @@ import Control.Effect.Class.Machinery.TH (
     makeEffectF,
     makeEffectH,
     makeEmptyEffect,
+ )
+import Control.Effect.Class.Machinery.TH.DepParams (
+    makeEffectInfoTypeInstances,
+ )
+import Control.Effect.Class.Machinery.TH.Send (
+    EffectOrder (FirstOrder, HigherOrder),
+    makeEffectSend,
  )
 import Data.Kind (Type)
 import "base" Prelude
