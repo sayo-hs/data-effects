@@ -160,7 +160,7 @@ effectMethodDec effTyVars MethodInterface{..} conName = do
 
         sendMethod = case methodOrder of
             FirstOrder -> [|sendIns|]
-            HigherOrder -> [|sendSig . hfmap runEffectsVia|]
+            HigherOrder -> [|sendSig . hfmap (runEffectsVia @EffectDataHandler)|]
         body = [|EffectsVia @EffectDataHandler $ $sendMethod $effData|]
 
     funDef <- funD methodName [clause (fmap varP methodParams) (normalB body) []]
