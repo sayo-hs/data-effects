@@ -252,7 +252,7 @@ type NopS = LiftIns NopI
 newtype Embed f (a :: Type) = Embed {unEmbed :: f a}
     deriving stock (Functor, Foldable, Traversable)
 
-newtype ViaEmbed handlerSystem g (f :: Type -> Type) a = ViaEmbed {runViaEmbed :: f a}
+newtype ViaEmbed handlerSystem (f :: Type -> Type) a = ViaEmbed {runViaEmbed :: f a}
     deriving newtype
         ( Functor
         , Applicative
@@ -270,21 +270,21 @@ newtype ViaEmbed handlerSystem g (f :: Type -> Type) a = ViaEmbed {runViaEmbed :
         )
 
 class Embeddable f where
-    type Embedded f g :: Type -> Type
-    unEmbedded :: Embedded f g a -> f a
+    type Embedded f :: Type -> Type
+    unEmbedded :: Embedded f a -> f a
 
 instance Embeddable (EffectsVia handlerSystem f) where
-    type Embedded (EffectsVia handlerSystem f) tag = EffectsVia handlerSystem (ViaEmbed handlerSystem tag f)
+    type Embedded (EffectsVia handlerSystem f) = EffectsVia handlerSystem (ViaEmbed handlerSystem f)
     unEmbedded = coerce
     {-# INLINE unEmbedded #-}
 
-embed :: forall g f a. Embeddable f => Embedded f g a -> f a
-embed = unEmbedded @_ @g
+embed :: Embeddable f => Embedded f a -> f a
+embed = unEmbedded
 {-# INLINE embed #-}
 
 instance
     SendIns (Embed g) (EffectsVia EffectDataHandler f) =>
-    SendIns g (ViaEmbed EffectDataHandler tag f)
+    SendIns g (ViaEmbed EffectDataHandler f)
     where
     sendIns = ViaEmbed . runEffectsVia @EffectDataHandler . sendIns . Embed
     {-# INLINE sendIns #-}
