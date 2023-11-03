@@ -252,10 +252,6 @@ type NopS = LiftIns NopI
 newtype Embed f (a :: Type) = Embed {unEmbed :: f a}
     deriving stock (Functor, Foldable, Traversable)
 
-instance SendIns f g => SendIns (Embed f) g where
-    sendIns = sendIns . unEmbed
-    {-# INLINE sendIns #-}
-
 newtype ViaEmbed handlerSystem g (f :: Type -> Type) a = ViaEmbed {runViaEmbed :: f a}
     deriving newtype
         ( Functor
