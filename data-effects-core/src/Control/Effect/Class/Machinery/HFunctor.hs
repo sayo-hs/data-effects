@@ -11,7 +11,7 @@ Portability :  portable
 
 This module re-exports the `HFunctor` type class and related definitions from the `compdata`
 package, which are required for the Heftia effect handler system. For more details, please refer to
- [CEP-03](https://github.com/sayo-hs/classy-effects/blob/master/CEPs/CEP-03.md) and
+ [CEP-03](https://github.com/sayo-hs/data-effects/blob/master/CEPs/CEP-03.md) and
 the [`compdata` documentation](https://hackage.haskell.org/package/compdata-0.13.0/docs/Data-Comp-Multi-HFunctor.html).
 -}
 module Control.Effect.Class.Machinery.HFunctor (

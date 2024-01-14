@@ -1,5 +1,5 @@
 cabal-version:      2.4
-name:               classy-effects
+name:               data-effects
 version:            0.1.0.0
 
 -- A short (one-line) description of the package.
@@ -7,22 +7,22 @@ synopsis: An interface for a handler-independent, typeclass-based effect system.
 
 -- A longer description of the package.
 description:
-    This library provides definitions for CEPs (classy-effects protocols) to standardize and unify
+    This library provides definitions for CEPs (data-effects protocols) to standardize and unify
     the definition of effects in Haskell in a backend-library-agnostic manner. It also includes
     several standard effect definitions defined in compliance with CEPs, and Template Haskell
     functions to automatically make type classes conform to CEPs as effect classes.
 
     Please refer
-    to [CEPs](https://github.com/sayo-hs/classy-effects/blob/master/CEPs/README.md) for details.
+    to [CEPs](https://github.com/sayo-hs/data-effects/blob/master/CEPs/README.md) for details.
 
     The Template Haskell functions are re-exported
-    from the [classy-effects-th](https://hackage.haskell.org/package/classy-effects-th) package,
+    from the [data-effects-th](https://hackage.haskell.org/package/data-effects-th) package,
     while the fundamental definitions are re-exported
-    from the [classy-effects-base](https://hackage.haskell.org/package/classy-effects-base)
+    from the [data-effects-core](https://hackage.haskell.org/package/data-effects-core)
     package.
 
 -- A URL where users can report bugs.
-bug-reports: https://github.com/sayo-hs/classy-effects
+bug-reports: https://github.com/sayo-hs/data-effects
 
 -- The license under which the package is released.
 license:            MPL-2.0
@@ -44,9 +44,9 @@ tested-with:
 
 source-repository head
     type: git
-    location: https://github.com/sayo-hs/classy-effects
+    location: https://github.com/sayo-hs/data-effects
     tag: v0.1.0
-    subdir: classy-effects
+    subdir: data-effects
 
 library
     exposed-modules:
@@ -85,8 +85,8 @@ library
     -- other-extensions:
     build-depends:
         base                          ^>= 4.16.4.0,
-        classy-effects-base           ^>= 0.1,
-        classy-effects-th             ^>= 0.1,
+        data-effects-core           ^>= 0.1,
+        data-effects-th             ^>= 0.1,
         these
 
     hs-source-dirs:   src
@@ -110,7 +110,7 @@ test-suite test
     main-is: Driver.hs
     hs-source-dirs: test
     build-depends:
-        classy-effects,
+        data-effects,
         base,
         tasty                         ^>= 1.4,
         tasty-hunit                   ^>= 0.10,

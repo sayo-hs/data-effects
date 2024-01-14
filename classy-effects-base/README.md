@@ -1,1 +1,0 @@
-../classy-effects/README.md

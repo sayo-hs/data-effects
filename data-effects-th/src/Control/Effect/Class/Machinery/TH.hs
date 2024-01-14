@@ -10,7 +10,7 @@ Stability   :  experimental
 Portability :  portable
 
 This module provides @TemplateHaskell@ functions to generates automatically various data types and
-instances that constitute the effect system supplied by the @classy-effects@ framework.
+instances that constitute the effect system supplied by the @data-effects@ framework.
 -}
 module Control.Effect.Class.Machinery.TH where
 

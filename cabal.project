@@ -1,6 +1,6 @@
 
 packages:
-    classy-effects/
-    classy-effects-base/
-    classy-effects-th/
+    data-effects/
+    data-effects-core/
+    data-effects-th/
 

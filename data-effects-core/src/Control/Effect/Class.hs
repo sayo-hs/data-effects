@@ -16,8 +16,8 @@ Stability   :  experimental
 Portability :  portable
 
 This module provides the essential definitions required for CEPs compliance, forming the foundation
-of classy-effects.
-Please refer to [CEPs](https://github.com/sayo-hs/classy-effects/blob/master/CEPs/README.md) for details.
+of data-effects.
+Please refer to [CEPs](https://github.com/sayo-hs/data-effects/blob/master/CEPs/README.md) for details.
 -}
 module Control.Effect.Class where
 
@@ -101,7 +101,7 @@ instance SendIns ins f => SendSig (LiftIns ins) f where
     sendSig = sendIns . unliftIns
     {-# INLINE sendSig #-}
 
--- | A wrapper data type to integrate a backend handler system into the classy-effects framework.
+-- | A wrapper data type to integrate a backend handler system into the data-effects framework.
 newtype EffectsVia handlerSystem (f :: Type -> Type) a = EffectsVia {runEffectsVia :: f a}
     deriving newtype
         ( Functor
