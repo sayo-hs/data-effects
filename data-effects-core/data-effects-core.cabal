@@ -3,19 +3,10 @@ name:               data-effects-core
 version:            0.1.0.0
 
 -- A short (one-line) description of the package.
-synopsis: An interface for a handler-independent, typeclass-based effect system.
+synopsis: A basic framework for an effect system based on effects represented by GADTs.
 
 -- A longer description of the package.
 description:
-    This library provides definitions for CEPs (data-effects protocols) to standardize and unify
-    the definition of effects in Haskell in a backend-library-agnostic manner. Please refer
-    to [CEPs](https://github.com/sayo-hs/data-effects/blob/master/CEPs/README.md) for details.
-
-    This library provides only the fundamental definitions for data-effects. Please also refer to
-    the [data-effects](https://hackage.haskell.org/package/data-effects) package, which offers
-    standard effect definitions compliant with CEPs, and
-    the [data-effects-th](https://hackage.haskell.org/package/data-effects-th) package, which
-    enables automatic compliance with CEPs.
 
 -- A URL where users can report bugs.
 bug-reports: https://github.com/sayo-hs/data-effects
@@ -28,7 +19,7 @@ maintainer:         Yamada Ryo <ymdfield@outlook.jp>
 
 -- A copyright notice.
 copyright:
-    2023 Yamada Ryo,
+    2023-2024 Yamada Ryo,
     2023 Casper Bach Poulsen and Cas van der Rest
 
 category: Control, Effect
@@ -49,9 +40,12 @@ source-repository head
 
 library
     exposed-modules:
-        Control.Effect.Class
-        Control.Effect.Class.Machinery.HFunctor
-        Control.Effect.Class.Machinery.DepParams
+        Data.Effect
+        Data.Effect.Tag
+        Data.Effect.HFunctor
+        Control.Effect
+        Control.Effect.Tag
+        Control.Effect.Key
 
     -- Modules included in this executable, other than Main.
     -- other-modules:

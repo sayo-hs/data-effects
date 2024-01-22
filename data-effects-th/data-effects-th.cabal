@@ -3,19 +3,10 @@ name:               data-effects-th
 version:            0.1.0.0
 
 -- A short (one-line) description of the package.
-synopsis: Automatic compliance with the data-effects protocols
+synopsis: A basic framework for an effect system based on effects represented by GADTs.
 
 -- A longer description of the package.
 description:
-    This package provides Template Haskell functions that enable automatic compliance with CEPs
-    (data-effects protocols), offering a unified framework for defining effects in Haskell.
-
-    CEPs aim to standardize and unify the definition of effects in Haskell in a
-    backend-library-agnostic manner. Please refer
-    to [CEPs](https://github.com/sayo-hs/data-effects/blob/master/CEPs/README.md) for details.
-
-    Please also refer to the [data-effects](https://hackage.haskell.org/package/data-effects)
-    package, which offers standard effect definitions compliant with CEPs.
 
 -- A URL where users can report bugs.
 bug-reports: https://github.com/sayo-hs/data-effects
