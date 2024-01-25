@@ -60,20 +60,18 @@ Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
 -}
-module Data.Effect.Class.TH.HFunctor.Internal where
+module Data.Effect.HFunctor.TH.Internal where
 
-import Control.Effect.Class.Machinery.HFunctor (HFunctor, hfmap)
-import Control.Monad (replicateM, (<=<))
-import Data.Effect.Class.TH.Internal (DataInfo (DataInfo), tyVarName)
+import Control.Monad (replicateM)
+import Data.Effect.HFunctor (HFunctor, hfmap)
+import Data.Effect.TH.Internal (ConInfo (ConInfo), DataInfo (DataInfo), conArgs, conGadtReturnType, conName, tyVarName)
 import Data.Maybe (catMaybes)
 import Language.Haskell.TH (
     Body (NormalB),
     Clause (Clause),
-    Con (ForallC, GadtC, InfixC, NormalC, RecC),
     Cxt,
-    Dec (DataD, InstanceD, NewtypeD),
+    Dec (InstanceD),
     Exp,
-    Info (TyConI),
     Name,
     Pat (ConP, VarP, WildP),
     Q,
@@ -84,20 +82,19 @@ import Language.Haskell.TH (
     funD,
     varE,
  )
-import Language.Haskell.TH.Syntax (StrictType)
 
 {- |
 Derive an instance of 'HFunctor' for a type constructor of any higher-order kind taking at least two
 arguments, from 'DataInfo'.
 -}
-deriveHFunctor :: DataInfo flag -> Q [Dec]
-deriveHFunctor (DataInfo _cxt name args constrs _deriving) = do
+deriveHFunctor :: DataInfo -> Q [Dec]
+deriveHFunctor (DataInfo _cxt name args constrs) = do
     let args' = init args
         fArg = VarT . tyVarName $ last args'
         argNames = map (VarT . tyVarName) (init args')
         complType = foldl AppT (ConT name) argNames
         classType = AppT (ConT ''HFunctor) complType
-    constrs' <- mapM (mkPatAndVars . isFarg fArg <=< normalConExp) constrs
+    constrs' <- mapM (mkPatAndVars . isFarg fArg . normalConExp) constrs
     hfmapDecl <- funD 'hfmap (map hfmapClause constrs')
     return [mkInstanceD [] classType [hfmapDecl]]
   where
@@ -131,32 +128,8 @@ deriveHFunctor (DataInfo _cxt name args constrs _deriving) = do
             body <- foldl appE con vars
             return $ Clause [fp, pat] (NormalB body) []
 
-{- |
-This function abstracts away @newtype@ declaration, it turns them into
-@data@ declarations.
--}
-abstractNewtype :: Info -> Maybe (DataInfo ())
-abstractNewtype = \case
-    TyConI (NewtypeD cxt name args _ constr derive) -> Just (DataInfo cxt name args [constr] derive)
-    TyConI (DataD cxt name args _ constrs derive) -> Just (DataInfo cxt name args constrs derive)
-    _ -> Nothing
-
-{- |
-This function provides the name and the arity of the given data
-constructor, and if it is a GADT also its type.
--}
-normalCon :: Con -> (Name, [StrictType], Maybe Type)
-normalCon (NormalC constr args) = (constr, args, Nothing)
-normalCon (RecC constr args) = (constr, map (\(_, s, t) -> (s, t)) args, Nothing)
-normalCon (InfixC a constr b) = (constr, [a, b], Nothing)
-normalCon (ForallC _ _ constr) = normalCon constr
-normalCon (GadtC (constr : _) args typ) = (constr, args, Just typ)
-normalCon _ = error "missing case for 'normalCon'"
-
-normalConExp :: Con -> Q (Name, [Type], Maybe Type)
-normalConExp con = pure (n, map snd ts, t)
-  where
-    (n, ts, t) = normalCon con
+normalConExp :: ConInfo -> (Name, [Type], Maybe Type)
+normalConExp ConInfo{..} = (conName, map snd conArgs, conGadtReturnType)
 
 containsType' :: Type -> Type -> [Int]
 containsType' = run 0

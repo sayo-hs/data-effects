@@ -4,7 +4,6 @@
 
 {- |
 Copyright   :  (c) 2023 Yamada Ryo
-               (c) 2010-2011 Patrick Bahr
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
@@ -15,9 +14,10 @@ This module provides @TemplateHaskell@ functions to derive an instance of
 
 The definitions come from "Data.Comp.Multi.Derive" in the compdata-0.13.0 package.
 -}
-module Data.Effect.Class.TH.HFunctor where
+module Data.Effect.HFunctor.TH where
 
-import Data.Effect.Class.TH.HFunctor.Internal (abstractNewtype, deriveHFunctor)
+import Data.Effect.HFunctor.TH.Internal (deriveHFunctor)
+import Data.Effect.TH.Internal (analyzeData)
 import Language.Haskell.TH (Dec, Name, Q, reify)
 
 {- |
@@ -25,6 +25,6 @@ Derive an instance of 'Data.Comp.Multi.HFunctor.HFunctor' for a type constructor
 kind taking at least two arguments.
 -}
 makeHFunctor :: Name -> Q [Dec]
-makeHFunctor fname = do
-    Just dInfo <- abstractNewtype <$> reify fname
-    deriveHFunctor dInfo
+makeHFunctor name = do
+    Just info <- analyzeData <$> reify name
+    deriveHFunctor info

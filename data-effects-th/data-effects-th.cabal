@@ -41,16 +41,10 @@ source-repository head
 
 library
     exposed-modules:
-        Control.Effect.Class.Machinery.TH
-        Control.Effect.Class.Machinery.TH.Internal
-        Control.Effect.Class.Machinery.TH.Send
-        Control.Effect.Class.Machinery.TH.Send.Internal
-        Control.Effect.Class.Machinery.TH.DepParams
-        Control.Effect.Class.Machinery.TH.DepParams.Internal
-        Data.Effect.Class.TH
-        Data.Effect.Class.TH.Internal
-        Data.Effect.Class.TH.HFunctor
-        Data.Effect.Class.TH.HFunctor.Internal
+        Data.Effect.HFunctor.TH
+        Data.Effect.HFunctor.TH.Internal
+        Data.Effect.TH.Internal
+        Data.Effect.TH
 
     -- Modules included in this executable, other than Main.
     -- other-modules:
@@ -65,7 +59,11 @@ library
         lens ^>= 5.2.3,
         mtl ^>= 2.2.2,
         extra ^>= 1.7.14,
-        containers
+        containers,
+        either,
+        text,
+        data-default
+
 
     hs-source-dirs:   src
     ghc-options:      -Wall
