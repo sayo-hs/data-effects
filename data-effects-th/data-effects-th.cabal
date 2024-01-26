@@ -82,7 +82,7 @@ library
 
 test-suite Example
     other-modules:
-        DeriveHFunctor
+        Example
 
     main-is: Driver.hs
     hs-source-dirs: Example
@@ -92,6 +92,7 @@ test-suite Example
         data-effects-core,
         tasty       ^>= 1.4,
         tasty-hunit ^>= 0.10,
+        data-default,
 
     type: exitcode-stdio-1.0
 
