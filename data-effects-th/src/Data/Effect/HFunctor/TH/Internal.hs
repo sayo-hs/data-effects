@@ -1,4 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use <=<" #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -42,16 +46,6 @@
         POSSIBILITY OF SUCH DAMAGE.
 -}
 
-{-
-This fork was made to work around the problem that the
-'Control.Effect.Class.Machinery.TH.makeEffect' function that generates multiple
-definitions at once for convenience is not possible with only the original
-'Data.Comp.Multi.Derive.makeHFunctor' function due to TH limitations,
-because the original function takes the name of the data type as an argument,
-but there is no version that takes 'DataInfo' as an argument (the data type
-reification and the HFunctor derivation process are not separated as functions).
--}
-
 {- |
 Copyright   :  (c) 2010-2011 Patrick Bahr, Tom Hvitved
                (c) 2023 Yamada Ryo
@@ -62,99 +56,167 @@ Portability :  portable
 -}
 module Data.Effect.HFunctor.TH.Internal where
 
-import Control.Monad (replicateM)
+import Control.Monad (replicateM, zipWithM)
 import Data.Effect.HFunctor (HFunctor, hfmap)
-import Data.Effect.TH.Internal (ConInfo (ConInfo), DataInfo (DataInfo), conArgs, conGadtReturnType, conName, tyVarName)
-import Data.Maybe (catMaybes)
+import Data.Effect.TH.Internal (ConInfo (ConInfo), DataInfo (DataInfo), conArgs, conGadtReturnType, conName, occurs, tyVarName, tyVarType, unkindType)
+import Data.Foldable (foldl')
+import Data.Functor ((<&>))
+import Data.List.Infinite (Infinite, prependList)
+import Data.Text qualified as T
+import Formatting (int, sformat, shown, stext, (%))
 import Language.Haskell.TH (
     Body (NormalB),
     Clause (Clause),
-    Cxt,
-    Dec (InstanceD),
-    Exp,
+    Dec (FunD, InstanceD, PragmaD),
+    Exp (AppE, CaseE, ConE, LamE, TupE, VarE),
+    Inline (Inline),
+    Match (Match),
     Name,
-    Pat (ConP, VarP, WildP),
+    Pat (ConP, TupP, VarP),
+    Phases (AllPhases),
+    Pragma (InlineP),
     Q,
     Quote (..),
-    Type (AppT, ConT, ForallT, SigT, VarT),
+    RuleMatch (FunLike),
+    TyVarBndr (PlainTV),
+    Type (AppT, ArrowT, ConT, ForallT, SigT, TupleT, VarT),
     appE,
-    conE,
-    funD,
-    varE,
+    nameBase,
+    pprint,
  )
+import Language.Haskell.TH qualified as TH
 
 {- |
-Derive an instance of 'HFunctor' for a type constructor of any higher-order kind taking at least two
-arguments, from 'DataInfo'.
+Derive an instance of t'Data.Effect.HFunctor.HFunctor' for a type constructor of any higher-order
+kind taking at least two arguments.
 -}
-deriveHFunctor :: DataInfo -> Q [Dec]
-deriveHFunctor (DataInfo _cxt name args constrs) = do
-    let args' = init args
-        fArg = VarT . tyVarName $ last args'
-        argNames = map (VarT . tyVarName) (init args')
-        complType = foldl AppT (ConT name) argNames
-        classType = AppT (ConT ''HFunctor) complType
-    constrs' <- mapM (mkPatAndVars . isFarg fArg . normalConExp) constrs
-    hfmapDecl <- funD 'hfmap (map hfmapClause constrs')
-    return [mkInstanceD [] classType [hfmapDecl]]
+deriveHFunctor :: (Infinite (Q TH.Type) -> Q TH.Type) -> DataInfo -> Q [Dec]
+deriveHFunctor manualCxt (DataInfo _ name args cons) = do
+    mapFnName <- newName "_f"
+    let mapFn = VarE mapFnName
+
+        initArgs = init args
+        hfArgs = init initArgs
+
+        hfArgNames = map (VarT . tyVarName) hfArgs
+
+        -- The algorithm is based on: https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/derive-functor
+        hfmapClause :: ConInfo -> Q Clause
+        hfmapClause ConInfo{..} = do
+            let f = case conGadtReturnType of
+                    Nothing -> last initArgs
+                    Just t -> case t of
+                        _ `AppT` VarT n `AppT` _ -> PlainTV n ()
+                        _ `AppT` (VarT n `SigT` _) `AppT` _ -> PlainTV n ()
+                        _ -> error $ "Encounted unknown structure: " ++ pprint t
+
+                hfmapE :: TH.Type -> Exp -> Q Exp
+                hfmapE tk
+                    | fNotOccurs t = pure
+                    | otherwise = \x -> case t of
+                        VarT n `AppT` a | n == tyVarName f && fNotOccurs a -> pure $ mapFn `AppE` x
+                        ArrowT `AppT` c `AppT` d ->
+                            wrapLam \y -> hfmapE d . (x `AppE`) =<< cohfmapE c y
+                        g `AppT` a
+                            | fNotOccurs g ->
+                                ((VarE 'fmap `AppE`) <$> wrapLam (hfmapE a)) <&> (`AppE` x)
+                        ff `AppT` g `AppT` a
+                            | fNotOccurs ff && fNotOccurs a ->
+                                ((VarE 'hfmap `AppE`) <$> wrapLam (hfmapE $ g `AppT` a)) <&> (`AppE` x)
+                        -- todo: tuple support
+                        ForallT _ _ a -> hfmapE a x
+                        _ ->
+                            case mapTupleE hfmapE t x of
+                                Just e -> e
+                                Nothing -> fail $ "Encounted unsupported structure: " ++ pprint t
+                  where
+                    t = unkindType tk
+
+                cohfmapE :: TH.Type -> Exp -> Q Exp
+                cohfmapE tk
+                    | not $ tyVarName f `occurs` t = pure
+                    | otherwise = \x -> case t of
+                        VarT n `AppT` a
+                            | n == tyVarName f && fNotOccurs a ->
+                                fail $ "Functor type variable occurs in contravariant position: " ++ pprint t
+                        ArrowT `AppT` c `AppT` d ->
+                            wrapLam \y -> cohfmapE d . (x `AppE`) =<< hfmapE c y
+                        g `AppT` a
+                            | fNotOccurs g ->
+                                ((VarE 'fmap `AppE`) <$> wrapLam (cohfmapE a)) <&> (`AppE` x)
+                        ff `AppT` _ `AppT` a
+                            | fNotOccurs ff && fNotOccurs a ->
+                                fail $ "Functor type variable occurs in contravariant position: " ++ pprint t
+                        ForallT _ _ b' -> cohfmapE b' x
+                        _ ->
+                            case mapTupleE cohfmapE t x of
+                                Just e -> e
+                                Nothing -> fail $ "Encounted unsupported structure: " ++ pprint t
+                  where
+                    t = unkindType tk
+
+                fNotOccurs = not . (tyVarName f `occurs`)
+
+            vars <- replicateM (length conArgs) (newName "x")
+            mappedArgs <- zipWithM hfmapE (map snd conArgs) (map VarE vars)
+            let body = foldl' AppE (ConE conName) mappedArgs
+            pure $ Clause [VarP mapFnName, ConP conName [] (map VarP vars)] (NormalB body) []
+
+    cxt <-
+        manualCxt $
+            map (pure . tyVarType) hfArgs
+                `prependList` error
+                    ( T.unpack $
+                        sformat
+                            ( "Too many data type arguments in use. The number of usable type arguments in the data type ‘"
+                                % shown
+                                % "’ to be derived is "
+                                % int
+                                % ". ("
+                                % stext
+                                % ")"
+                            )
+                            name
+                            (length hfArgs)
+                            (T.intercalate ", " $ map ((\t -> "‘" <> t <> "’") . T.pack . nameBase . tyVarName) hfArgs)
+                    )
+
+    hfmapDecls <- FunD 'hfmap <$> mapM hfmapClause cons
+    let fnInline = PragmaD (InlineP 'hfmap Inline FunLike AllPhases)
+
+    pure
+        [ InstanceD
+            Nothing
+            [cxt]
+            (ConT ''HFunctor `AppT` foldl' AppT (ConT name) hfArgNames)
+            [hfmapDecls, fnInline]
+        ]
+
+wrapLam :: (Exp -> Q Exp) -> Q Exp
+wrapLam f = do
+    x <- newName "x"
+    LamE [VarP x] <$> f (VarE x)
+
+mapTupleE :: (TH.Type -> Exp -> Q Exp) -> TH.Type -> Exp -> Maybe (Q Exp)
+mapTupleE f t e = do
+    es <- decomposeTupleT t
+    let n = length es
+    Just do
+        xs <- newNames n "x"
+        ys <- zipWithM f es $ map VarE xs
+        pure $ CaseE e [Match (TupP $ map VarP xs) (NormalB $ TupE $ map Just ys) []]
+
+decomposeTupleT :: TH.Type -> Maybe [TH.Type]
+decomposeTupleT = go [] 0
   where
-    isFarg fArg (constr, args_, ty) = (constr, map (`containsType'` getBinaryFArg fArg ty) args_)
-    filterVar _ nonFarg [] x = nonFarg x
-    filterVar farg _ [depth] x = farg depth x
-    filterVar _ _ _ _ = error "functor variable occurring twice in argument type"
-    filterVars args_ varNs farg nonFarg = zipWith (filterVar farg nonFarg) args_ varNs
-    mkCPat constr varNs = ConP constr [] $ map mkPat varNs
-    mkPat = VarP
-    mkPatAndVars ::
-        (Name, [[t]]) ->
-        Q (Q Exp, Pat, (t -> Q Exp -> c) -> (Q Exp -> c) -> [c], Bool, [Q Exp], [(t, Name)])
-    mkPatAndVars (constr, args_) =
-        do
-            varNs <- newNames (length args_) "x"
-            return
-                ( conE constr
-                , mkCPat constr varNs
-                , \f g -> filterVars args_ varNs (\d x -> f d (varE x)) (g . varE)
-                , not (all null args_)
-                , map varE varNs
-                , catMaybes $ filterVars args_ varNs (curry Just) (const Nothing)
-                )
-    hfmapClause (con, pat, vars', hasFargs, _, _) =
-        do
-            fn <- newName "f"
-            let f = varE fn
-                fp = if hasFargs then VarP fn else WildP
-                vars = vars' (\d x -> iter d [|fmap|] f `appE` x) id
-            body <- foldl appE con vars
-            return $ Clause [fp, pat] (NormalB body) []
+    go :: [TH.Type] -> Int -> TH.Type -> Maybe [TH.Type]
+    go acc !n = \case
+        TupleT m | m == n -> Just acc
+        f `AppT` a -> go (a : acc) (n + 1) f
+        _ -> Nothing
+{-# INLINE decomposeTupleT #-}
 
-normalConExp :: ConInfo -> (Name, [Type], Maybe Type)
-normalConExp ConInfo{..} = (conName, map snd conArgs, conGadtReturnType)
-
-containsType' :: Type -> Type -> [Int]
-containsType' = run 0
-  where
-    run n s t
-        | s == t = [n]
-        | otherwise = case s of
-            ForallT _ _ s' -> run n s' t
-            -- only going through the right-hand side counts!
-            AppT s1 s2 -> run n s1 t ++ run (n + 1) s2 t
-            SigT s' _ -> run n s' t
-            _ -> []
-
-{- |
-Auxiliary function to extract the first argument of a binary type
-application (the second argument of this function). If the second
-argument is @Nothing@ or not of the right shape, the first argument
-is returned as a default.
--}
-getBinaryFArg :: Type -> Maybe Type -> Type
-getBinaryFArg _ (Just (AppT (AppT _ t) _)) = t
-getBinaryFArg def _ = def
-
-mkInstanceD :: Cxt -> Type -> [Dec] -> Dec
-mkInstanceD = InstanceD Nothing
+-- * Utility functions
 
 {- |
 This function provides a list (of the given length) of new names based

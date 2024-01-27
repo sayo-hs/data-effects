@@ -62,8 +62,9 @@ library
         containers,
         either,
         text,
-        data-default
-
+        data-default,
+        infinite-list,
+        formatting,
 
     hs-source-dirs:   src
     ghc-options:      -Wall
@@ -93,6 +94,7 @@ test-suite Example
         tasty       ^>= 1.4,
         tasty-hunit ^>= 0.10,
         data-default,
+        infinite-list,
 
     type: exitcode-stdio-1.0
 

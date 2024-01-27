@@ -35,7 +35,7 @@ import Data.Effect.TH.Internal (
  )
 import Data.Function ((&))
 import Data.List (singleton)
-import Language.Haskell.TH (Dec, Name, Q)
+import Language.Haskell.TH (Dec, Name, Q, Type (TupleT))
 
 makeEffect' :: [Name] -> [Name] -> MakeEffectConf -> Q [Dec]
 makeEffect' inss sigs (MakeEffectConf conf) = execWriterT do
@@ -58,7 +58,7 @@ makeEffect' inss sigs (MakeEffectConf conf) = execWriterT do
         makeSenders ecConf effClsInfo & lift >>= tell
 
         when _doesDeriveHFunctor do
-            deriveHFunctor dataInfo & lift >>= tell
+            deriveHFunctor (const $ pure $ TupleT 0) dataInfo & lift >>= tell
 
 makeEffect :: [Name] -> [Name] -> Q [Dec]
 makeEffect inss sigs = makeEffect' inss sigs def
