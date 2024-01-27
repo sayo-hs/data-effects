@@ -38,3 +38,6 @@ makeHFunctor' ''ManuallyCxt \(g :< h :< _) -> [t|(Functor $g, HFunctor $h)|]
 data NestedTuple (f :: Type -> Type) (a :: Type) where
     NestedTuple :: ((forall x. (f x, f a) -> Int) -> Int) -> NestedTuple f a
 makeHFunctor ''NestedTuple
+
+newtype IdentityH f (a :: Type) = IdentityH {unIdentityH :: f a}
+makeHFunctor ''IdentityH

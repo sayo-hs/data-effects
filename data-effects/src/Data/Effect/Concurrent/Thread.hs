@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,16 +11,9 @@ Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
 -}
-module Control.Effect.Class.State where
+module Data.Effect.Concurrent.Thread where
 
-class State s f where
-    get :: f s
-    put :: s -> f ()
+data Thread tid f (a :: Type) where
+    ForkThread :: f () -> Thread tid f tid
 
-makeEffectF ''State
-
-gets :: (State s f, Functor f) => (s -> a) -> f a
-gets f = f <$> get
-
-modify :: (State s m, Monad m) => (s -> s) -> m ()
-modify f = put . f =<< get
+makeEffectH [''Thread]

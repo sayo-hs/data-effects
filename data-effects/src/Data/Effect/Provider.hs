@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -15,39 +15,30 @@ This module provides the `Provider` effect, comes
 from [@Effectful.Provider@](https://hackage.haskell.org/package/effectful-core-2.3.0.0/docs/Effectful-Provider.html)
 in the @effectful@ package.
 -}
-module Control.Effect.Class.Provider where
+module Data.Effect.Provider where
 
-import Control.Effect.Class (type (~>))
-import Control.Effect.Class.Machinery.HFunctor (HFunctor, hfmap)
-import Data.Effect.Class.TH (makeSignature)
+data Provider c i ctx e (f :: Type -> Type) (a :: Type) where
+    Provide :: i -> (forall g. (c g, e g) => (forall x. f x -> g x) -> g a) -> Provider c i ctx e f (ctx a)
 
-class Provider c i ctx e (f :: Type -> Type) | i ctx f -> c e where
-    provide :: i -> (forall g. (c g, e g) => (f ~> g) -> g a) -> f (ctx a)
-
-makeSignature ''Provider
-makeEffectInfoTypeInstances ''Provider (Just (HigherOrder, ''ProviderS))
-makeEffectSend ''Provider (Just (HigherOrder, ''ProviderS))
-
-instance HFunctor (ProviderS c i ctx e) where
-    hfmap phi (Provide i f) = Provide i \emb -> f $ emb . phi
+makeEffectH [''Provider]
 
 type MonadProvider = Provider Monad
 type ApplicativeProvider = Provider Applicative
 
 mprovide ::
     forall e i ctx f a.
-    MonadProvider i ctx e f =>
+    MonadProvider i ctx e <<: f =>
     i ->
-    (forall g. (Monad g, e g) => (f ~> g) -> g a) ->
+    (forall g. (Monad g, e g) => (forall x. f x -> g x) -> g a) ->
     f (ctx a)
 mprovide = provide
 {-# INLINE mprovide #-}
 
 aprovide ::
     forall e i ctx f a.
-    ApplicativeProvider i ctx e f =>
+    ApplicativeProvider i ctx e <<: f =>
     i ->
-    (forall h. (Applicative h, e h) => (f ~> h) -> h a) ->
+    (forall h. (Applicative h, e h) => (forall x. f x -> h x) -> h a) ->
     f (ctx a)
 aprovide = provide
 {-# INLINE aprovide #-}

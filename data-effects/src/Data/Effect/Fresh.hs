@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,9 +11,9 @@ Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
 -}
-module Control.Effect.Class.Concurrent.Thread where
+module Data.Effect.Fresh where
 
-class Thread tid f | f -> tid where
-    forkThread :: f () -> f tid
+data Fresh i (a :: Type) where
+    Fresh :: Fresh i i
 
-makeEffectH ''Thread
+makeEffectF [''Fresh]

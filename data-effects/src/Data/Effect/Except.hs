@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -10,14 +10,13 @@ License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
-
-This module provides the t`Output` effect, comes
-from [@Polysemy.Output@](https://hackage.haskell.org/package/polysemy-1.9.1.1/docs/Polysemy-Output.html)
-in the @polysemy@ package.
 -}
-module Control.Effect.Class.Output where
+module Data.Effect.Except where
 
-class Output o f where
-    output :: o -> f ()
+data Throw e (a :: Type) where
+    Throw :: e -> Throw e a
 
-makeEffectF ''Output
+data Catch e f (a :: Type) where
+    Catch :: f a -> (e -> f a) -> Catch e f a
+
+makeEffect [''Throw] [''Catch]

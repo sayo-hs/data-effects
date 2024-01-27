@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,15 +11,16 @@ Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
 -}
-module Control.Effect.Class.Reader where
+module Data.Effect.State where
 
-class Ask (r :: Type) f where
-    ask :: f r
+data State s a where
+    Get :: State s s
+    Put :: s -> State s ()
 
-class Local r f where
-    local :: (r -> r) -> f a -> f a
+makeEffectF [''State]
 
-makeEffect "Reader" ''Ask ''Local
+gets :: (State s <: f, Functor f) => (s -> a) -> f a
+gets f = f <$> get
 
-asks :: (Ask r f, Functor f) => (r -> a) -> f a
-asks f = f <$> ask
+modify :: (State s <: m, Monad m) => (s -> s) -> m ()
+modify f = put . f =<< get

@@ -1,8 +1,8 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-module Control.Effect.Class.Fresh where
 
 {- |
 Copyright   :  (c) 2023 Yamada Ryo
@@ -11,7 +11,15 @@ Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
 -}
-class Fresh (i :: Type) f where
-    fresh :: f i
+module Data.Effect.Reader where
 
-makeEffectF ''Fresh
+data Ask r (a :: Type) where
+    Ask :: Ask r r
+
+data Local r f (a :: Type) where
+    Local :: (r -> r) -> f a -> Local r f a
+
+makeEffect [''Ask] [''Local]
+
+asks :: (Ask r <: f, Functor f) => (r -> a) -> f a
+asks f = f <$> ask

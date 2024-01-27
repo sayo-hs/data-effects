@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -16,9 +16,9 @@ This module provides the t`Coroutine` effect, comes
 from [@Control.Monad.Freer.Coroutine@](https://hackage.haskell.org/package/freer-simple-1.2.1.2/docs/Control-Monad-Freer-Coroutine.html)
 in the @freer-simple@ package.
 -}
-module Control.Effect.Class.Coroutine where
+module Data.Effect.Coroutine where
 
-class Coroutine a b f where
-    yield :: a -> (b -> c) -> f c
+data Coroutine a b c where
+    Yield :: a -> (b -> c) -> Coroutine a b c
 
-makeEffectF ''Coroutine
+makeEffectF [''Coroutine]

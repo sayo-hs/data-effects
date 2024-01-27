@@ -1,10 +1,12 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-module Control.Effect.Class.Select where
+module Data.Effect.Fail where
 
-class Select r f where
-    select :: ((a -> r) -> a) -> f a
+data Fail (a :: Type) where
+    Fail :: String -> Fail a
 
-makeEffectF ''Select
+makeEffectF [''Fail]

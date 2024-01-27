@@ -37,22 +37,23 @@ source-repository head
 
 library
     exposed-modules:
-        Control.Effect.Class.Reader
-        Control.Effect.Class.Writer
-        Control.Effect.Class.State
-        Control.Effect.Class.Except
-        Control.Effect.Class.Accum
-        Control.Effect.Class.Coroutine
-        Control.Effect.Class.Input
-        Control.Effect.Class.Output
-        Control.Effect.Class.Provider
-        Control.Effect.Class.Provider.Implicit
-        Control.Effect.Class.Fix
-        Control.Effect.Class.Fail
-        Control.Effect.Class.Cont
-        Control.Effect.Class.Chronicle
-        Control.Effect.Class.Resource
-        Control.Effect.Class.Concurrent.Thread
+        Data.Effect.Reader
+        Data.Effect.Writer
+        Data.Effect.State
+        Data.Effect.Except
+        Data.Effect.Accum
+        Data.Effect.Coroutine
+        Data.Effect.Input
+        Data.Effect.Output
+        Data.Effect.Provider
+        Data.Effect.Provider.Implicit
+        Data.Effect.Fix
+        Data.Effect.Fail
+        Data.Effect.Cont
+        Data.Effect.Chronicle
+        Data.Effect.Resource
+        Data.Effect.Fresh
+        Data.Effect.Concurrent.Thread
 
     reexported-modules:
         Data.Effect,
@@ -71,7 +72,8 @@ library
         base                          ^>= 4.16.4.0,
         data-effects-core           ^>= 0.1,
         data-effects-th             ^>= 0.1,
-        these
+        these,
+        data-default
 
     hs-source-dirs:   src
     ghc-options:      -Wall
