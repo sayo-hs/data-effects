@@ -15,18 +15,31 @@ Portability :  portable
 -}
 module Data.Effect.Provider.Implicit where
 
-data ImplicitProvider c i e (f :: Type -> Type) (a :: Type) where
-    WithImplicit :: i -> (forall g. (c g, e g) => (forall x. f x -> g x) -> g a) -> ImplicitProvider c i e f a
+data ImplicitProvider' c i e (f :: Type -> Type) (a :: Type) where
+    WithImplicit ::
+        i ->
+        (forall g. (c g, e g) => (forall x. f x -> g x) -> g a) ->
+        ImplicitProvider' c i e f a
 
-makeEffectH [''ImplicitProvider]
+makeKeyedEffect [] [''ImplicitProvider']
 
-type MonadImplicitProvider = ImplicitProvider Monad
-type ApplicativeImplicitProvider = ImplicitProvider Applicative
+type MonadImplicitProvider i e = ImplicitProvider Monad i e
+type ApplicativeImplicitProvider i e = ImplicitProvider Applicative i e
 
-(.!) :: forall c e i f a. ImplicitProvider c i e <<: f => i -> (forall g. (c g, e g) => g a) -> f a
-i .! m = withImplicit @i @c @e i \_ -> m
+(.!) ::
+    forall c e i f a.
+    SendSigBy ImplicitProviderKey f (ImplicitProvider' c i e) =>
+    i ->
+    (forall g. (c g, e g) => g a) ->
+    f a
+i .! m = withImplicit i \_ -> m
 {-# INLINE (.!) #-}
 
-(..!) :: forall c e i f a. ImplicitProvider c i e <<: f => i -> (forall g. (c g, e g) => (forall x. f x -> g x) -> g a) -> f a
-i ..! f = withImplicit @i @c @e i f
+(..!) ::
+    forall c e i f a.
+    SendSigBy ImplicitProviderKey f (ImplicitProvider' c i e) =>
+    i ->
+    (forall g. (c g, e g) => (forall x. f x -> g x) -> g a) ->
+    f a
+i ..! f = withImplicit i f
 {-# INLINE (..!) #-}

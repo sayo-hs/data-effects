@@ -17,17 +17,23 @@ in the @effectful@ package.
 -}
 module Data.Effect.Provider where
 
-data Provider c i ctx e (f :: Type -> Type) (a :: Type) where
-    Provide :: i -> (forall g. (c g, e g) => (forall x. f x -> g x) -> g a) -> Provider c i ctx e f (ctx a)
+data Provider' c i ctx e (f :: Type -> Type) (a :: Type) where
+    Provide ::
+        i ->
+        (forall g. (c g, e g) => (forall x. f x -> g x) -> g a) ->
+        Provider' c i ctx e f (ctx a)
 
-makeEffectH [''Provider]
+makeKeyedEffect [] [''Provider']
 
-type MonadProvider = Provider Monad
-type ApplicativeProvider = Provider Applicative
+type MonadProvider' = Provider' Monad
+type ApplicativeProvider' = Provider' Applicative
+
+type MonadProvider i ctx e = Provider Monad i ctx e
+type ApplicativeProvider i ctx e = Provider Applicative i ctx e
 
 mprovide ::
     forall e i ctx f a.
-    MonadProvider i ctx e <<: f =>
+    SendSigBy ProviderKey f (MonadProvider' i ctx e) =>
     i ->
     (forall g. (Monad g, e g) => (forall x. f x -> g x) -> g a) ->
     f (ctx a)
@@ -36,7 +42,7 @@ mprovide = provide
 
 aprovide ::
     forall e i ctx f a.
-    ApplicativeProvider i ctx e <<: f =>
+    SendSigBy ProviderKey f (ApplicativeProvider' i ctx e) =>
     i ->
     (forall h. (Applicative h, e h) => (forall x. f x -> h x) -> h a) ->
     f (ctx a)

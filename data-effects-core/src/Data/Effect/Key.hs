@@ -11,35 +11,35 @@ Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
 -}
-module Data.Effect.Tag where
+module Data.Effect.Key where
 
 import Data.Comp.Multi.HFunctor (HFunctor)
 import Data.Effect (InsClass, SigClass)
 
--- | Tagged /instruction class/.
-newtype Tag (ins :: InsClass) tag a = Tag {unTag :: ins a}
+-- | Keyed /instruction class/.
+newtype Key key (ins :: InsClass) a = Key {unKey :: ins a}
     deriving stock (Functor, Foldable, Traversable)
 
--- | Tagged /instruction class/.
-type (#) = Tag
+-- | Keyed /instruction class/.
+type (#>) = Key
 
-infixl 7 #
+infixr 6 #>
 
--- | Tagged /instruction class/.
-pattern T :: forall tag ins a. ins a -> Tag ins tag a
-pattern T e = Tag e
-{-# INLINE T #-}
+-- | Keyed /instruction class/.
+pattern K :: forall key ins a. ins a -> Key key ins a
+pattern K e = Key e
+{-# INLINE K #-}
 
--- | Tagged /signature class/.
-newtype TagH (sig :: SigClass) tag f a = TagH {unTagH :: sig f a}
+-- | Keyed /signature class/.
+newtype KeyH key (sig :: SigClass) f a = KeyH {unKeyH :: sig f a}
     deriving stock (Functor, Foldable, Traversable)
     deriving newtype (HFunctor)
 
--- | Tagged /signature class/.
-type (##) = TagH
+-- | Keyed /signature class/.
+type (##>) = KeyH
 
-infixl 7 ##
+infix 6 ##>
 
--- | Tagged /signature class/.
-pattern TH :: forall tag sig f a. sig f a -> TagH sig tag f a
-pattern TH e = TagH e
+-- | Keyed /signature class/.
+pattern KH :: forall key sig f a. sig f a -> KeyH key sig f a
+pattern KH e = KeyH e

@@ -19,6 +19,8 @@ import Control.Monad.Writer (execWriterT, forM_, lift, tell, when)
 import Data.Default (def)
 import Data.Effect.HFunctor.TH.Internal (deriveHFunctor)
 import Data.Effect.TH.Internal (
+    DataInfo,
+    EffClsInfo,
     EffectClassConf (
         EffectClassConf,
         _confByEffect,
@@ -30,20 +32,25 @@ import Data.Effect.TH.Internal (
     MakeEffectConf (MakeEffectConf),
     genLiftInsPatternSynonyms,
     genLiftInsTypeSynonym,
-    makeSenders,
+    genSenders,
     reifyEffCls,
  )
 import Data.Function ((&))
 import Data.List (singleton)
-import Language.Haskell.TH (Dec, Name, Q, Type (TupleT))
+import Language.Haskell.TH (Dec, Info, Name, Q, Type (TupleT))
 
-makeEffect' :: [Name] -> [Name] -> MakeEffectConf -> Q [Dec]
-makeEffect' inss sigs (MakeEffectConf conf) = execWriterT do
+makeEffect' ::
+    MakeEffectConf ->
+    (EffectOrder -> Info -> DataInfo -> EffClsInfo -> EffectClassConf -> Q [Dec]) ->
+    [Name] ->
+    [Name] ->
+    Q [Dec]
+makeEffect' (MakeEffectConf conf) extTemplate inss sigs = execWriterT do
     forM_ inss \ins -> do
-        (_, _, effClsInfo) <- reifyEffCls FirstOrder ins & lift
+        (info, dataInfo, effClsInfo) <- reifyEffCls FirstOrder ins & lift
         ecConf@EffectClassConf{..} <- conf effClsInfo & lift
 
-        makeSenders ecConf effClsInfo & lift >>= tell
+        genSenders ecConf effClsInfo & lift >>= tell
 
         when _doesGenerateLiftInsTypeSynonym do
             genLiftInsTypeSynonym effClsInfo & singleton & tell
@@ -51,17 +58,25 @@ makeEffect' inss sigs (MakeEffectConf conf) = execWriterT do
         when _doesGenerateLiftInsPatternSynonyms do
             genLiftInsPatternSynonyms effClsInfo & lift >>= tell
 
+        extTemplate FirstOrder info dataInfo effClsInfo ecConf & lift >>= tell
+
     forM_ sigs \sig -> do
-        (_, dataInfo, effClsInfo) <- reifyEffCls HigherOrder sig & lift
+        (info, dataInfo, effClsInfo) <- reifyEffCls HigherOrder sig & lift
         ecConf@EffectClassConf{..} <- conf effClsInfo & lift
 
-        makeSenders ecConf effClsInfo & lift >>= tell
+        genSenders ecConf effClsInfo & lift >>= tell
 
         when _doesDeriveHFunctor do
             deriveHFunctor (const $ pure $ TupleT 0) dataInfo & lift >>= tell
 
+        extTemplate HigherOrder info dataInfo effClsInfo ecConf & lift >>= tell
+
+noExtTemplate :: EffectOrder -> Info -> DataInfo -> EffClsInfo -> EffectClassConf -> Q [Dec]
+noExtTemplate = mempty
+{-# INLINE noExtTemplate #-}
+
 makeEffect :: [Name] -> [Name] -> Q [Dec]
-makeEffect inss sigs = makeEffect' inss sigs def
+makeEffect = makeEffect' def noExtTemplate
 {-# INLINE makeEffect #-}
 
 makeEffectF :: [Name] -> Q [Dec]

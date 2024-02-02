@@ -42,6 +42,7 @@ library
     exposed-modules:
         Data.Effect
         Data.Effect.Tag
+        Data.Effect.Key
         Data.Effect.HFunctor
         Control.Effect
         Control.Effect.Tag

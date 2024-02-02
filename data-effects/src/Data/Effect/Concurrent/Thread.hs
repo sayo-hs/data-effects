@@ -13,7 +13,7 @@ Portability :  portable
 -}
 module Data.Effect.Concurrent.Thread where
 
-data Thread tid f (a :: Type) where
-    ForkThread :: f () -> Thread tid f tid
+data Thread' tid f (a :: Type) where
+    ForkThread :: f () -> Thread' tid f tid
 
-makeEffectH [''Thread]
+makeKeyedEffect [] [''Thread']

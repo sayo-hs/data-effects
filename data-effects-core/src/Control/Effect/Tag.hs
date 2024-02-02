@@ -16,6 +16,7 @@ module Control.Effect.Tag where
 
 import Control.Applicative (Alternative)
 import Control.Effect (SendIns (sendIns), SendSig (sendSig))
+import Control.Effect.Key (SendInsBy, SendSigBy, sendInsBy, sendSigBy)
 import Control.Monad (MonadPlus)
 import Control.Monad.Except (MonadError)
 import Control.Monad.Fix (MonadFix)
@@ -59,3 +60,11 @@ instance SendIns (ins # tag) f => SendIns ins (ViaTag tag f) where
 instance (SendSig (sig ## tag) f, HFunctor sig) => SendSig sig (ViaTag tag f) where
     sendSig = ViaTag . sendSig . TH @tag . hfmap coerce
     {-# INLINE sendSig #-}
+
+instance SendInsBy key f (ins # tag) => SendInsBy key (ViaTag tag f) ins where
+    sendInsBy = ViaTag . sendInsBy @key . T @tag
+    {-# INLINE sendInsBy #-}
+
+instance (SendSigBy key f (sig ## tag), HFunctor sig) => SendSigBy key (ViaTag tag f) sig where
+    sendSigBy = ViaTag . sendSigBy @key . TH @tag . hfmap coerce
+    {-# INLINE sendSigBy #-}

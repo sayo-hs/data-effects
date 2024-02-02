@@ -6,16 +6,21 @@
 
 module Prelude (
     module Prelude,
-    module Data.Effect.TH,
     module Control.Effect,
+    module Control.Effect.Key,
+    module Data.Effect.TH,
+    module Data.Effect.TH.Key,
     Type,
+    def,
+    (&),
 ) where
 
 import Control.Effect (type (<:), type (<<:))
-import Data.Effect.TH (
-    makeEffect,
-    makeEffectF,
-    makeEffectH,
- )
+import Control.Effect.Key (SendInsBy, SendSigBy)
+import Data.Default (Default (def))
+import Data.Effect.TH (makeEffect, makeEffect', makeEffectF, makeEffectH)
+import Data.Effect.TH.Key (makeKeyedEffect)
+import Data.Function ((&))
 import Data.Kind (Type)
+
 import "base" Prelude

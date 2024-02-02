@@ -6,12 +6,10 @@
 
 module Data.Effect.Cont where
 
-import Data.Default (Default (def))
-import Data.Effect.TH (makeEffect')
+import Data.Effect.TH (noExtTemplate)
 import Data.Effect.TH.Internal (noDeriveHFunctor)
-import Data.Function ((&))
 
 data CallCC m a where
     CallCC :: (forall r. (a -> m r) -> m a) -> CallCC m a
 
-makeEffect' [] [''CallCC] (def & noDeriveHFunctor)
+makeEffect' (def & noDeriveHFunctor) noExtTemplate [] [''CallCC]

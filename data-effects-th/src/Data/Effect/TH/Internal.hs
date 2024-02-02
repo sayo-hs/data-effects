@@ -127,10 +127,10 @@ alterEffectClassConf f (MakeEffectConf conf) = MakeEffectConf (fmap f . conf)
 
 alterEffectConf :: (EffectConf -> EffectConf) -> MakeEffectConf -> MakeEffectConf
 alterEffectConf f = alterEffectClassConf \conf ->
-    conf{_confByEffect = fmap f . _confByEffect conf}
+    conf{_confByEffect = f . _confByEffect conf}
 
 data EffectClassConf = EffectClassConf
-    { _confByEffect :: Name -> Q EffectConf
+    { _confByEffect :: Name -> EffectConf
     , _doesDeriveHFunctor :: Bool
     , _doesGenerateLiftInsTypeSynonym :: Bool
     , _doesGenerateLiftInsPatternSynonyms :: Bool
@@ -228,30 +228,29 @@ instance Default EffectClassConf where
                             , _senderFnDoc = pure
                             , _senderFnArgDoc = const pure
                             }
-                 in pure
-                        EffectConf
-                            { _normalSenderGenConf = Just normalSenderFnConf
-                            , _taggedSenderGenConf =
-                                Just $ normalSenderFnConf & senderFnName %~ (++ "'")
-                            , _keyedSenderGenConf =
-                                Just $ normalSenderFnConf & senderFnName %~ (++ "''")
-                            , _warnFirstOrderInSigCls = True
-                            }
+                 in EffectConf
+                        { _normalSenderGenConf = Just normalSenderFnConf
+                        , _taggedSenderGenConf =
+                            Just $ normalSenderFnConf & senderFnName %~ (++ "'")
+                        , _keyedSenderGenConf =
+                            Just $ normalSenderFnConf & senderFnName %~ (++ "''")
+                        , _warnFirstOrderInSigCls = True
+                        }
             , _doesDeriveHFunctor = True
             , _doesGenerateLiftInsTypeSynonym = True
             , _doesGenerateLiftInsPatternSynonyms = True
             }
 
-makeSenders :: EffectClassConf -> EffClsInfo -> Q [Dec]
-makeSenders EffectClassConf{..} ec@EffClsInfo{..} = do
+genSenders :: EffectClassConf -> EffClsInfo -> Q [Dec]
+genSenders EffectClassConf{..} ec@EffClsInfo{..} = do
     let order = orderOf ec
 
     execWriterT $ forM ecEffs \con@EffConInfo{..} -> do
-        EffectConf{..} <- _confByEffect effName & lift
+        let EffectConf{..} = _confByEffect effName
 
-        forM_ _normalSenderGenConf \conf -> makeNormalSender order conf con
-        forM_ _taggedSenderGenConf \conf -> makeTaggedSender order conf con
-        forM_ _keyedSenderGenConf \conf -> makeKeyedSender order conf con
+        forM_ _normalSenderGenConf \conf -> genNormalSender order conf con
+        forM_ _taggedSenderGenConf \conf -> genTaggedSender order conf con
+        forM_ _keyedSenderGenConf \conf -> genKeyedSender order conf con
 
         -- Check for First Order in Signature Class warning
         when (_warnFirstOrderInSigCls && order == HigherOrder) do
@@ -266,12 +265,12 @@ makeSenders EffectClassConf{..} ec@EffClsInfo{..} = do
                             <> nameBase ecName
                             <> "’.\nConsider separating the first-order effect into an instruction class data type."
 
-makeNormalSender ::
+genNormalSender ::
     EffectOrder ->
     SenderFunctionConf ->
     EffConInfo ->
     WriterT [Dec] Q ()
-makeNormalSender order = makeSender order send sendCxt id
+genNormalSender order = genSender order send sendCxt id
   where
     (send, sendCxt) = case order of
         FirstOrder ->
@@ -283,12 +282,12 @@ makeNormalSender order = makeSender order send sendCxt id
             , \effDataType carrier -> ConT ''SendSig `AppT` effDataType `AppT` carrier
             )
 
-makeTaggedSender ::
+genTaggedSender ::
     EffectOrder ->
     SenderFunctionConf ->
     EffConInfo ->
     WriterT [Dec] Q ()
-makeTaggedSender order conf eff = do
+genTaggedSender order conf eff = do
     nTag <- newName "tag" & lift
     let tag = VarT nTag
 
@@ -304,14 +303,14 @@ makeTaggedSender order conf eff = do
                     ConT ''SendSig `AppT` (ConT ''TagH `AppT` effDataType `AppT` tag) `AppT` carrier
                 )
 
-    makeSender order send sendCxt (PlainTV nTag SpecifiedSpec :) conf eff
+    genSender order send sendCxt (PlainTV nTag SpecifiedSpec :) conf eff
 
-makeKeyedSender ::
+genKeyedSender ::
     EffectOrder ->
     SenderFunctionConf ->
     EffConInfo ->
     WriterT [Dec] Q ()
-makeKeyedSender order conf eff = do
+genKeyedSender order conf eff = do
     nKey <- newName "key" & lift
     let key = VarT nKey
 
@@ -327,9 +326,9 @@ makeKeyedSender order conf eff = do
                     ConT ''SendSigBy `AppT` key `AppT` carrier `AppT` effDataType
                 )
 
-    makeSender order send sendCxt (PlainTV nKey SpecifiedSpec :) conf eff
+    genSender order send sendCxt (PlainTV nKey SpecifiedSpec :) conf eff
 
-makeSender ::
+genSender ::
     EffectOrder ->
     (Exp -> Exp) ->
     (TH.Type -> TH.Type -> TH.Type) ->
@@ -337,25 +336,37 @@ makeSender ::
     SenderFunctionConf ->
     EffConInfo ->
     WriterT [Dec] Q ()
-makeSender order send sendCxt alterFnSigTVs SenderFunctionConf{..} EffConInfo{..} = do
-    args <- replicateM (length effParamTypes) (newName "x") & lift
+genSender order send sendCxt alterFnSigTVs conf@SenderFunctionConf{..} con@EffConInfo{..} = do
+    genSenderArmor sendCxt alterFnSigTVs conf con \f -> do
+        args <- replicateM (length effParamTypes) (newName "x")
+
+        let body =
+                send
+                    ( foldl' AppE (ConE effName) (map VarE args)
+                        & if _doesGenerateSenderFnSignature
+                            then (`SigE` ((effDataType & appCarrier) `AppT` effResultType))
+                            else id
+                    )
+
+            appCarrier = case order of
+                FirstOrder -> id
+                HigherOrder -> (`AppT` f)
+
+        pure $ Clause (map VarP args) (NormalB body) []
+
+genSenderArmor ::
+    (TH.Type -> TH.Type -> TH.Type) ->
+    ([TyVarBndrSpec] -> [TyVarBndrSpec]) ->
+    SenderFunctionConf ->
+    EffConInfo ->
+    (Type -> Q Clause) ->
+    WriterT [Dec] Q ()
+genSenderArmor sendCxt alterFnSigTVs SenderFunctionConf{..} EffConInfo{..} clause = do
     carrier <- maybe ((`PlainTV` ()) <$> newName "f") pure effCarrier & lift
 
     let f = tyVarType carrier
 
-        appCarrier = case order of
-            FirstOrder -> id
-            HigherOrder -> (`AppT` f)
-
         fnName = mkName _senderFnName
-        body =
-            send
-                ( foldl' AppE con (map VarE args)
-                    & if _doesGenerateSenderFnSignature
-                        then (`SigE` ((effDataType & appCarrier) `AppT` effResultType))
-                        else id
-                )
-        con = ConE effName
 
         funSig =
             SigD
@@ -366,8 +377,9 @@ makeSender order send sendCxt alterFnSigTVs SenderFunctionConf{..} EffConInfo{..
                     (arrowChain effParamTypes (f `AppT` effResultType))
                 )
 
-        funDef = FunD fnName [Clause (map VarP args) (NormalB body) []]
         funInline = PragmaD (InlineP fnName Inline FunLike AllPhases)
+
+    funDef <- FunD fnName <$> sequence [clause f & lift]
 
     -- Put documents
     lift do

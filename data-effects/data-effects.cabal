@@ -73,7 +73,8 @@ library
         data-effects-core           ^>= 0.1,
         data-effects-th             ^>= 0.1,
         these,
-        data-default
+        data-default,
+        lens
 
     hs-source-dirs:   src
     ghc-options:      -Wall
