@@ -37,4 +37,4 @@ makeHFunctor ''LiftIns
 data Nop :: InsClass
 
 -- | A /signature class/ with no effects.
-type NopS = LiftIns Nop
+type LNop = LiftIns Nop
