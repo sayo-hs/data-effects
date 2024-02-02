@@ -21,6 +21,8 @@ class SendIns (ins :: InsClass) f where
 -- | The operator version of `SendIns`.
 type (<:) = SendIns
 
+infix 3 <:
+
 -- | A type class that represents the ability to send a /signature/ @sig@ to carrier @f@.
 class SendSig (sig :: SigClass) f where
     -- | Send a /signature/ @sig@ to carrier @f@.
@@ -28,6 +30,8 @@ class SendSig (sig :: SigClass) f where
 
 -- | The operator version of `SendSig`.
 type (<<:) = SendSig
+
+infix 3 <<:
 
 instance SendIns ins f => SendSig (LiftIns ins) f where
     sendSig = sendIns . unliftIns
