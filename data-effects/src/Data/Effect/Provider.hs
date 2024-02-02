@@ -35,7 +35,7 @@ mprovide ::
     forall e i ctx f a.
     SendSigBy ProviderKey f (MonadProvider' i ctx e) =>
     i ->
-    (forall g. (Monad g, e g) => (forall x. f x -> g x) -> g a) ->
+    (forall g. (Monad g, e g) => f ~> g -> g a) ->
     f (ctx a)
 mprovide = provide
 {-# INLINE mprovide #-}
@@ -44,7 +44,7 @@ aprovide ::
     forall e i ctx f a.
     SendSigBy ProviderKey f (ApplicativeProvider' i ctx e) =>
     i ->
-    (forall h. (Applicative h, e h) => (forall x. f x -> h x) -> h a) ->
+    (forall h. (Applicative h, e h) => f ~> h -> h a) ->
     f (ctx a)
 aprovide = provide
 {-# INLINE aprovide #-}

@@ -15,7 +15,7 @@ module Prelude (
     (&),
 ) where
 
-import Control.Effect (type (<:), type (<<:))
+import Control.Effect (type (<:), type (<<:), type (~>))
 import Control.Effect.Key (SendInsBy, SendSigBy)
 import Data.Default (Default (def))
 import Data.Effect.Key.TH (makeKeyedEffect)

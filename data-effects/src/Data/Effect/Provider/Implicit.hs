@@ -39,7 +39,7 @@ i .! m = withImplicit i \_ -> m
     forall c e i f a.
     SendSigBy ImplicitProviderKey f (ImplicitProvider' c i e) =>
     i ->
-    (forall g. (c g, e g) => (forall x. f x -> g x) -> g a) ->
+    (forall g. (c g, e g) => f ~> g -> g a) ->
     f a
 i ..! f = withImplicit i f
 {-# INLINE (..!) #-}

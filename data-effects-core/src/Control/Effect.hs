@@ -12,6 +12,7 @@ Portability :  portable
 module Control.Effect where
 
 import Data.Effect (InsClass, LiftIns (unliftIns), SigClass)
+import Data.Kind (Type)
 
 -- | A type class that represents the ability to send an /instruction/ @ins@ to carrier @f@.
 class SendIns (ins :: InsClass) f where
@@ -36,3 +37,8 @@ infix 3 <<:
 instance SendIns ins f => SendSig (LiftIns ins) f where
     sendSig = sendIns . unliftIns
     {-# INLINE sendSig #-}
+
+-- | A natural transformation.
+type f ~> g = forall (x :: Type). f x -> g x
+
+infixr 4 ~>
