@@ -13,10 +13,46 @@ Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
 -}
-module Data.Effect.TH where
+module Data.Effect.TH (
+    module Data.Effect.TH,
+    module Data.Default,
+    module Data.Function,
+    EffectOrder (..),
+    orderOf,
+    MakeEffectConf (..),
+    alterEffectClassConf,
+    alterEffectConf,
+    EffectClassConf (..),
+    confByEffect,
+    doesDeriveHFunctor,
+    doesGenerateLiftInsPatternSynonyms,
+    doesGenerateLiftInsTypeSynonym,
+    EffectConf (..),
+    keyedSenderGenConf,
+    normalSenderGenConf,
+    taggedSenderGenConf,
+    warnFirstOrderInSigCls,
+    SenderFunctionConf (..),
+    senderFnName,
+    doesGenerateSenderFnSignature,
+    senderFnDoc,
+    senderFnArgDoc,
+    senderFnConfs,
+    deriveHFunctor,
+    noDeriveHFunctor,
+    generateLiftInsTypeSynonym,
+    noGenerateLiftInsTypeSynonym,
+    generateLiftInsPatternSynonyms,
+    noGenerateLiftInsPatternSynonyms,
+    noGenerateNormalSenderFunction,
+    noGenerateTaggedSenderFunction,
+    noGenerateKeyedSenderFunction,
+    suppressFirstOrderInSignatureClassWarning,
+    noGenerateSenderFunctionSignature,
+) where
 
 import Control.Monad.Writer (execWriterT, forM_, lift, tell, when)
-import Data.Default (def)
+import Data.Default (Default (def))
 import Data.Effect.HFunctor.TH.Internal (deriveHFunctor)
 import Data.Effect.TH.Internal (
     DataInfo,
@@ -28,12 +64,52 @@ import Data.Effect.TH.Internal (
         _doesGenerateLiftInsPatternSynonyms,
         _doesGenerateLiftInsTypeSynonym
     ),
+    EffectConf (
+        EffectConf,
+        _keyedSenderGenConf,
+        _normalSenderGenConf,
+        _taggedSenderGenConf,
+        _warnFirstOrderInSigCls
+    ),
     EffectOrder (FirstOrder, HigherOrder),
-    MakeEffectConf (MakeEffectConf),
+    MakeEffectConf (MakeEffectConf, unMakeEffectConf),
+    SenderFunctionConf (
+        _doesGenerateSenderFnSignature,
+        _senderFnArgDoc,
+        _senderFnDoc,
+        _senderFnName
+    ),
+    alterEffectClassConf,
+    alterEffectConf,
+    confByEffect,
+    doesDeriveHFunctor,
+    doesGenerateLiftInsPatternSynonyms,
+    doesGenerateLiftInsTypeSynonym,
+    doesGenerateSenderFnSignature,
     genLiftInsPatternSynonyms,
     genLiftInsTypeSynonym,
     genSenders,
+    generateLiftInsPatternSynonyms,
+    generateLiftInsTypeSynonym,
+    keyedSenderGenConf,
+    noDeriveHFunctor,
+    noGenerateKeyedSenderFunction,
+    noGenerateLiftInsPatternSynonyms,
+    noGenerateLiftInsTypeSynonym,
+    noGenerateNormalSenderFunction,
+    noGenerateSenderFunctionSignature,
+    noGenerateTaggedSenderFunction,
+    normalSenderGenConf,
+    orderOf,
     reifyEffCls,
+    senderFnArgDoc,
+    senderFnConfs,
+    senderFnDoc,
+    senderFnName,
+    suppressFirstOrderInSignatureClassWarning,
+    taggedSenderGenConf,
+    unMakeEffectConf,
+    warnFirstOrderInSigCls,
  )
 import Data.Function ((&))
 import Data.List (singleton)

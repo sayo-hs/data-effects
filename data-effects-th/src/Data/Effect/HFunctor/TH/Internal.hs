@@ -58,7 +58,17 @@ module Data.Effect.HFunctor.TH.Internal where
 
 import Control.Monad (replicateM, zipWithM)
 import Data.Effect.HFunctor (HFunctor, hfmap)
-import Data.Effect.TH.Internal (ConInfo (ConInfo), DataInfo (DataInfo), conArgs, conGadtReturnType, conName, occurs, tyVarName, tyVarType, unkindType)
+import Data.Effect.TH.Internal (
+    ConInfo (ConInfo),
+    DataInfo (DataInfo),
+    conArgs,
+    conGadtReturnType,
+    conName,
+    occurs,
+    tyVarName,
+    tyVarType,
+    unkindType,
+ )
 import Data.Foldable (foldl')
 import Data.Functor ((<&>))
 import Data.List.Infinite (Infinite, prependList)

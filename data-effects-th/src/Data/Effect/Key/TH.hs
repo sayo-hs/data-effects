@@ -5,7 +5,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-module Data.Effect.TH.Key where
+module Data.Effect.Key.TH where
 
 import Control.Effect.Key (SendInsBy, SendSigBy)
 import Control.Lens ((%~), (<&>), _Just, _head)

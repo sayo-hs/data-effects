@@ -57,10 +57,15 @@ library
 
     reexported-modules:
         Data.Effect,
+        Data.Effect.TH,
         Data.Effect.Tag,
+        Data.Effect.Key,
+        Data.Effect.Key.TH,
         Data.Effect.HFunctor,
+        Data.Effect.HFunctor.TH,
         Control.Effect,
         Control.Effect.Tag,
+        Control.Effect.Key,
 
     -- Modules included in this executable, other than Main.
     other-modules:
@@ -73,8 +78,7 @@ library
         data-effects-core           ^>= 0.1,
         data-effects-th             ^>= 0.1,
         these,
-        data-default,
-        lens
+        data-default
 
     hs-source-dirs:   src
     ghc-options:      -Wall
