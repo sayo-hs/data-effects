@@ -41,4 +41,4 @@ instance SendIns ins f => SendSig (LiftIns ins) f where
 -- | A natural transformation.
 type f ~> g = forall (x :: Type). f x -> g x
 
-infixr 4 ~>
+infixr 3 ~>
