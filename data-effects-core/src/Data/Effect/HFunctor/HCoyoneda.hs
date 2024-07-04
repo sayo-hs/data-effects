@@ -42,3 +42,11 @@ lowerHCoyoneda (HCoyoneda f ff) = hfmap f ff
 hoistHCoyoneda :: (forall g. ff g ~> gg g) -> HCoyoneda ff f a -> HCoyoneda gg f a
 hoistHCoyoneda f (HCoyoneda g ff) = HCoyoneda g (f ff)
 {-# INLINE hoistHCoyoneda #-}
+
+hCoyoneda :: (forall g. g ~> f -> ff g a -> r) -> HCoyoneda ff f a -> r
+hCoyoneda f (HCoyoneda k ff) = f k ff
+{-# INLINE hCoyoneda #-}
+
+hCoyoneda_ :: (forall g. ff g a -> r) -> HCoyoneda ff f a ->  r
+hCoyoneda_ f (HCoyoneda _ ff) = f ff
+{-# INLINE hCoyoneda_ #-}
