@@ -44,6 +44,7 @@ library
         Data.Effect.Tag
         Data.Effect.Key
         Data.Effect.HFunctor
+        Data.Effect.HFunctor.HCoyoneda
         Control.Effect
         Control.Effect.Tag
         Control.Effect.Key
