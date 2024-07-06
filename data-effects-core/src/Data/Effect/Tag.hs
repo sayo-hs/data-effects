@@ -23,7 +23,7 @@ newtype Tag (ins :: InsClass) tag a = Tag {unTag :: ins a}
 -- | Tagged /instruction class/.
 type (#) = Tag
 
-infixl 7 #
+infixl 8 #
 
 -- | Tagged /instruction class/.
 pattern T :: forall tag ins a. ins a -> Tag ins tag a
@@ -38,7 +38,7 @@ newtype TagH (sig :: SigClass) tag f a = TagH {unTagH :: sig f a}
 -- | Tagged /signature class/.
 type (##) = TagH
 
-infixl 7 ##
+infixl 8 ##
 
 -- | Tagged /signature class/.
 pattern TH :: forall tag sig f a. sig f a -> TagH sig tag f a

@@ -22,7 +22,7 @@ class SendIns (ins :: InsClass) f where
 -- | The operator version of `SendIns`.
 type (<:) = SendIns
 
-infix 3 <:
+infix 2 <:
 
 -- | A type class that represents the ability to send a /signature/ @sig@ to carrier @f@.
 class SendSig (sig :: SigClass) f where
@@ -32,7 +32,7 @@ class SendSig (sig :: SigClass) f where
 -- | The operator version of `SendSig`.
 type (<<:) = SendSig
 
-infix 3 <<:
+infix 2 <<:
 
 instance SendIns ins f => SendSig (LiftIns ins) f where
     sendSig = sendIns . unliftIns
@@ -41,4 +41,4 @@ instance SendIns ins f => SendSig (LiftIns ins) f where
 -- | A natural transformation.
 type f ~> g = forall (x :: Type). f x -> g x
 
-infixr 3 ~>
+infixr 2 ~>

@@ -23,7 +23,7 @@ newtype Key key (ins :: InsClass) a = Key {unKey :: ins a}
 -- | Keyed /instruction class/.
 type (#>) = Key
 
-infixr 6 #>
+infixr 7 #>
 
 -- | Keyed /instruction class/.
 pattern K :: forall key ins a. ins a -> Key key ins a
@@ -38,7 +38,7 @@ newtype KeyH key (sig :: SigClass) f a = KeyH {unKeyH :: sig f a}
 -- | Keyed /signature class/.
 type (##>) = KeyH
 
-infix 6 ##>
+infixr 7 ##>
 
 -- | Keyed /signature class/.
 pattern KH :: forall key sig f a. sig f a -> KeyH key sig f a
