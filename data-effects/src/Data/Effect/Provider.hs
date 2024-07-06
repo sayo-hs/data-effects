@@ -33,7 +33,7 @@ type ApplicativeProvider i ctx e = Provider Applicative i ctx e
 
 mprovide ::
     forall e i ctx f a.
-    SendSigBy ProviderKey f (MonadProvider' i ctx e) =>
+    SendSigBy ProviderKey (MonadProvider' i ctx e) f =>
     i ->
     (forall g. (Monad g, e g) => f ~> g -> g a) ->
     f (ctx a)
@@ -42,7 +42,7 @@ mprovide = provide
 
 aprovide ::
     forall e i ctx f a.
-    SendSigBy ProviderKey f (ApplicativeProvider' i ctx e) =>
+    SendSigBy ProviderKey (ApplicativeProvider' i ctx e) f =>
     i ->
     (forall h. (Applicative h, e h) => f ~> h -> h a) ->
     f (ctx a)

@@ -318,12 +318,12 @@ genKeyedSender order conf eff = do
             FirstOrder ->
                 ( (VarE 'sendInsBy `AppTypeE` key `AppE`)
                 , \effDataType carrier ->
-                    ConT ''SendInsBy `AppT` key `AppT` carrier `AppT` effDataType
+                    ConT ''SendInsBy `AppT` key `AppT` effDataType `AppT` carrier
                 )
             HigherOrder ->
                 ( (VarE 'sendSigBy `AppTypeE` key `AppE`)
                 , \effDataType carrier ->
-                    ConT ''SendSigBy `AppT` key `AppT` carrier `AppT` effDataType
+                    ConT ''SendSigBy `AppT` key `AppT` effDataType `AppT` carrier
                 )
 
     genSender order send sendCxt (PlainTV nKey SpecifiedSpec :) conf eff

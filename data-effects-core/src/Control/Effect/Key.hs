@@ -28,10 +28,10 @@ import Data.Effect (InsClass, SigClass)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Kind (Type)
 
-class SendInsBy key f (ins :: InsClass) | key f -> ins where
+class SendInsBy key (ins :: InsClass) f | key f -> ins where
     sendInsBy :: ins a -> f a
 
-class SendSigBy key f (sig :: SigClass) | key f -> sig where
+class SendSigBy key (sig :: SigClass) f | key f -> sig where
     sendSigBy :: sig f a -> f a
 
 -- | A wrapper data type to represent sending an effect to the carrier @f@ with the specified key.
@@ -57,10 +57,10 @@ key :: forall key f a. ByKey key f a -> f a
 key = runByKey
 {-# INLINE key #-}
 
-instance SendInsBy key f ins => SendIns ins (ByKey key f) where
+instance SendInsBy key ins f => SendIns ins (ByKey key f) where
     sendIns = ByKey . sendInsBy @key
     {-# INLINE sendIns #-}
 
-instance (SendSigBy key f sig, HFunctor sig) => SendSig sig (ByKey key f) where
+instance (SendSigBy key sig f, HFunctor sig) => SendSig sig (ByKey key f) where
     sendSig = ByKey . sendSigBy @key . hfmap coerce
     {-# INLINE sendSig #-}

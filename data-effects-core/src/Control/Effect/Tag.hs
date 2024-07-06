@@ -61,10 +61,10 @@ instance (SendSig (sig ## tag) f, HFunctor sig) => SendSig sig (ViaTag tag f) wh
     sendSig = ViaTag . sendSig . TH @tag . hfmap coerce
     {-# INLINE sendSig #-}
 
-instance SendInsBy key f (ins # tag) => SendInsBy key (ViaTag tag f) ins where
+instance SendInsBy key (ins # tag) f => SendInsBy key ins (ViaTag tag f) where
     sendInsBy = ViaTag . sendInsBy @key . T @tag
     {-# INLINE sendInsBy #-}
 
-instance (SendSigBy key f (sig ## tag), HFunctor sig) => SendSigBy key (ViaTag tag f) sig where
+instance (SendSigBy key (sig ## tag) f, HFunctor sig) => SendSigBy key sig (ViaTag tag f) where
     sendSigBy = ViaTag . sendSigBy @key . TH @tag . hfmap coerce
     {-# INLINE sendSigBy #-}

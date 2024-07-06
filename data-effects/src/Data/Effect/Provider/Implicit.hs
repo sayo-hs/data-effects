@@ -28,7 +28,7 @@ type ApplicativeImplicitProvider i e = ImplicitProvider Applicative i e
 
 (.!) ::
     forall c e i f a.
-    SendSigBy ImplicitProviderKey f (ImplicitProvider' c i e) =>
+    SendSigBy ImplicitProviderKey (ImplicitProvider' c i e) f =>
     i ->
     (forall g. (c g, e g) => g a) ->
     f a
@@ -37,7 +37,7 @@ i .! m = withImplicit i \_ -> m
 
 (..!) ::
     forall c e i f a.
-    SendSigBy ImplicitProviderKey f (ImplicitProvider' c i e) =>
+    SendSigBy ImplicitProviderKey (ImplicitProvider' c i e) f =>
     i ->
     (forall g. (c g, e g) => f ~> g -> g a) ->
     f a
