@@ -17,7 +17,13 @@ data Tell w a where
     Tell :: w -> Tell w ()
 
 data WriterH w f a where
-    Listen :: f a -> WriterH w f (a, w)
+    Listen :: f a -> WriterH w f (w, a)
     Censor :: (w -> w) -> f a -> WriterH w f a
 
 makeEffect [''Tell] [''WriterH]
+
+pass :: (Tell w <: m, WriterH w <<: m, Monad m) => m (w -> w, a) -> m a
+pass m = do
+    (w, (f, a)) <- listen m
+    tell $ f w
+    pure a
