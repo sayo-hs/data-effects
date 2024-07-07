@@ -54,6 +54,7 @@ library
         Data.Effect.Resource
         Data.Effect.Fresh
         Data.Effect.Concurrent.Thread
+        Data.Effect.Unlift
 
     reexported-modules:
         Data.Effect,
