@@ -55,6 +55,7 @@ library
         Data.Effect.Fresh
         Data.Effect.Concurrent.Thread
         Data.Effect.Unlift
+        Data.Effect.ShiftReset
 
     reexported-modules:
         Data.Effect,
