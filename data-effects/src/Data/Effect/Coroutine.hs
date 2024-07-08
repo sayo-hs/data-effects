@@ -18,19 +18,34 @@ in the @freer-simple@ package.
 -}
 module Data.Effect.Coroutine where
 
+import Control.Monad ((>=>))
+
 data Yield a b c where
     Yield :: a -> (b -> c) -> Yield a b c
 
 makeEffectF [''Yield]
+
+data YieldH a b f (c :: Type) where
+    YieldH :: a -> (b -> f c) -> YieldH a b f c
+
+makeEffectH [''YieldH]
+
 
 data Status f a b r =
         Done r
     |   Coroutine a (b -> f (Status f a b r))
     deriving Functor
 
+continueStatus :: Monad f => (x -> f (Status f a b r)) -> Status f a b x -> f (Status f a b r)
+continueStatus kk = \case
+    Done x -> kk x
+    Coroutine a k -> pure . Coroutine a $ k >=> continueStatus kk
+
+
 replyCoroutine ::
     Applicative f =>
         Yield a b c
     ->  (c -> f (Status f a b r))
-    ->  f (Status f a b r)
-replyCoroutine (Yield a k) kk = pure $ Coroutine a (kk . k)
+    ->  Status f a b r
+replyCoroutine (Yield a k) kk = Coroutine a (kk . k)
+{-# INLINE replyCoroutine #-}
