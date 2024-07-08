@@ -6,7 +6,7 @@
 
 {- |
 Copyright   : (c) 2016 Allele Dev; 2017 Ixperta Solutions s.r.o.; 2017 Alexis King
-              (c) 2023 Yamada Ryo
+              (c) 2023-2024 Yamada Ryo
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
@@ -18,7 +18,12 @@ in the @freer-simple@ package.
 -}
 module Data.Effect.Coroutine where
 
-data Coroutine a b c where
-    Yield :: a -> (b -> c) -> Coroutine a b c
+data Yield a b c where
+    Yield :: a -> (b -> c) -> Yield a b c
 
-makeEffectF [''Coroutine]
+makeEffectF [''Yield]
+
+data Status f a b r =
+        Done r
+    |   Coroutine a (b -> f (Status f a b r))
+    deriving Functor
