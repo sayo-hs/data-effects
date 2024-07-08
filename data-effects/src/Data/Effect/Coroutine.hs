@@ -27,3 +27,10 @@ data Status f a b r =
         Done r
     |   Coroutine a (b -> f (Status f a b r))
     deriving Functor
+
+replyCoroutine ::
+    Applicative f =>
+        Yield a b c
+    ->  (c -> f (Status f a b r))
+    ->  f (Status f a b r)
+replyCoroutine (Yield a k) kk = pure $ Coroutine a (kk . k)
