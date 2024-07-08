@@ -21,3 +21,6 @@ data Input i (a :: Type) where
     Input :: Input i i
 
 makeEffectF [''Input]
+
+inputs :: (Input i <: f, Functor f) => (i -> a) -> f a
+inputs f = f <$> input
