@@ -56,6 +56,7 @@ library
         Data.Effect.Concurrent.Thread
         Data.Effect.Unlift
         Data.Effect.ShiftReset
+        Data.Effect.KVStore
 
     reexported-modules:
         Data.Effect,
