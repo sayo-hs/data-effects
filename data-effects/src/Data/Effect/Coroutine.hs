@@ -14,31 +14,20 @@ Portability :  portable
 
 This module provides the t`Coroutine` effect, comes
 from [@Control.Monad.Freer.Coroutine@](https://hackage.haskell.org/package/freer-simple-1.2.1.2/docs/Control-Monad-Freer-Coroutine.html)
-in the @freer-simple@ package.
+in the @freer-simple@ package (The continuation part @(b -> c)@ has been removed. If necessary, please manually compose the t`Data.Functor.Coyoneda.Coyoneda`) .
 -}
 module Data.Effect.Coroutine where
 
 import Control.Monad ((>=>))
 
-data Yield a b c where
-    Yield :: a -> (b -> c) -> Yield a b c
+data Yield a b (c :: Type) where
+    Yield :: a -> Yield a b b
 
 makeEffectF [''Yield]
 
-type Yield_ a = Yield a ()
-
-yield_ :: Yield a b <: f => a -> f b
-yield_ a = yield a id
+yield_ :: Yield a () <: f => a -> f ()
+yield_ = yield
 {-# INLINE yield_ #-}
-
-data YieldH a b f (c :: Type) where
-    YieldH :: a -> (b -> f c) -> YieldH a b f c
-
-makeEffectH [''YieldH]
-
-yieldH_ :: (YieldH a b <<: f, Applicative f) => a -> f b
-yieldH_ a = yieldH a pure
-{-# INLINE yieldH_ #-}
 
 data Status f a b r
     = Done r
@@ -50,15 +39,7 @@ continueStatus kk = \case
     Done x -> kk x
     Coroutine a k -> pure . Coroutine a $ k >=> continueStatus kk
 
-loopStatus :: Monad m => Status m a a r -> m r
-loopStatus = \case
+loopStatus :: Monad m => (a -> m b) -> Status m a b r -> m r
+loopStatus f = \case
     Done r -> pure r
-    Coroutine a k -> k a >>= loopStatus
-
-replyCoroutine ::
-    Applicative f =>
-    Yield a b c ->
-    (c -> f (Status f a b r)) ->
-    Status f a b r
-replyCoroutine (Yield a k) kk = Coroutine a (kk . k)
-{-# INLINE replyCoroutine #-}
+    Coroutine a k -> f a >>= k >>= loopStatus f
