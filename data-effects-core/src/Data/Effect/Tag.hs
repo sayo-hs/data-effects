@@ -28,7 +28,8 @@ infixl 8 #
 -- | Tagged /instruction class/.
 pattern T :: forall tag ins a. ins a -> Tag ins tag a
 pattern T e = Tag e
-{-# INLINE T #-}
+
+{-# COMPLETE T #-}
 
 -- | Tagged /signature class/.
 newtype TagH (sig :: SigClass) tag f a = TagH {unTagH :: sig f a}
@@ -43,3 +44,5 @@ infixl 8 ##
 -- | Tagged /signature class/.
 pattern TH :: forall tag sig f a. sig f a -> TagH sig tag f a
 pattern TH e = TagH e
+
+{-# COMPLETE TH #-}

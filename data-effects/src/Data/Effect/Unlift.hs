@@ -13,7 +13,6 @@ data UnliftBase b f (a :: Type) where
 
 makeEffectH [''UnliftBase]
 
-
 type UnliftIO = UnliftBase IO
 
 pattern WithRunInIO :: (f ~> IO -> IO a) -> UnliftIO f a

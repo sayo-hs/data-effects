@@ -13,11 +13,10 @@ Portability :  portable
 
 Free `HFunctor`s.
 -}
-
 module Data.Effect.HFunctor.HCoyoneda where
 
-import Data.Effect.HFunctor (HFunctor, hfmap)
 import Control.Effect (type (~>))
+import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Kind (Type)
 
 -- | The free `HFunctor` for a @ff@.
@@ -47,6 +46,6 @@ hCoyoneda :: (forall g. g ~> f -> ff g a -> r) -> HCoyoneda ff f a -> r
 hCoyoneda f (HCoyoneda k ff) = f k ff
 {-# INLINE hCoyoneda #-}
 
-hCoyoneda_ :: (forall g. ff g a -> r) -> HCoyoneda ff f a ->  r
+hCoyoneda_ :: (forall g. ff g a -> r) -> HCoyoneda ff f a -> r
 hCoyoneda_ f (HCoyoneda _ ff) = f ff
 {-# INLINE hCoyoneda_ #-}

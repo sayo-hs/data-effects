@@ -30,22 +30,20 @@ data YieldH a b f (c :: Type) where
 
 makeEffectH [''YieldH]
 
-
-data Status f a b r =
-        Done r
-    |   Coroutine a (b -> f (Status f a b r))
-    deriving Functor
+data Status f a b r
+    = Done r
+    | Coroutine a (b -> f (Status f a b r))
+    deriving (Functor)
 
 continueStatus :: Monad f => (x -> f (Status f a b r)) -> Status f a b x -> f (Status f a b r)
 continueStatus kk = \case
     Done x -> kk x
     Coroutine a k -> pure . Coroutine a $ k >=> continueStatus kk
 
-
 replyCoroutine ::
     Applicative f =>
-        Yield a b c
-    ->  (c -> f (Status f a b r))
-    ->  Status f a b r
+    Yield a b c ->
+    (c -> f (Status f a b r)) ->
+    Status f a b r
 replyCoroutine (Yield a k) kk = Coroutine a (kk . k)
 {-# INLINE replyCoroutine #-}

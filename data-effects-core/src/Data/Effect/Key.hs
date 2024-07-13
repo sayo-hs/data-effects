@@ -28,7 +28,8 @@ infixr 7 #>
 -- | Keyed /instruction class/.
 pattern K :: forall key ins a. ins a -> Key key ins a
 pattern K e = Key e
-{-# INLINE K #-}
+
+{-# COMPLETE K #-}
 
 -- | Keyed /signature class/.
 newtype KeyH key (sig :: SigClass) f a = KeyH {unKeyH :: sig f a}
@@ -43,3 +44,5 @@ infixr 7 ##>
 -- | Keyed /signature class/.
 pattern KH :: forall key sig f a. sig f a -> KeyH key sig f a
 pattern KH e = KeyH e
+
+{-# COMPLETE KH #-}

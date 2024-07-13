@@ -14,7 +14,6 @@ package, which are required for the Heftia effect handler system. For more detai
  [CEP-03](https://github.com/sayo-hs/data-effects/blob/master/CEPs/CEP-03.md) and
 the [`compdata` documentation](https://hackage.haskell.org/package/compdata-0.13.0/docs/Data-Comp-Multi-HFunctor.html).
 -}
-
 module Data.Effect.HFunctor (
     HFunctor (..),
     makeHFunctor,
