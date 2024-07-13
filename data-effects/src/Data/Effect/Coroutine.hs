@@ -45,10 +45,15 @@ data Status f a b r
     | Coroutine a (b -> f (Status f a b r))
     deriving (Functor)
 
-continueStatus :: Monad f => (x -> f (Status f a b r)) -> Status f a b x -> f (Status f a b r)
+continueStatus :: Monad m => (x -> m (Status m a b r)) -> Status m a b x -> m (Status m a b r)
 continueStatus kk = \case
     Done x -> kk x
     Coroutine a k -> pure . Coroutine a $ k >=> continueStatus kk
+
+loopStatus :: Monad m => Status m a a r -> m r
+loopStatus = \case
+    Done r -> pure r
+    Coroutine a k -> k a >>= loopStatus
 
 replyCoroutine ::
     Applicative f =>
