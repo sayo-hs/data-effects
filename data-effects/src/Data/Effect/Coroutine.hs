@@ -25,10 +25,20 @@ data Yield a b c where
 
 makeEffectF [''Yield]
 
+type Yield_ a = Yield a ()
+
+yield_ :: Yield a b <: f => a -> f b
+yield_ a = yield a id
+{-# INLINE yield_ #-}
+
 data YieldH a b f (c :: Type) where
     YieldH :: a -> (b -> f c) -> YieldH a b f c
 
 makeEffectH [''YieldH]
+
+yieldH_ :: (YieldH a b <<: f, Applicative f) => a -> f b
+yieldH_ a = yieldH a pure
+{-# INLINE yieldH_ #-}
 
 data Status f a b r
     = Done r
