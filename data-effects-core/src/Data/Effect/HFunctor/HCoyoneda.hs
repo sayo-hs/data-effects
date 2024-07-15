@@ -49,3 +49,5 @@ hCoyoneda f (HCoyoneda k ff) = f k ff
 hCoyoneda_ :: (forall g. ff g a -> r) -> HCoyoneda ff f a -> r
 hCoyoneda_ f (HCoyoneda _ ff) = f ff
 {-# INLINE hCoyoneda_ #-}
+
+newtype (~~>) ff g f (a :: Type) = Interpret ((f ~> g) -> ff g a)
