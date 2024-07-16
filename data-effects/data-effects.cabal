@@ -43,7 +43,6 @@ library
         Data.Effect.Except
         Data.Effect.Accum
         Data.Effect.NonDet
-        Data.Effect.Choice
         Data.Effect.Coroutine
         Data.Effect.Input
         Data.Effect.Output

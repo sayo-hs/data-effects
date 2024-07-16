@@ -18,7 +18,12 @@ data Empty (a :: Type) where
 
 makeEffectF [''Empty]
 
-data Choose f (a :: Type) where
-    Choose :: f a -> f a -> Choose f a
+data Choose (a :: Type) where
+    Choose :: Choose Bool
 
-makeEffectH [''Choose]
+makeEffectF [''Choose]
+
+data ChooseH f (a :: Type) where
+    ChooseH :: f a -> f a -> ChooseH f a
+
+makeEffectH [''ChooseH]
