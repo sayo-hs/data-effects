@@ -7,22 +7,27 @@
 module Data.Effect.ShiftReset where
 
 import Control.Monad (void, (>=>))
+import Data.Effect.Key.TH qualified as Keyed
 import Data.Effect.TH (noExtTemplate)
 import Data.Effect.TH.Internal (noDeriveHFunctor)
 
-data Shift (r :: Type) m a where
-    Shift :: forall r m a. ((a -> m r) -> m r) -> Shift r m a
+data Shift' (r :: Type) m a where
+    Shift :: forall r m a. ((a -> m r) -> m r) -> Shift' r m a
 
-makeEffect' (def & noDeriveHFunctor) noExtTemplate [] [''Shift]
+makeEffect'
+    (def & noDeriveHFunctor & Keyed.changeNormalSenderFnNameFormat)
+    Keyed.genEffectKey
+    []
+    [''Shift']
 
-callCC :: forall r m a. (Shift r <<: m, Monad m) => ((a -> m r) -> m a) -> m a
-callCC f = shift @r \k -> f (k >=> exit) >>= k
+callCC :: forall r m a. (SendSigBy ShiftKey (Shift' r) m, Monad m) => ((a -> m r) -> m a) -> m a
+callCC f = shift \k -> f (k >=> exit) >>= k
 
-exit :: (Shift r <<: f, Applicative f) => r -> f a
+exit :: (SendSigBy ShiftKey (Shift' r) f, Applicative f) => r -> f a
 exit r = shift \_ -> pure r
 {-# INLINE exit #-}
 
-getCC :: (Shift r <<: m, Monad m) => m (m r)
+getCC :: (SendSigBy ShiftKey (Shift' r) m, Monad m) => m (m r)
 getCC = callCC \exit' -> let a = exit' a in pure a
 
 data Shift_ m a where
