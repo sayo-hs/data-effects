@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
@@ -14,7 +12,7 @@ Portability :  portable
 -}
 module Data.Effect where
 
-import Data.Effect.HFunctor (makeHFunctor)
+import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Kind (Type)
 
 -- | A kind of /signature class/ (a datatype of higher-order effect).
@@ -31,7 +29,9 @@ type InsClass = Type -> Type
 newtype LiftIns (ins :: InsClass) (f :: Type -> Type) a = LiftIns {unliftIns :: ins a}
     deriving stock (Functor, Foldable, Traversable)
 
-makeHFunctor ''LiftIns
+instance HFunctor (LiftIns ins) where
+    hfmap _ (LiftIns e) = LiftIns e
+    {-# INLINE hfmap #-}
 
 -- | An /instruction class/ with no effects.
 data Nop :: InsClass
