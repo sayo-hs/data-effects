@@ -11,7 +11,7 @@ This library set was created by being separated from
 the [Heftia](https://github.com/sayo-hs/heftia) extensible effects library.
 
 ## Your contributions are welcome!
-Please see [CONTRIBUTING.md](CONTRIBUTING.md).
+Please see [CONTRIBUTING.md](https://github.com/sayo-hs/data-effects/blob/ef706ef3fa547de01ce6bb5636af911354e53b58/CONTRIBUTING.md).
 
 ## Credits
 Parts of this project have been adapted or inspired by the following resources:
