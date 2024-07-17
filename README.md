@@ -1,5 +1,9 @@
 # data-effects
 
+[![Hackage](https://img.shields.io/hackage/v/data-effects.svg?logo=haskell&label=data-effects)](https://hackage.haskell.org/package/data-effects)
+[![Hackage](https://img.shields.io/hackage/v/data-effects-core.svg?logo=haskell&label=data-effects-core)](https://hackage.haskell.org/package/data-effects-core)
+[![Hackage](https://img.shields.io/hackage/v/data-effects-th.svg?logo=haskell&label=data-effects-th)](https://hackage.haskell.org/package/data-effects-th)
+
 A basic framework for a Haskell effect system library based on GADTs-based effect representations
 with a style that separates first-order effects and higher-order effects.
 
