@@ -1,6 +1,10 @@
 # data-effects
 
-A basic framework for an effect system based on effects represented by GADTs.
+A basic framework for a Haskell effect system library based on GADTs-based effect representations
+with a style that separates first-order effects and higher-order effects.
+
+This library set was created by being separated from
+the [Heftia](https://github.com/sayo-hs/heftia) extensible effects library.
 
 ## Your contributions are welcome!
 Please see [CONTRIBUTING.md](CONTRIBUTING.md).
