@@ -223,7 +223,11 @@ instance Default EffectClassConf where
             { _confByEffect = \effConName ->
                 let normalSenderFnConf =
                         SenderFunctionConf
-                            { _senderFnName = nameBase effConName & _head %~ toLower
+                            { _senderFnName =
+                                let effConName' = nameBase effConName
+                                 in if head effConName' == ':'
+                                        then tail effConName'
+                                        else effConName' & _head %~ toLower
                             , _doesGenerateSenderFnSignature = True
                             , _senderFnDoc = pure
                             , _senderFnArgDoc = const pure
