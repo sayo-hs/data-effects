@@ -97,10 +97,5 @@ toRawCmdSpec = \case
     RawCommand exe args -> Raw.RawCommand exe (map T.unpack args)
 {-# INLINE toRawCmdSpec #-}
 
-type Shell f = (Process <: f, ShellChan <: f, Pipe <<: f)
-type ShellChan = EndoChan Stdio ByteString
-type ShellRouter = EndoRouter Stdio ByteString
+type Shell f = (Process <: f, PipeBroadComm Stdio ByteString f)
 data Stdio = Stdin | Stdout | Stderr
-
-type FileSource = Chan FilePath Stdio ByteString ByteString
-type FileSink = Chan Stdio FilePath ByteString ByteString

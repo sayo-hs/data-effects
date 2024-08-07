@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -22,95 +23,120 @@ module Data.Effect.Concurrent.Pipe where
 
 import Control.Applicative (liftA2)
 import Control.Arrow (app)
-import Control.Selective (Selective, select)
+import Control.Selective (Selective, select, swapEither)
 import Data.Bifunctor (first)
+import Data.Coerce (Coercible)
+import Data.Effect.Foldl (FoldingMapH (..), foldingMapH)
+import Data.Foldable (for_)
 import Data.Functor ((<&>))
 import Data.These (These)
 import Data.These.Combinators (swapThese)
 import Data.Tuple (swap)
+import Data.Vector (Vector)
+import Data.Vector qualified as V
 import Numeric.Natural (Natural)
 
-data Pipe f a where
-    PipeTo :: f a -> f b -> Pipe f (These a b)
-    FstBlockingPipeTo :: f a -> f b -> Pipe f (a, Maybe b)
-    SndBlockingPipeTo :: f a -> f b -> Pipe f (Maybe a, b)
-    BlockingPipeTo :: f a -> f b -> Pipe f (a, b)
-    Race :: f a -> f b -> Pipe f (These a b)
-    ThenStop :: f a -> f b -> Pipe f (a, Maybe b)
-    WaitBoth :: f a -> f b -> Pipe f (a, b)
-makeEffectH [''Pipe]
+data Pipe' a f b where
+    PipeTo :: f b -> f c -> Pipe' a f (b, c)
+    FstWaitPipeTo :: f b -> f c -> Pipe' a f (b, Maybe c)
+    SndWaitPipeTo :: f b -> f c -> Pipe' a f (Maybe b, c)
+    RacePipeTo :: f b -> f c -> Pipe' a f (Either b c)
+    WaitBoth :: f b -> f c -> Pipe' a f (b, c)
+    ThenStop :: f b -> f c -> Pipe' a f (b, Maybe c)
+    Race :: f b -> f c -> Pipe' a f (Either b c)
+
+data Feed a b where
+    Feed :: a -> Feed a ()
+
+data InPlumber a b f c where
+    ZipInflux :: (Either a b -> Either a b) -> f c -> InPlumber a b f c
+    ZipInfluxH :: (Either a b -> f (Either a b)) -> f c -> InPlumber a b f c
+    MergeInfluxToFst :: Coercible a b => f c -> InPlumber a b f c
+    MergeInfluxToSnd :: Coercible a b => f c -> InPlumber a b f c
+    SwapInflux :: Coercible a b => f c -> InPlumber a b f c
+
+data OutPlumber a b f c where
+    ZipOutflux :: (Either a b -> Either a b) -> f c -> OutPlumber a b f c
+    ZipOutfluxH :: (Either a b -> f (Either a b)) -> f c -> OutPlumber a b f c
+    MergeOutfluxToFst :: Coercible a b => f c -> OutPlumber a b f c
+    MergeOutfluxToSnd :: Coercible a b => f c -> OutPlumber a b f c
+    SwapOutflux :: Coercible a b => f c -> OutPlumber a b f c
+
+makeKeyedEffect [] [''Pipe']
+makeEffectF [''Feed]
+makeEffectH [''InPlumber, ''OutPlumber]
 
 infixl 1 |>
-(|>) :: Pipe <<: f => f a -> f b -> f (These a b)
+(|>) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (b, c)
 (|>) = pipeTo
 {-# INLINE (|>) #-}
 
 infixl 1 *|>
-(*|>) :: Pipe <<: f => f a -> f b -> f (a, Maybe b)
-(*|>) = fstBlockingPipeTo
+(*|>) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (b, Maybe c)
+(*|>) = fstWaitPipeTo
 {-# INLINE (*|>) #-}
 
 infixl 1 |*>
-(|*>) :: Pipe <<: f => f a -> f b -> f (Maybe a, b)
-(|*>) = sndBlockingPipeTo
+(|*>) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (Maybe b, c)
+(|*>) = sndWaitPipeTo
 {-# INLINE (|*>) #-}
 
 infixl 1 *|*>
-(*|*>) :: Pipe <<: f => f a -> f b -> f (a, b)
-(*|*>) = blockingPipeTo
+(*|*>) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (Either b c)
+(*|*>) = racePipeTo
 {-# INLINE (*|*>) #-}
 
 infixr 0 <|
-(<|) :: (Pipe <<: f, Functor f) => f a -> f b -> f (These a b)
-a <| b = swapThese <$> pipeTo b a
+(<|) :: (SendSigBy PipeKey (Pipe' a) f, Functor f) => f b -> f c -> f (b, c)
+a <| b = swap <$> pipeTo b a
 {-# INLINE (<|) #-}
 
 infixr 0 <|*
-(<|*) :: (Pipe <<: f, Functor f) => f a -> f b -> f (Maybe a, b)
-a <|* b = swap <$> fstBlockingPipeTo b a
+(<|*) :: (SendSigBy PipeKey (Pipe' a) f, Functor f) => f b -> f c -> f (Maybe b, c)
+a <|* b = swap <$> fstWaitPipeTo b a
 {-# INLINE (<|*) #-}
 
 infixr 0 <*|
-(<*|) :: (Pipe <<: f, Functor f) => f a -> f b -> f (a, Maybe b)
-a <*| b = swap <$> sndBlockingPipeTo b a
+(<*|) :: (SendSigBy PipeKey (Pipe' a) f, Functor f) => f b -> f c -> f (b, Maybe c)
+a <*| b = swap <$> sndWaitPipeTo b a
 {-# INLINE (<*|) #-}
 
 infixr 0 <*|*
-(<*|*) :: (Pipe <<: f, Functor f) => f a -> f b -> f (a, b)
-a <*|* b = swap <$> blockingPipeTo b a
+(<*|*) :: (SendSigBy PipeKey (Pipe' a) f, Functor f) => f b -> f c -> f (Either b c)
+a <*|* b = swapEither <$> racePipeTo b a
 {-# INLINE (<*|*) #-}
 
 infixl 1 |||
-(|||) :: Pipe <<: f => f a -> f b -> f (These a b)
+(|||) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (Either b c)
 (|||) = race
 {-# INLINE (|||) #-}
 
 infixl 1 *||
-(*||) :: Pipe <<: f => f a -> f b -> f (a, Maybe b)
+(*||) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (b, Maybe c)
 (*||) = thenStop
 {-# INLINE (*||) #-}
 
 infixr 0 ||*
-(||*) :: (Pipe <<: f, Functor f) => f a -> f b -> f (Maybe a, b)
+(||*) :: (SendSigBy PipeKey (Pipe' a) f, Functor f) => f b -> f c -> f (Maybe b, c)
 a ||* b = swap <$> thenStop b a
 {-# INLINE (||*) #-}
 
 infixl 1 *|*
-(*|*) :: Pipe <<: f => f a -> f b -> f (a, b)
+(*|*) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (b, c)
 (*|*) = waitBoth
 {-# INLINE (*|*) #-}
 
 newtype Concurrently f a = Concurrently {runConcurrently :: f a}
     deriving (Functor)
 
-instance (Pipe <<: f, Applicative f) => Applicative (Concurrently f) where
+instance (SendSigBy PipeKey (Pipe' a) f, Applicative f) => Applicative (Concurrently f) where
     pure = Concurrently . pure
     liftA2 f (Concurrently a) (Concurrently b) =
         Concurrently $ uncurry f <$> (a *|* b)
     {-# INLINE pure #-}
     {-# INLINE liftA2 #-}
 
-instance (Pipe <<: f, Selective f) => Selective (Concurrently f) where
+instance (SendSigBy PipeKey (Pipe' a) f, Selective f) => Selective (Concurrently f) where
     select (Concurrently x) (Concurrently y) =
         Concurrently $
             select
@@ -118,154 +144,130 @@ instance (Pipe <<: f, Selective f) => Selective (Concurrently f) where
                 (pure app)
     {-# INLINE select #-}
 
-timesConcurrently :: forall f m. (Pipe <<: f, Applicative f, Monoid m) => Natural -> f m -> f m
+timesConcurrently ::
+    forall a f m.
+    (SendSigBy PipeKey (Pipe' a) f, Applicative f, Monoid m) =>
+    Natural ->
+    f m ->
+    f m
 timesConcurrently n a = case n of
     0 -> pure mempty
     1 -> a
     _ -> runConcurrently $ liftA2 (<>) (Concurrently a) (Concurrently $ timesConcurrently (n - 1) a)
 
-data Chan' src dst i o a where
-    Send :: forall src dst i o. dst -> o -> Chan' src dst i o ()
-    Recv :: forall src dst i o. src -> Chan' src dst i o i
-    TryRecv :: forall src dst i o. src -> Chan' src dst i o (Maybe i)
-makeKeyedEffect [''Chan'] []
+{-
+newtype Chan subchan = Chan {unChan :: Maybe subchan}
+    deriving newtype (Functor, Foldable, Eq, Ord)
+    deriving stock (Traversable, Show)
 
-type BroadChan src dst i o = Chan (Maybe src) (Maybe dst) (src, i) o
-type BroadChan' src dst i o = Chan' (Maybe src) (Maybe dst) (src, i) o
+pattern MainChan :: Chan subchan
+pattern MainChan = Chan Nothing
 
-type EndoChan chan a = Chan chan chan a a
-type BroadEndoChan chan a = BroadChan chan chan a a
+pattern SubChan :: subchan -> Chan subchan
+pattern SubChan chan = Chan (Just chan)
 
-broadcast :: SendInsBy ChanKey (BroadChan' src dst i o) f => o -> f ()
-broadcast = send Nothing
-{-# INLINE broadcast #-}
+{-# COMPLETE MainChan, SubChan #-}
 
-recvAny :: SendInsBy ChanKey (BroadChan' src dst i o) f => f (src, i)
-recvAny = recv Nothing
-{-# INLINE recvAny #-}
+data Routing' src dst f (a :: Type) where
+    Preroute :: (Chan src -> [Chan src]) -> f a -> Routing' src dst f a
+    Postroute :: (Chan dst -> [Chan dst]) -> f a -> Routing' src dst f a
+    Loopback :: (Chan dst -> [Chan src]) -> f a -> Routing' src dst f a
+makeKeyedEffect [] [''Routing']
 
-tryRecvAny :: SendInsBy ChanKey (BroadChan' src dst i o) f => f (Maybe (src, i))
-tryRecvAny = tryRecv Nothing
-{-# INLINE tryRecvAny #-}
-
-broadcastEffect :: o -> BroadChan' src dst i o ()
-broadcastEffect = Send Nothing
-{-# INLINE broadcastEffect #-}
-
-recvAnyEffect :: BroadChan' src dst i o (src, i)
-recvAnyEffect = Recv Nothing
-{-# INLINE recvAnyEffect #-}
-
-tryRecvAnyEffect :: BroadChan' src dst i o (Maybe (src, i))
-tryRecvAnyEffect = TryRecv Nothing
-{-# INLINE tryRecvAnyEffect #-}
-
-data Router' src dst i o f (a :: Type) where
-    Preroute :: forall src dst i o f a. (src -> Maybe src) -> f a -> Router' src dst i o f a
-    Postroute :: forall src dst i o f a. (dst -> Maybe dst) -> f a -> Router' src dst i o f a
-    Loopback :: forall src dst io f a. (dst -> Maybe src) -> f a -> Router' src dst io io f a
-makeKeyedEffect [] [''Router']
-
-type EndoRouter' chan a = Router' chan chan a a
-type EndoRouter chan a = Router chan chan a a
-
-preforward :: SendSigBy RouterKey (Router' src dst i o) f => (src -> src) -> f a -> f a
+preforward :: SendSigBy RoutingKey (Routing' src dst) f => (src -> src) -> f a -> f a
 preforward f = preroute $ Just . f
 {-# INLINE preforward #-}
 
-postforward :: SendSigBy RouterKey (Router' src dst i o) f => (dst -> dst) -> f a -> f a
+postforward :: SendSigBy RoutingKey (Routing' src dst) f => (dst -> dst) -> f a -> f a
 postforward f = postroute $ Just . f
 {-# INLINE postforward #-}
 
-recurrent :: SendSigBy RouterKey (Router' src dst io io) f => (dst -> src) -> f a -> f a
+recurrent :: SendSigBy RoutingKey (Routing' src dst) f => (dst -> src) -> f a -> f a
 recurrent f = loopback $ Just . f
 {-# INLINE recurrent #-}
 
-disconnectIn :: SendSigBy RouterKey (Router' src dst i o) f => f a -> f a
+disconnectIn :: SendSigBy RoutingKey (Routing' src dst) f => f a -> f a
 disconnectIn = preroute $ const Nothing
 {-# INLINE disconnectIn #-}
 
-disconnectOut :: SendSigBy RouterKey (Router' src dst i o) f => f a -> f a
+disconnectOut :: SendSigBy RoutingKey (Routing' src dst) f => f a -> f a
 disconnectOut = postroute $ const Nothing
 {-# INLINE disconnectOut #-}
 
-isolate :: SendSigBy RouterKey (Router' src dst i o) f => f a -> f a
+isolate :: SendSigBy RoutingKey (Routing' src dst) f => f a -> f a
 isolate = disconnectOut . disconnectIn
 {-# INLINE isolate #-}
 
-preforwardEffect :: (src -> src) -> f a -> Router' src dst i o f a
+preforwardEffect :: (src -> src) -> f a -> Routing' src dst f a
 preforwardEffect f = Preroute (Just . f)
 {-# INLINE preforwardEffect #-}
 
-postforwardEffect :: (dst -> dst) -> f a -> Router' src dst i o f a
+postforwardEffect :: (dst -> dst) -> f a -> Routing' src dst f a
 postforwardEffect f = Postroute (Just . f)
 {-# INLINE postforwardEffect #-}
 
-recurrentEffect :: (dst -> src) -> f a -> Router' src dst io io f a
+recurrentEffect :: (dst -> src) -> f a -> Routing' src dst f a
 recurrentEffect f = Loopback (Just . f)
 {-# INLINE recurrentEffect #-}
 
-disconnectInEffect :: f a -> Router' src dst i o f a
+disconnectInEffect :: f a -> Routing' src dst f a
 disconnectInEffect = Preroute $ const Nothing
 {-# INLINE disconnectInEffect #-}
 
-disconnectOutEffect :: f a -> Router' src dst i o f a
+disconnectOutEffect :: f a -> Routing' src dst f a
 disconnectOutEffect = Postroute $ const Nothing
 {-# INLINE disconnectOutEffect #-}
 
-data Filter' src dst i o f (a :: Type) where
-    Prefilter :: forall src dst i o f a. (src -> i -> f (Maybe (src, i))) -> f a -> Filter' src dst i o f a
-    Postfilter :: forall src dst i o f a. (dst -> o -> f (Maybe (dst, o))) -> f a -> Filter' src dst i o f a
-    Loopfilter :: forall src dst i o f a. (dst -> o -> f (Maybe (src, i))) -> f a -> Filter' src dst i o f a
-makeKeyedEffect [] [''Filter']
+data Comm chan a b where
+    Send :: chan -> a -> Comm chan a ()
+    Recv :: chan -> Comm chan a a
+    TryRecv :: chan -> Comm chan a (Maybe a)
+makeEffectF [''Comm]
 
-type EndoFilter' chan a = Filter' chan chan a a
-type EndoFilter chan a = Filter chan chan a a
+type PipeComm chan a f = (Comm chan a <: f, SendSigBy PipeKey (Pipe' a) f)
 
-data PipeProxy src dst i o (a :: Type) where
-    PipeProxy :: forall src dst i o a. (src -> i -> Maybe (dst, o)) -> PipeProxy src dst i o a
-makeEffectF [''PipeProxy]
+data BroadComm chan a b where
+    Broadcast :: forall chan a. a -> BroadComm chan a ()
+    RecvAny :: BroadComm chan a (chan, a)
+    TryRecvAny :: BroadComm chan a (Maybe (chan, a))
+makeEffectF [''BroadComm]
 
-data PipeProxyH src dst i o f (a :: Type) where
-    PipeProxyH :: forall src dst i o f a. (src -> i -> f (Maybe (dst, o))) -> PipeProxyH src dst i o f a
-makeEffectF [''PipeProxyH]
+type PipeBroadComm chan a f = (PipeComm chan a f, BroadComm chan a <: f)
+-}
 
-data Processing' src dst i o f (a :: Type) where
-    PreProcess :: forall src dst i o f a. (src -> i -> f (src, i)) -> f a -> Processing' src dst i o f a
-    PostProcess :: forall src dst i o f a. (dst -> o -> f (dst, o)) -> f a -> Processing' src dst i o f a
-    LoopProcess :: forall src dst i o f a. (dst -> o -> f (src, i)) -> f a -> Processing' src dst i o f a
-makeKeyedEffect [] [''Processing']
-
-type EndoProcessing' chan a = Processing' chan chan a a
-type EndoProcessing chan a = Processing chan chan a a
-
-defaultProcessing ::
-    forall src dst i o f a.
-    Functor f =>
-    Processing' src dst i o f a ->
-    Filter' src dst i o f a
-defaultProcessing = \case
-    PreProcess f a -> Prefilter ((fmap Just .) . f) a
-    PostProcess f a -> Postfilter ((fmap Just .) . f) a
-    LoopProcess f a -> Loopfilter ((fmap Just .) . f) a
-{-# INLINE defaultProcessing #-}
-
-data Streaming src dst i o (a :: Type) where
-    Streaming :: forall src dst i o a. (src -> i -> (dst, o)) -> Streaming src dst i o a
+data Streaming a b c where
+    Streaming :: (a -> b) -> Streaming a b ()
 makeEffectF [''Streaming]
 
-defaultStreaming :: Streaming src dst i o a -> PipeProxy src dst i o a
-defaultStreaming (Streaming f) = PipeProxy ((Just .) . f)
+defaultStreaming :: Streaming a b c -> Filtering a b c
+defaultStreaming (Streaming f) = Filtering $ Just . f
 {-# INLINE defaultStreaming #-}
 
-data StreamingH src dst i o f (a :: Type) where
-    StreamingH :: forall src dst i o f a. (src -> i -> f (dst, o)) -> StreamingH src dst i o f a
-makeEffectH [''StreamingH]
+data Filtering a b c where
+    Filtering :: (a -> Maybe b) -> Filtering a b ()
+makeEffectF [''Filtering]
 
-defaultStreamingH ::
-    forall src dst i o f a.
-    Functor f =>
-    StreamingH src dst i o f a ->
-    PipeProxyH src dst i o f a
-defaultStreamingH (StreamingH f) = PipeProxyH ((fmap Just .) . f)
-{-# INLINE defaultStreamingH #-}
+defaultFiltering :: Filtering a b c -> Processing a b c
+defaultFiltering (Filtering f) = Processing $ maybe V.empty V.singleton . f
+{-# INLINE defaultFiltering #-}
+
+data Processing a b c where
+    Processing :: (a -> Vector b) -> Processing a b ()
+makeEffectF [''Processing]
+
+defaultProcessing ::
+    (Foldable t, FoldingMapH a <<: f, Feed b <: f, Applicative f) =>
+    (a -> t b) ->
+    f ()
+defaultProcessing f =
+    foldingMapH \a -> for_ (f a) feed
+{-# INLINE defaultProcessing #-}
+
+foldConcurrent ::
+    (FoldingMapH a <<: f, SendSigBy PipeKey (Pipe' a) f, Applicative f) =>
+    Natural ->
+    FoldingMapH a f m ->
+    f m
+foldConcurrent nWorkers (FoldingMapH f) =
+    timesConcurrently nWorkers (foldingMapH f)
+{-# INLINE foldConcurrent #-}

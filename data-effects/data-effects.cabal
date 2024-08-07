@@ -65,6 +65,7 @@ library
         Data.Effect.Unlift
         Data.Effect.ShiftReset
         Data.Effect.KVStore
+        Data.Effect.Foldl
         Data.Effect.Shell
 
     reexported-modules:
@@ -98,6 +99,8 @@ library
         time,
         selective,
         bytestring,
+        vector,
+        foldl,
 
     hs-source-dirs:   src
     ghc-options:      -Wall
