@@ -9,9 +9,11 @@ module Data.Effect.Shell where
 import Control.Lens (makeLenses, makePrisms)
 import Data.Bifunctor (bimap)
 import Data.ByteString (ByteString)
-import Data.Effect.Concurrent.Pipe
+import Data.Effect.Concurrent.Pipe (Feed, OutPlumber, PipeComm, joinOutfluxToLeft, joinOutfluxToRight, swapOutflux)
+import Data.Effect.Foldl (Folding)
 import Data.Text (Text)
 import Data.Text qualified as T
+import GHC.Exts (IsString)
 import System.Exit (ExitCode)
 import System.Posix.Types (GroupID, UserID)
 import System.Process (StdStream)
@@ -97,5 +99,30 @@ toRawCmdSpec = \case
     RawCommand exe args -> Raw.RawCommand exe (map T.unpack args)
 {-# INLINE toRawCmdSpec #-}
 
-type Shell f = (Process <: f, PipeBroadComm Stdio ByteString f)
-data Stdio = Stdin | Stdout | Stderr
+type Shell f =
+    ( Process <: f
+    , PipeComm Stdio f
+    , Feed Stderr <: f
+    , Folding Stderr <: f
+    , OutPlumber Stderr Stdio <<: f
+    )
+
+newtype Stdio = Stdio {getStdio :: ByteString}
+    deriving newtype (Eq, Ord, Semigroup, Monoid, IsString)
+    deriving stock (Show)
+
+newtype Stderr = Stderr {getStderr :: ByteString}
+    deriving newtype (Eq, Ord, Semigroup, Monoid, IsString)
+    deriving stock (Show)
+
+stderrToOut :: OutPlumber Stderr Stdio <<: f => f a -> f a
+stderrToOut = joinOutfluxToRight @Stderr @Stdio
+{-# INLINE stderrToOut #-}
+
+stdoutToErr :: OutPlumber Stderr Stdio <<: f => f a -> f a
+stdoutToErr = joinOutfluxToLeft @Stderr @Stdio
+{-# INLINE stdoutToErr #-}
+
+swapStdOutErr :: OutPlumber Stderr Stdio <<: f => f a -> f a
+swapStdOutErr = swapOutflux @Stderr @Stdio
+{-# INLINE swapStdOutErr #-}

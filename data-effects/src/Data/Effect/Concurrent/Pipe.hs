@@ -14,9 +14,10 @@ Portability :  portable
 
 Ergonomic and high-level primitive combinators for effectful concurrent programming.
 
-This operates through the cooperation of higher-order effect 'pipes' and first-order effect 'channels'.
-This is equivalent to the paradigm of pipes in POSIX.
-In the pipe operators, each action can be viewed as an autonomously concurrent process that
+This operates through the cooperation of `Feed`/"Data.Effect.Foldl" effects, which send and receive data,
+and the `Pipe` effect, which handles their routing.
+This is similar to the shell paradigm in POSIX.
+In the pipe operator, each action can be seen as a process that operates autonomously in parallel and
 communicates with other processes using channels.
 -}
 module Data.Effect.Concurrent.Pipe where
@@ -25,12 +26,10 @@ import Control.Applicative (liftA2)
 import Control.Arrow (app)
 import Control.Selective (Selective, select, swapEither)
 import Data.Bifunctor (first)
-import Data.Coerce (Coercible)
-import Data.Effect.Foldl (FoldingMapH (..), foldingMapH)
+import Data.Coerce (Coercible, coerce)
+import Data.Effect.Foldl (Folding, FoldingMapH (..), foldingMapH)
 import Data.Foldable (for_)
 import Data.Functor ((<&>))
-import Data.These (These)
-import Data.These.Combinators (swapThese)
 import Data.Tuple (swap)
 import Data.Vector (Vector)
 import Data.Vector qualified as V
@@ -49,22 +48,24 @@ data Feed a b where
     Feed :: a -> Feed a ()
 
 data InPlumber a b f c where
-    ZipInflux :: (Either a b -> Either a b) -> f c -> InPlumber a b f c
-    ZipInfluxH :: (Either a b -> f (Either a b)) -> f c -> InPlumber a b f c
-    MergeInfluxToFst :: Coercible a b => f c -> InPlumber a b f c
-    MergeInfluxToSnd :: Coercible a b => f c -> InPlumber a b f c
+    RewriteInflux :: (Either a b -> Either a b) -> f c -> InPlumber a b f c
+    RewriteInfluxH :: (Either a b -> f (Either a b)) -> f c -> InPlumber a b f c
+    JoinInfluxToLeft :: Coercible a b => f c -> InPlumber a b f c
+    JoinInfluxToRight :: Coercible a b => f c -> InPlumber a b f c
     SwapInflux :: Coercible a b => f c -> InPlumber a b f c
 
 data OutPlumber a b f c where
-    ZipOutflux :: (Either a b -> Either a b) -> f c -> OutPlumber a b f c
-    ZipOutfluxH :: (Either a b -> f (Either a b)) -> f c -> OutPlumber a b f c
-    MergeOutfluxToFst :: Coercible a b => f c -> OutPlumber a b f c
-    MergeOutfluxToSnd :: Coercible a b => f c -> OutPlumber a b f c
+    RewriteOutflux :: (Either a b -> Either a b) -> f c -> OutPlumber a b f c
+    RewriteOutfluxH :: (Either a b -> f (Either a b)) -> f c -> OutPlumber a b f c
+    JoinOutfluxToLeft :: Coercible a b => f c -> OutPlumber a b f c
+    JoinOutfluxToRight :: Coercible a b => f c -> OutPlumber a b f c
     SwapOutflux :: Coercible a b => f c -> OutPlumber a b f c
 
 makeKeyedEffect [] [''Pipe']
 makeEffectF [''Feed]
 makeEffectH [''InPlumber, ''OutPlumber]
+
+type PipeComm a f = (SendSigBy PipeKey (Pipe' a) f, Feed a <: f, Folding a <: f)
 
 infixl 1 |>
 (|>) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (b, c)
@@ -155,85 +156,53 @@ timesConcurrently n a = case n of
     1 -> a
     _ -> runConcurrently $ liftA2 (<>) (Concurrently a) (Concurrently $ timesConcurrently (n - 1) a)
 
-{-
-newtype Chan subchan = Chan {unChan :: Maybe subchan}
-    deriving newtype (Functor, Foldable, Eq, Ord)
-    deriving stock (Traversable, Show)
+mergeInfluxToLeft :: InPlumber a b <<: f => (b -> a) -> f c -> f c
+mergeInfluxToLeft f = rewriteInflux $ either Left (Left . f)
+{-# INLINE mergeInfluxToLeft #-}
 
-pattern MainChan :: Chan subchan
-pattern MainChan = Chan Nothing
+mergeInfluxToRight :: InPlumber a b <<: f => (a -> b) -> f c -> f c
+mergeInfluxToRight f = rewriteInflux $ either (Right . f) Right
+{-# INLINE mergeInfluxToRight #-}
 
-pattern SubChan :: subchan -> Chan subchan
-pattern SubChan chan = Chan (Just chan)
+exchangeInflux :: InPlumber a b <<: f => (a -> b) -> (b -> a) -> f c -> f c
+exchangeInflux f g = rewriteInflux $ either (Right . f) (Left . g)
+{-# INLINE exchangeInflux #-}
 
-{-# COMPLETE MainChan, SubChan #-}
+mergeOutfluxToLeft :: OutPlumber a b <<: f => (b -> a) -> f c -> f c
+mergeOutfluxToLeft f = rewriteOutflux $ either Left (Left . f)
+{-# INLINE mergeOutfluxToLeft #-}
 
-data Routing' src dst f (a :: Type) where
-    Preroute :: (Chan src -> [Chan src]) -> f a -> Routing' src dst f a
-    Postroute :: (Chan dst -> [Chan dst]) -> f a -> Routing' src dst f a
-    Loopback :: (Chan dst -> [Chan src]) -> f a -> Routing' src dst f a
-makeKeyedEffect [] [''Routing']
+mergeOutfluxToRight :: OutPlumber a b <<: f => (a -> b) -> f c -> f c
+mergeOutfluxToRight f = rewriteOutflux $ either (Right . f) Right
+{-# INLINE mergeOutfluxToRight #-}
 
-preforward :: SendSigBy RoutingKey (Routing' src dst) f => (src -> src) -> f a -> f a
-preforward f = preroute $ Just . f
-{-# INLINE preforward #-}
+exchangeOutflux :: OutPlumber a b <<: f => (a -> b) -> (b -> a) -> f c -> f c
+exchangeOutflux f g = rewriteOutflux $ either (Right . f) (Left . g)
+{-# INLINE exchangeOutflux #-}
 
-postforward :: SendSigBy RoutingKey (Routing' src dst) f => (dst -> dst) -> f a -> f a
-postforward f = postroute $ Just . f
-{-# INLINE postforward #-}
+defaultJoinInfluxToLeft :: forall a b f c. (InPlumber a b <<: f, Coercible a b) => f c -> f c
+defaultJoinInfluxToLeft = mergeInfluxToLeft @a @b coerce
+{-# INLINE defaultJoinInfluxToLeft #-}
 
-recurrent :: SendSigBy RoutingKey (Routing' src dst) f => (dst -> src) -> f a -> f a
-recurrent f = loopback $ Just . f
-{-# INLINE recurrent #-}
+defaultJoinInfluxToRight :: forall a b f c. (InPlumber a b <<: f, Coercible a b) => f c -> f c
+defaultJoinInfluxToRight = mergeInfluxToLeft @a @b coerce
+{-# INLINE defaultJoinInfluxToRight #-}
 
-disconnectIn :: SendSigBy RoutingKey (Routing' src dst) f => f a -> f a
-disconnectIn = preroute $ const Nothing
-{-# INLINE disconnectIn #-}
+defaultSwapInflux :: forall a b f c. (InPlumber a b <<: f, Coercible a b) => f c -> f c
+defaultSwapInflux = exchangeInflux @a @b coerce coerce
+{-# INLINE defaultSwapInflux #-}
 
-disconnectOut :: SendSigBy RoutingKey (Routing' src dst) f => f a -> f a
-disconnectOut = postroute $ const Nothing
-{-# INLINE disconnectOut #-}
+defaultJoinOutfluxToLeft :: forall a b f c. (OutPlumber a b <<: f, Coercible a b) => f c -> f c
+defaultJoinOutfluxToLeft = mergeOutfluxToLeft @a @b coerce
+{-# INLINE defaultJoinOutfluxToLeft #-}
 
-isolate :: SendSigBy RoutingKey (Routing' src dst) f => f a -> f a
-isolate = disconnectOut . disconnectIn
-{-# INLINE isolate #-}
+defaultJoinOutfluxToRight :: forall a b f c. (OutPlumber a b <<: f, Coercible a b) => f c -> f c
+defaultJoinOutfluxToRight = mergeOutfluxToLeft @a @b coerce
+{-# INLINE defaultJoinOutfluxToRight #-}
 
-preforwardEffect :: (src -> src) -> f a -> Routing' src dst f a
-preforwardEffect f = Preroute (Just . f)
-{-# INLINE preforwardEffect #-}
-
-postforwardEffect :: (dst -> dst) -> f a -> Routing' src dst f a
-postforwardEffect f = Postroute (Just . f)
-{-# INLINE postforwardEffect #-}
-
-recurrentEffect :: (dst -> src) -> f a -> Routing' src dst f a
-recurrentEffect f = Loopback (Just . f)
-{-# INLINE recurrentEffect #-}
-
-disconnectInEffect :: f a -> Routing' src dst f a
-disconnectInEffect = Preroute $ const Nothing
-{-# INLINE disconnectInEffect #-}
-
-disconnectOutEffect :: f a -> Routing' src dst f a
-disconnectOutEffect = Postroute $ const Nothing
-{-# INLINE disconnectOutEffect #-}
-
-data Comm chan a b where
-    Send :: chan -> a -> Comm chan a ()
-    Recv :: chan -> Comm chan a a
-    TryRecv :: chan -> Comm chan a (Maybe a)
-makeEffectF [''Comm]
-
-type PipeComm chan a f = (Comm chan a <: f, SendSigBy PipeKey (Pipe' a) f)
-
-data BroadComm chan a b where
-    Broadcast :: forall chan a. a -> BroadComm chan a ()
-    RecvAny :: BroadComm chan a (chan, a)
-    TryRecvAny :: BroadComm chan a (Maybe (chan, a))
-makeEffectF [''BroadComm]
-
-type PipeBroadComm chan a f = (PipeComm chan a f, BroadComm chan a <: f)
--}
+defaultSwapOutflux :: forall a b f c. (OutPlumber a b <<: f, Coercible a b) => f c -> f c
+defaultSwapOutflux = exchangeOutflux @a @b coerce coerce
+{-# INLINE defaultSwapOutflux #-}
 
 data Streaming a b c where
     Streaming :: (a -> b) -> Streaming a b ()

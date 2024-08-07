@@ -37,8 +37,8 @@ data FoldingMapH' a f b where
 iso :: Functor f => FoldingMapH a f b -> FoldingMapH' a f b
 iso (FoldingMapH f) = FoldingMapH' (fmap (<>) . f) mempty
 
-iso' :: (FoldingMapH a <<: f, Functor f) => FoldingMapH' a f b -> f b
-iso' (FoldingMapH' step initial) = foldingMapH (fmap Endo . step) <&> (`appEndo` initial)
+iso_inv :: (FoldingMapH a <<: f, Functor f) => FoldingMapH' a f b -> f b
+iso_inv (FoldingMapH' step initial) = foldingMapH (fmap Endo . step) <&> (`appEndo` initial)
 -}
 
 data FoldingH a f b where
