@@ -14,38 +14,61 @@ Portability :  portable
 
 Ergonomic and high-level primitive combinators for effectful concurrent programming.
 
-This operates through the cooperation of `Feed`/"Data.Effect.Foldl" effects, which send and receive data,
-and the `Pipe` effect, which handles their routing.
+This operates through the cooperation of v'Feed'/v'Consume' effects, which send and receive data,
+and the v'PipeTo' effects, which handles their routing.
 This is similar to the shell paradigm in POSIX.
 In the pipe operator, each action can be seen as a process that operates autonomously in parallel and
 communicates with other processes using channels.
 -}
 module Data.Effect.Concurrent.Pipe where
 
-import Control.Applicative (liftA2)
+import Control.Applicative (Alternative, liftA2)
 import Control.Arrow (app)
+import Control.Monad (MonadPlus, forever, unless)
+import Control.Monad.Fix (MonadFix)
+import Control.Monad.Zip (MonadZip)
 import Control.Selective (Selective, select, swapEither)
 import Data.Bifunctor (first)
 import Data.Coerce (Coercible, coerce)
-import Data.Effect.Foldl (Folding, FoldingMapH (..), foldingMapH)
+import Data.Effect.Foldl (
+    Folding (Folding),
+    FoldingH (FoldingH),
+    FoldingMapH (..),
+    foldingMapH,
+    toFoldingH,
+ )
 import Data.Foldable (for_)
+import Data.Function (fix)
 import Data.Functor ((<&>))
+import Data.Functor.Classes (Eq1, Ord1)
 import Data.Tuple (swap)
 import Data.Vector (Vector)
 import Data.Vector qualified as V
+import GHC.Generics (Generic, Generic1)
 import Numeric.Natural (Natural)
 
-data Pipe' a f b where
-    PipeTo :: f b -> f c -> Pipe' a f (b, c)
-    FstWaitPipeTo :: f b -> f c -> Pipe' a f (b, Maybe c)
-    SndWaitPipeTo :: f b -> f c -> Pipe' a f (Maybe b, c)
-    RacePipeTo :: f b -> f c -> Pipe' a f (Either b c)
-    WaitBoth :: f b -> f c -> Pipe' a f (b, c)
-    ThenStop :: f b -> f c -> Pipe' a f (b, Maybe c)
-    Race :: f b -> f c -> Pipe' a f (Either b c)
+data PipeH' a f b where
+    PipeTo :: f b -> f c -> PipeH' a f (b, c)
+    FstWaitPipeTo :: f b -> f c -> PipeH' a f (b, Maybe c)
+    SndWaitPipeTo :: f b -> f c -> PipeH' a f (Maybe b, c)
+    RacePipeTo :: f b -> f c -> PipeH' a f (Either b c)
+    WaitBoth :: f b -> f c -> PipeH' a f (b, c)
+    ThenStop :: f b -> f c -> PipeH' a f (b, Maybe c)
+    Race :: f b -> f c -> PipeH' a f (Either b c)
+
+data PipeF (a :: Type) (b :: Type) where
+    Passthrough :: PipeF a b
 
 data Feed a b where
     Feed :: a -> Feed a ()
+    TryFeed :: a -> Feed a Bool
+
+data Consume a b where
+    Consume :: Consume a a
+    TryConsume :: Consume a (Maybe a)
+
+data Yield a where
+    Yield :: Yield ()
 
 data InPlumber a b f c where
     RewriteInflux :: (Either a b -> Either a b) -> f c -> InPlumber a b f c
@@ -61,83 +84,138 @@ data OutPlumber a b f c where
     JoinOutfluxToRight :: Coercible a b => f c -> OutPlumber a b f c
     SwapOutflux :: Coercible a b => f c -> OutPlumber a b f c
 
-makeKeyedEffect [] [''Pipe']
-makeEffectF [''Feed]
+makeKeyedEffect [] [''PipeH']
+makeEffectF [''PipeF, ''Feed, ''Consume, ''Yield]
 makeEffectH [''InPlumber, ''OutPlumber]
 
-type PipeComm a f = (SendSigBy PipeKey (Pipe' a) f, Feed a <: f, Folding a <: f)
+type PipeComm a f =
+    ( SendSigBy PipeHKey (PipeH' a) f
+    , PipeF a <: f
+    , Feed a <: f
+    , Consume a <: f
+    , Yield <: f
+    )
+
+newtype Connection a = Connection {unConnection :: Maybe a}
+    deriving newtype
+        ( Eq
+        , Ord
+        , Functor
+        , Foldable
+        , Applicative
+        , Alternative
+        , Monad
+        , MonadPlus
+        , MonadZip
+        , MonadFail
+        , MonadFix
+        , Semigroup
+        , Monoid
+        , Eq1
+        , Ord1
+        )
+    deriving stock (Traversable, Show, Read, Generic, Generic1)
+
+pattern OpenPipe :: a -> Connection a
+pattern OpenPipe a = Connection (Just a)
+
+pattern ClosePipe :: Connection a
+pattern ClosePipe = Connection Nothing
+
+{-# COMPLETE OpenPipe, ClosePipe #-}
 
 infixl 1 |>
-(|>) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (b, c)
+(|>) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (b, c)
 (|>) = pipeTo
 {-# INLINE (|>) #-}
 
 infixl 1 *|>
-(*|>) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (b, Maybe c)
+(*|>) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (b, Maybe c)
 (*|>) = fstWaitPipeTo
 {-# INLINE (*|>) #-}
 
 infixl 1 |*>
-(|*>) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (Maybe b, c)
+(|*>) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (Maybe b, c)
 (|*>) = sndWaitPipeTo
 {-# INLINE (|*>) #-}
 
 infixl 1 *|*>
-(*|*>) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (Either b c)
+(*|*>) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (Either b c)
 (*|*>) = racePipeTo
 {-# INLINE (*|*>) #-}
 
 infixr 0 <|
-(<|) :: (SendSigBy PipeKey (Pipe' a) f, Functor f) => f b -> f c -> f (b, c)
+(<|) :: (SendSigBy PipeHKey (PipeH' a) f, Functor f) => f b -> f c -> f (b, c)
 a <| b = swap <$> pipeTo b a
 {-# INLINE (<|) #-}
 
 infixr 0 <|*
-(<|*) :: (SendSigBy PipeKey (Pipe' a) f, Functor f) => f b -> f c -> f (Maybe b, c)
+(<|*) :: (SendSigBy PipeHKey (PipeH' a) f, Functor f) => f b -> f c -> f (Maybe b, c)
 a <|* b = swap <$> fstWaitPipeTo b a
 {-# INLINE (<|*) #-}
 
 infixr 0 <*|
-(<*|) :: (SendSigBy PipeKey (Pipe' a) f, Functor f) => f b -> f c -> f (b, Maybe c)
+(<*|) :: (SendSigBy PipeHKey (PipeH' a) f, Functor f) => f b -> f c -> f (b, Maybe c)
 a <*| b = swap <$> sndWaitPipeTo b a
 {-# INLINE (<*|) #-}
 
 infixr 0 <*|*
-(<*|*) :: (SendSigBy PipeKey (Pipe' a) f, Functor f) => f b -> f c -> f (Either b c)
+(<*|*) :: (SendSigBy PipeHKey (PipeH' a) f, Functor f) => f b -> f c -> f (Either b c)
 a <*|* b = swapEither <$> racePipeTo b a
 {-# INLINE (<*|*) #-}
 
 infixl 1 |||
-(|||) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (Either b c)
+(|||) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (Either b c)
 (|||) = race
 {-# INLINE (|||) #-}
 
 infixl 1 *||
-(*||) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (b, Maybe c)
+(*||) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (b, Maybe c)
 (*||) = thenStop
 {-# INLINE (*||) #-}
 
 infixr 0 ||*
-(||*) :: (SendSigBy PipeKey (Pipe' a) f, Functor f) => f b -> f c -> f (Maybe b, c)
+(||*) :: (SendSigBy PipeHKey (PipeH' a) f, Functor f) => f b -> f c -> f (Maybe b, c)
 a ||* b = swap <$> thenStop b a
 {-# INLINE (||*) #-}
 
 infixl 1 *|*
-(*|*) :: SendSigBy PipeKey (Pipe' a) f => f b -> f c -> f (b, c)
+(*|*) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (b, c)
 (*|*) = waitBoth
 {-# INLINE (*|*) #-}
+
+defaultFeed :: (Feed a <: m, Yield <: m, Monad m) => a -> m ()
+defaultFeed a = do
+    success <- tryFeed a
+    unless success do
+        yield
+        defaultFeed a
+
+defaultConsume :: (Consume a <: m, Yield <: m, Monad m) => m a
+defaultConsume = do
+    tryConsume >>= \case
+        Just a -> pure a
+        Nothing -> do
+            yield
+            defaultConsume
+
+defaultPassthrough :: forall a m. (Feed a <: m, Consume a <: m, Yield <: m, Monad m) => m a
+defaultPassthrough =
+    forever do
+        consume @a >>= feed
+        yield
 
 newtype Concurrently f a = Concurrently {runConcurrently :: f a}
     deriving (Functor)
 
-instance (SendSigBy PipeKey (Pipe' a) f, Applicative f) => Applicative (Concurrently f) where
+instance (SendSigBy PipeHKey (PipeH' a) f, Applicative f) => Applicative (Concurrently f) where
     pure = Concurrently . pure
     liftA2 f (Concurrently a) (Concurrently b) =
         Concurrently $ uncurry f <$> (a *|* b)
     {-# INLINE pure #-}
     {-# INLINE liftA2 #-}
 
-instance (SendSigBy PipeKey (Pipe' a) f, Selective f) => Selective (Concurrently f) where
+instance (SendSigBy PipeHKey (PipeH' a) f, Selective f) => Selective (Concurrently f) where
     select (Concurrently x) (Concurrently y) =
         Concurrently $
             select
@@ -147,7 +225,7 @@ instance (SendSigBy PipeKey (Pipe' a) f, Selective f) => Selective (Concurrently
 
 timesConcurrently ::
     forall a f m.
-    (SendSigBy PipeKey (Pipe' a) f, Applicative f, Monoid m) =>
+    (SendSigBy PipeHKey (PipeH' a) f, Applicative f, Monoid m) =>
     Natural ->
     f m ->
     f m
@@ -204,6 +282,24 @@ defaultSwapOutflux :: forall a b f c. (OutPlumber a b <<: f, Coercible a b) => f
 defaultSwapOutflux = exchangeOutflux @a @b coerce coerce
 {-# INLINE defaultSwapOutflux #-}
 
+defaultFolding :: (Consume (Connection a) <: m, Monad m) => Folding a b -> m b
+defaultFolding (Folding step initial) =
+    flip fix initial \next acc -> do
+        consume >>= \case
+            OpenPipe a -> next $ step acc a
+            ClosePipe -> pure acc
+
+defaultFoldingH :: (Consume (Connection a) <: m, Monad m) => FoldingH a m b -> m b
+defaultFoldingH (FoldingH step initial) =
+    flip fix initial \next acc -> do
+        consume >>= \case
+            OpenPipe a -> next =<< step acc a
+            ClosePipe -> pure acc
+
+defaultFoldingMapH :: (Consume (Connection a) <: m, Monad m) => FoldingMapH a m b -> m b
+defaultFoldingMapH = defaultFoldingH . toFoldingH
+{-# INLINE defaultFoldingMapH #-}
+
 data Streaming a b c where
     Streaming :: (a -> b) -> Streaming a b ()
 makeEffectF [''Streaming]
@@ -233,7 +329,7 @@ defaultProcessing f =
 {-# INLINE defaultProcessing #-}
 
 foldConcurrent ::
-    (FoldingMapH a <<: f, SendSigBy PipeKey (Pipe' a) f, Applicative f) =>
+    (FoldingMapH a <<: f, SendSigBy PipeHKey (PipeH' a) f, Applicative f) =>
     Natural ->
     FoldingMapH a f m ->
     f m

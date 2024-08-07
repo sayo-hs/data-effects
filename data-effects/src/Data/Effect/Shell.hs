@@ -9,8 +9,16 @@ module Data.Effect.Shell where
 import Control.Lens (makeLenses, makePrisms)
 import Data.Bifunctor (bimap)
 import Data.ByteString (ByteString)
-import Data.Effect.Concurrent.Pipe (Feed, OutPlumber, PipeComm, joinOutfluxToLeft, joinOutfluxToRight, swapOutflux)
-import Data.Effect.Foldl (Folding)
+import Data.Effect.Concurrent.Pipe (
+    Connection,
+    Feed,
+    OutPlumber,
+    PipeComm,
+    joinOutfluxToLeft,
+    joinOutfluxToRight,
+    swapOutflux,
+ )
+import Data.Effect.Foldl (Folding, FoldingH, FoldingMapH)
 import Data.Text (Text)
 import Data.Text qualified as T
 import GHC.Exts (IsString)
@@ -101,9 +109,11 @@ toRawCmdSpec = \case
 
 type Shell f =
     ( Process <: f
-    , PipeComm Stdio f
-    , Feed Stderr <: f
-    , Folding Stderr <: f
+    , PipeComm (Connection Stdio) f
+    , Folding Stdio <: f
+    , FoldingMapH Stdio <<: f
+    , FoldingH Stdio <<: f
+    , Feed (Connection Stderr) <: f
     , OutPlumber Stderr Stdio <<: f
     )
 
@@ -123,6 +133,6 @@ stdoutToErr :: OutPlumber Stderr Stdio <<: f => f a -> f a
 stdoutToErr = joinOutfluxToLeft @Stderr @Stdio
 {-# INLINE stdoutToErr #-}
 
-swapStdOutErr :: OutPlumber Stderr Stdio <<: f => f a -> f a
-swapStdOutErr = swapOutflux @Stderr @Stdio
-{-# INLINE swapStdOutErr #-}
+swapStdOE :: OutPlumber Stderr Stdio <<: f => f a -> f a
+swapStdOE = swapOutflux @Stderr @Stdio
+{-# INLINE swapStdOE #-}
