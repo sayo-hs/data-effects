@@ -82,7 +82,7 @@ import Language.Haskell.TH (
     Specificity (SpecifiedSpec),
     TyVarBndr (..),
     TyVarBndrSpec,
-    Type (WildCardT),
+    Type (TupleT, WildCardT),
     getDoc,
     mkName,
     patSynSigD,
@@ -543,7 +543,9 @@ genLiftInsPatternSynonyms EffClsInfo{..} = do
                         -- not inferred properly (why?).
                         [t|
                             () =>
-                            ($(pure a) ~ $(pure effResultType)) =>
+                            ( $(pure a) ~ $(pure effResultType)
+                            , $(pure $ foldl AppT (TupleT (length effCxt)) effCxt)
+                            ) =>
                             $( pure $
                                 arrowChain
                                     effParamTypes
