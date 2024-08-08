@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -47,52 +48,66 @@ import Data.Vector qualified as V
 import GHC.Generics (Generic, Generic1)
 import Numeric.Natural (Natural)
 
-data PipeH' a f b where
-    PipeTo :: f b -> f c -> PipeH' a f (b, c)
-    FstWaitPipeTo :: f b -> f c -> PipeH' a f (b, Maybe c)
-    SndWaitPipeTo :: f b -> f c -> PipeH' a f (Maybe b, c)
-    RacePipeTo :: f b -> f c -> PipeH' a f (Either b c)
-    WaitBoth :: f b -> f c -> PipeH' a f (b, c)
-    ThenStop :: f b -> f c -> PipeH' a f (b, Maybe c)
-    Race :: f b -> f c -> PipeH' a f (Either b c)
+data PipeH f a where
+    PipeTo :: f a -> f b -> PipeH f (a, b)
+    FstWaitPipeTo :: f a -> f b -> PipeH f (a, Maybe b)
+    SndWaitPipeTo :: f a -> f b -> PipeH f (Maybe a, b)
+    RacePipeTo :: f a -> f b -> PipeH f (Either a b)
+    WaitBoth :: f a -> f b -> PipeH f (a, b)
+    ThenStop :: f a -> f b -> PipeH f (a, Maybe b)
+    Race :: f a -> f b -> PipeH f (Either a b)
 
-data PipeF (a :: Type) (b :: Type) where
-    Passthrough :: PipeF a b
+data PipeF (a :: Type) where
+    Passthrough :: PipeF a
 
-data Feed a b where
-    Feed :: a -> Feed a ()
-    TryFeed :: a -> Feed a Bool
+data FeedF p a where
+    Feed :: p -> FeedF p ()
+    TryFeed :: p -> FeedF p Bool
 
-data Consume a b where
-    Consume :: Consume a a
-    TryConsume :: Consume a (Maybe a)
+data FeedH (p :: Type) f (a :: Type) where
+    ConnectOutPort :: f a -> FeedH p f a
+
+data ConsumeF p a where
+    Consume :: ConsumeF p p
+    TryConsume :: ConsumeF p (Maybe p)
+
+data ConsumeH (p :: Type) f (a :: Type) where
+    ConnectInPort :: f a -> ConsumeH p f a
+
+data Plumber (s :: Stream) (p :: Type) (q :: Type) f a where
+    RewriteExchange ::
+        forall s p q f a.
+        (Either p q -> Either p q) ->
+        f a ->
+        Plumber s p q f a
+    RewriteExchangeH ::
+        forall s p q f a.
+        (Either p q -> f (Either p q)) ->
+        f a ->
+        Plumber s p q f a
+    JoinToLeft :: forall s p q f a. Coercible p q => f a -> Plumber s p q f a
+    JoinToRight :: forall s p q f a. Coercible p q => f a -> Plumber s p q f a
+    SwapPipe :: forall s p q f a. Coercible p q => f a -> Plumber s p q f a
+
+data Stream = Upstream | Downstream
+
+data PipeLoop (p :: Type) f (a :: Type) where
+    PipeLoop :: f a -> PipeLoop p f a
 
 data Yield a where
     Yield :: Yield ()
 
-data InPlumber a b f c where
-    RewriteInflux :: (Either a b -> Either a b) -> f c -> InPlumber a b f c
-    RewriteInfluxH :: (Either a b -> f (Either a b)) -> f c -> InPlumber a b f c
-    JoinInfluxToLeft :: Coercible a b => f c -> InPlumber a b f c
-    JoinInfluxToRight :: Coercible a b => f c -> InPlumber a b f c
-    SwapInflux :: Coercible a b => f c -> InPlumber a b f c
+makeEffectF [''PipeF, ''FeedF, ''ConsumeF, ''Yield]
+makeEffectH [''PipeH, ''FeedH, ''ConsumeH, ''Plumber, ''PipeLoop]
 
-data OutPlumber a b f c where
-    RewriteOutflux :: (Either a b -> Either a b) -> f c -> OutPlumber a b f c
-    RewriteOutfluxH :: (Either a b -> f (Either a b)) -> f c -> OutPlumber a b f c
-    JoinOutfluxToLeft :: Coercible a b => f c -> OutPlumber a b f c
-    JoinOutfluxToRight :: Coercible a b => f c -> OutPlumber a b f c
-    SwapOutflux :: Coercible a b => f c -> OutPlumber a b f c
-
-makeKeyedEffect [] [''PipeH']
-makeEffectF [''PipeF, ''Feed, ''Consume, ''Yield]
-makeEffectH [''InPlumber, ''OutPlumber]
-
-type PipeComm a f =
-    ( SendSigBy PipeHKey (PipeH' a) f
-    , PipeF a <: f
-    , Feed a <: f
-    , Consume a <: f
+type PipeComm p f =
+    ( PipeH <<: f
+    , PipeF <: f
+    , FeedF p <: f
+    , FeedH p <<: f
+    , ConsumeF p <: f
+    , ConsumeH p <<: f
+    , PipeLoop p <<: f
     , Yield <: f
     )
 
@@ -125,73 +140,73 @@ pattern ClosePipe = Connection Nothing
 {-# COMPLETE OpenPipe, ClosePipe #-}
 
 infixl 1 |>
-(|>) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (b, c)
+(|>) :: PipeH <<: f => f a -> f b -> f (a, b)
 (|>) = pipeTo
 {-# INLINE (|>) #-}
 
 infixl 1 *|>
-(*|>) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (b, Maybe c)
+(*|>) :: PipeH <<: f => f a -> f b -> f (a, Maybe b)
 (*|>) = fstWaitPipeTo
 {-# INLINE (*|>) #-}
 
 infixl 1 |*>
-(|*>) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (Maybe b, c)
+(|*>) :: PipeH <<: f => f a -> f b -> f (Maybe a, b)
 (|*>) = sndWaitPipeTo
 {-# INLINE (|*>) #-}
 
 infixl 1 *|*>
-(*|*>) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (Either b c)
+(*|*>) :: PipeH <<: f => f a -> f b -> f (Either a b)
 (*|*>) = racePipeTo
 {-# INLINE (*|*>) #-}
 
 infixr 0 <|
-(<|) :: (SendSigBy PipeHKey (PipeH' a) f, Functor f) => f b -> f c -> f (b, c)
+(<|) :: (PipeH <<: f, Functor f) => f a -> f b -> f (a, b)
 a <| b = swap <$> pipeTo b a
 {-# INLINE (<|) #-}
 
 infixr 0 <|*
-(<|*) :: (SendSigBy PipeHKey (PipeH' a) f, Functor f) => f b -> f c -> f (Maybe b, c)
+(<|*) :: (PipeH <<: f, Functor f) => f a -> f b -> f (Maybe a, b)
 a <|* b = swap <$> fstWaitPipeTo b a
 {-# INLINE (<|*) #-}
 
 infixr 0 <*|
-(<*|) :: (SendSigBy PipeHKey (PipeH' a) f, Functor f) => f b -> f c -> f (b, Maybe c)
+(<*|) :: (PipeH <<: f, Functor f) => f a -> f b -> f (a, Maybe b)
 a <*| b = swap <$> sndWaitPipeTo b a
 {-# INLINE (<*|) #-}
 
 infixr 0 <*|*
-(<*|*) :: (SendSigBy PipeHKey (PipeH' a) f, Functor f) => f b -> f c -> f (Either b c)
+(<*|*) :: (PipeH <<: f, Functor f) => f a -> f b -> f (Either a b)
 a <*|* b = swapEither <$> racePipeTo b a
 {-# INLINE (<*|*) #-}
 
 infixl 1 |||
-(|||) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (Either b c)
+(|||) :: PipeH <<: f => f a -> f b -> f (Either a b)
 (|||) = race
 {-# INLINE (|||) #-}
 
 infixl 1 *||
-(*||) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (b, Maybe c)
+(*||) :: PipeH <<: f => f a -> f b -> f (a, Maybe b)
 (*||) = thenStop
 {-# INLINE (*||) #-}
 
 infixr 0 ||*
-(||*) :: (SendSigBy PipeHKey (PipeH' a) f, Functor f) => f b -> f c -> f (Maybe b, c)
+(||*) :: (PipeH <<: f, Functor f) => f a -> f b -> f (Maybe a, b)
 a ||* b = swap <$> thenStop b a
 {-# INLINE (||*) #-}
 
 infixl 1 *|*
-(*|*) :: SendSigBy PipeHKey (PipeH' a) f => f b -> f c -> f (b, c)
+(*|*) :: PipeH <<: f => f a -> f b -> f (a, b)
 (*|*) = waitBoth
 {-# INLINE (*|*) #-}
 
-defaultFeed :: (Feed a <: m, Yield <: m, Monad m) => a -> m ()
+defaultFeed :: (FeedF p <: m, Yield <: m, Monad m) => p -> m ()
 defaultFeed a = do
     success <- tryFeed a
     unless success do
         yield
         defaultFeed a
 
-defaultConsume :: (Consume a <: m, Yield <: m, Monad m) => m a
+defaultConsume :: (ConsumeF p <: m, Yield <: m, Monad m) => m p
 defaultConsume = do
     tryConsume >>= \case
         Just a -> pure a
@@ -199,23 +214,23 @@ defaultConsume = do
             yield
             defaultConsume
 
-defaultPassthrough :: forall a m. (Feed a <: m, Consume a <: m, Yield <: m, Monad m) => m a
+defaultPassthrough :: forall p m a. (FeedF p <: m, ConsumeF p <: m, Yield <: m, Monad m) => m a
 defaultPassthrough =
     forever do
-        consume @a >>= feed
+        consume @p >>= feed
         yield
 
 newtype Concurrently f a = Concurrently {runConcurrently :: f a}
     deriving (Functor)
 
-instance (SendSigBy PipeHKey (PipeH' a) f, Applicative f) => Applicative (Concurrently f) where
+instance (PipeH <<: f, Applicative f) => Applicative (Concurrently f) where
     pure = Concurrently . pure
     liftA2 f (Concurrently a) (Concurrently b) =
         Concurrently $ uncurry f <$> (a *|* b)
     {-# INLINE pure #-}
     {-# INLINE liftA2 #-}
 
-instance (SendSigBy PipeHKey (PipeH' a) f, Selective f) => Selective (Concurrently f) where
+instance (PipeH <<: f, Selective f) => Selective (Concurrently f) where
     select (Concurrently x) (Concurrently y) =
         Concurrently $
             select
@@ -224,8 +239,8 @@ instance (SendSigBy PipeHKey (PipeH' a) f, Selective f) => Selective (Concurrent
     {-# INLINE select #-}
 
 timesConcurrently ::
-    forall a f m.
-    (SendSigBy PipeHKey (PipeH' a) f, Applicative f, Monoid m) =>
+    forall f m.
+    (PipeH <<: f, Applicative f, Monoid m) =>
     Natural ->
     f m ->
     f m
@@ -234,69 +249,63 @@ timesConcurrently n a = case n of
     1 -> a
     _ -> runConcurrently $ liftA2 (<>) (Concurrently a) (Concurrently $ timesConcurrently (n - 1) a)
 
-mergeInfluxToLeft :: InPlumber a b <<: f => (b -> a) -> f c -> f c
-mergeInfluxToLeft f = rewriteInflux $ either Left (Left . f)
-{-# INLINE mergeInfluxToLeft #-}
+mergeToLeft :: forall s p q f a. Plumber s p q <<: f => (q -> p) -> f a -> f a
+mergeToLeft f = rewriteExchange @s $ either Left (Left . f)
+{-# INLINE mergeToLeft #-}
 
-mergeInfluxToRight :: InPlumber a b <<: f => (a -> b) -> f c -> f c
-mergeInfluxToRight f = rewriteInflux $ either (Right . f) Right
-{-# INLINE mergeInfluxToRight #-}
+mergeToRight :: forall s p q f a. Plumber s p q <<: f => (p -> q) -> f a -> f a
+mergeToRight f = rewriteExchange @s $ either (Right . f) Right
+{-# INLINE mergeToRight #-}
 
-exchangeInflux :: InPlumber a b <<: f => (a -> b) -> (b -> a) -> f c -> f c
-exchangeInflux f g = rewriteInflux $ either (Right . f) (Left . g)
-{-# INLINE exchangeInflux #-}
+exchangePipe ::
+    forall s p q f a.
+    Plumber s p q <<: f =>
+    (p -> q) ->
+    (q -> p) ->
+    f a ->
+    f a
+exchangePipe f g = rewriteExchange @s $ either (Right . f) (Left . g)
+{-# INLINE exchangePipe #-}
 
-mergeOutfluxToLeft :: OutPlumber a b <<: f => (b -> a) -> f c -> f c
-mergeOutfluxToLeft f = rewriteOutflux $ either Left (Left . f)
-{-# INLINE mergeOutfluxToLeft #-}
+defaultJoinToLeft ::
+    forall s p q f a.
+    (Plumber s p q <<: f, Coercible p q) =>
+    f a ->
+    f a
+defaultJoinToLeft = mergeToLeft @s @p @q coerce
+{-# INLINE defaultJoinToLeft #-}
 
-mergeOutfluxToRight :: OutPlumber a b <<: f => (a -> b) -> f c -> f c
-mergeOutfluxToRight f = rewriteOutflux $ either (Right . f) Right
-{-# INLINE mergeOutfluxToRight #-}
+defaultJoinToRight ::
+    forall s p q f a.
+    (Plumber s p q <<: f, Coercible p q) =>
+    f a ->
+    f a
+defaultJoinToRight = mergeToLeft @s @p @q coerce
+{-# INLINE defaultJoinToRight #-}
 
-exchangeOutflux :: OutPlumber a b <<: f => (a -> b) -> (b -> a) -> f c -> f c
-exchangeOutflux f g = rewriteOutflux $ either (Right . f) (Left . g)
-{-# INLINE exchangeOutflux #-}
+defaultSwapPipe ::
+    forall s p q f a.
+    (Plumber s p q <<: f, Coercible p q) =>
+    f a ->
+    f a
+defaultSwapPipe = exchangePipe @s @p @q coerce coerce
+{-# INLINE defaultSwapPipe #-}
 
-defaultJoinInfluxToLeft :: forall a b f c. (InPlumber a b <<: f, Coercible a b) => f c -> f c
-defaultJoinInfluxToLeft = mergeInfluxToLeft @a @b coerce
-{-# INLINE defaultJoinInfluxToLeft #-}
-
-defaultJoinInfluxToRight :: forall a b f c. (InPlumber a b <<: f, Coercible a b) => f c -> f c
-defaultJoinInfluxToRight = mergeInfluxToLeft @a @b coerce
-{-# INLINE defaultJoinInfluxToRight #-}
-
-defaultSwapInflux :: forall a b f c. (InPlumber a b <<: f, Coercible a b) => f c -> f c
-defaultSwapInflux = exchangeInflux @a @b coerce coerce
-{-# INLINE defaultSwapInflux #-}
-
-defaultJoinOutfluxToLeft :: forall a b f c. (OutPlumber a b <<: f, Coercible a b) => f c -> f c
-defaultJoinOutfluxToLeft = mergeOutfluxToLeft @a @b coerce
-{-# INLINE defaultJoinOutfluxToLeft #-}
-
-defaultJoinOutfluxToRight :: forall a b f c. (OutPlumber a b <<: f, Coercible a b) => f c -> f c
-defaultJoinOutfluxToRight = mergeOutfluxToLeft @a @b coerce
-{-# INLINE defaultJoinOutfluxToRight #-}
-
-defaultSwapOutflux :: forall a b f c. (OutPlumber a b <<: f, Coercible a b) => f c -> f c
-defaultSwapOutflux = exchangeOutflux @a @b coerce coerce
-{-# INLINE defaultSwapOutflux #-}
-
-defaultFolding :: (Consume (Connection a) <: m, Monad m) => Folding a b -> m b
+defaultFolding :: (ConsumeF (Connection a) <: m, Monad m) => Folding a b -> m b
 defaultFolding (Folding step initial) =
     flip fix initial \next acc -> do
         consume >>= \case
             OpenPipe a -> next $ step acc a
             ClosePipe -> pure acc
 
-defaultFoldingH :: (Consume (Connection a) <: m, Monad m) => FoldingH a m b -> m b
+defaultFoldingH :: (ConsumeF (Connection a) <: m, Monad m) => FoldingH a m b -> m b
 defaultFoldingH (FoldingH step initial) =
     flip fix initial \next acc -> do
         consume >>= \case
             OpenPipe a -> next =<< step acc a
             ClosePipe -> pure acc
 
-defaultFoldingMapH :: (Consume (Connection a) <: m, Monad m) => FoldingMapH a m b -> m b
+defaultFoldingMapH :: (ConsumeF (Connection a) <: m, Monad m) => FoldingMapH a m b -> m b
 defaultFoldingMapH = defaultFoldingH . toFoldingH
 {-# INLINE defaultFoldingMapH #-}
 
@@ -321,7 +330,7 @@ data Processing a b c where
 makeEffectF [''Processing]
 
 defaultProcessing ::
-    (Foldable t, FoldingMapH a <<: f, Feed b <: f, Applicative f) =>
+    (Foldable t, FoldingMapH a <<: f, FeedF b <: f, Applicative f) =>
     (a -> t b) ->
     f ()
 defaultProcessing f =
@@ -329,7 +338,7 @@ defaultProcessing f =
 {-# INLINE defaultProcessing #-}
 
 foldConcurrent ::
-    (FoldingMapH a <<: f, SendSigBy PipeHKey (PipeH' a) f, Applicative f) =>
+    (FoldingMapH a <<: f, PipeH <<: f, Applicative f) =>
     Natural ->
     FoldingMapH a f m ->
     f m

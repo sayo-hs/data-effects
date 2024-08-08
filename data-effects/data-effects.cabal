@@ -61,6 +61,7 @@ library
         Data.Effect.Fresh
         Data.Effect.Concurrent.Thread
         Data.Effect.Concurrent.Pipe
+        Data.Effect.Concurrent.Pipe.Invertible
         Data.Effect.Concurrent.Timer
         Data.Effect.Unlift
         Data.Effect.ShiftReset

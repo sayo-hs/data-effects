@@ -11,12 +11,13 @@ import Data.Bifunctor (bimap)
 import Data.ByteString (ByteString)
 import Data.Effect.Concurrent.Pipe (
     Connection,
-    Feed,
-    OutPlumber,
+    FeedF,
     PipeComm,
-    joinOutfluxToLeft,
-    joinOutfluxToRight,
-    swapOutflux,
+    Plumber,
+    Stream (Downstream),
+    joinToLeft,
+    joinToRight,
+    swapPipe,
  )
 import Data.Effect.Foldl (Folding, FoldingH, FoldingMapH)
 import Data.Text (Text)
@@ -113,8 +114,8 @@ type Shell f =
     , Folding Stdio <: f
     , FoldingMapH Stdio <<: f
     , FoldingH Stdio <<: f
-    , Feed (Connection Stderr) <: f
-    , OutPlumber Stderr Stdio <<: f
+    , FeedF (Connection Stderr) <: f
+    , Plumber 'Downstream Stderr Stdio <<: f
     )
 
 newtype Stdio = Stdio {getStdio :: ByteString}
@@ -125,14 +126,14 @@ newtype Stderr = Stderr {getStderr :: ByteString}
     deriving newtype (Eq, Ord, Semigroup, Monoid, IsString)
     deriving stock (Show)
 
-stderrToOut :: OutPlumber Stderr Stdio <<: f => f a -> f a
-stderrToOut = joinOutfluxToRight @Stderr @Stdio
+stderrToOut :: Plumber 'Downstream Stderr Stdio <<: f => f a -> f a
+stderrToOut = joinToRight @( 'Downstream) @Stderr @Stdio
 {-# INLINE stderrToOut #-}
 
-stdoutToErr :: OutPlumber Stderr Stdio <<: f => f a -> f a
-stdoutToErr = joinOutfluxToLeft @Stderr @Stdio
+stdoutToErr :: Plumber 'Downstream Stderr Stdio <<: f => f a -> f a
+stdoutToErr = joinToLeft @( 'Downstream) @Stderr @Stdio
 {-# INLINE stdoutToErr #-}
 
-swapStdOE :: OutPlumber Stderr Stdio <<: f => f a -> f a
-swapStdOE = swapOutflux @Stderr @Stdio
+swapStdOE :: Plumber 'Downstream Stderr Stdio <<: f => f a -> f a
+swapStdOE = swapPipe @( 'Downstream) @Stderr @Stdio
 {-# INLINE swapStdOE #-}
