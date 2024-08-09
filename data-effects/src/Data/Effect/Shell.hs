@@ -111,15 +111,19 @@ toRawCmdSpec = \case
 type Shell f =
     ( Process <: f
     , PipeComm (Connection Stdio) f
-    , Folding Stdio <: f
-    , FoldingMapH Stdio <<: f
-    , FoldingH Stdio <<: f
+    , Folding StdioLine <: f
+    , FoldingMapH StdioLine <<: f
+    , FoldingH StdioLine <<: f
     , FeedF (Connection Stderr) <: f
     , Plumber Stderr Stdio <: f
     , PlumberH Stderr Stdio <<: f
     )
 
 newtype Stdio = Stdio {getStdio :: ByteString}
+    deriving newtype (Eq, Ord, Semigroup, Monoid, IsString)
+    deriving stock (Show)
+
+newtype StdioLine = StdioLine {getStdioLine :: Text}
     deriving newtype (Eq, Ord, Semigroup, Monoid, IsString)
     deriving stock (Show)
 
