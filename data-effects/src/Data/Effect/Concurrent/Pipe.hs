@@ -11,13 +11,15 @@ Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
 
-Ergonomic and high-level primitive combinators for effectful concurrent programming.
+High-level primitive combinators for effectful concurrent programming.
 
-This operates through the cooperation of v'Feed'/v'Consume' effects, which send and receive data,
+This operates through the cooperation of v'Feed' / v'Consume' effects, which send and receive data,
 and the v'PipeTo' effects, which handles their routing.
-This is similar to the shell paradigm in POSIX.
+This is similar to the shell paradigm in POSIX or the t'Control.Arrow.Arrow' type class.
 In the pipe operator, each action can be seen as a process that operates autonomously in parallel and
 communicates with other processes using channels.
+
+Mathematically, this emulates a traced symmetric monoidal category.
 -}
 module Data.Effect.Concurrent.Pipe where
 
@@ -63,14 +65,14 @@ data FeedF p a where
     TryFeed :: p -> FeedF p Bool
 
 data FeedH (p :: Type) f (a :: Type) where
-    ConnectOutPort :: f a -> FeedH p f a
+    ConnectOutPort :: forall p f a. f a -> FeedH p f a
 
 data ConsumeF p a where
     Consume :: ConsumeF p p
     TryConsume :: ConsumeF p (Maybe p)
 
 data ConsumeH (p :: Type) f (a :: Type) where
-    ConnectInPort :: f a -> ConsumeH p f a
+    ConnectInPort :: forall p f a. f a -> ConsumeH p f a
 
 data Plumber p q (a :: Type) where
     RewriteExchange :: (Either p q -> Either p q) -> Plumber p q a
@@ -238,6 +240,10 @@ timesConcurrently n a = case n of
     0 -> pure mempty
     1 -> a
     _ -> runConcurrently $ liftA2 (<>) (Concurrently a) (Concurrently $ timesConcurrently (n - 1) a)
+
+connectPipe :: forall p f a. (FeedH p <<: f, ConsumeH p <<: f) => f a -> f a
+connectPipe = connectOutPort @p . connectInPort @p
+{-# INLINE connectPipe #-}
 
 mergeToLeft :: forall p q f a. Plumber p q <: f => (q -> p) -> f a
 mergeToLeft f = rewriteExchange $ either Left (Left . f)

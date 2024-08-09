@@ -12,13 +12,14 @@ Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
 
-Ergonomic and high-level primitive combinators for effectful concurrent programming.
+High-level primitive combinators for effectful concurrent programming.
+See also "Data.Effect.Concurrent.Pipe" .
+This module adds a new "inversion pipe" to the usual pipe.
+In a standard pipe, data flows from upstream to downstream, but the inversion pipe flows in the opposite direction,
+contrary to the usual direction defined by the composition operator v'|>'.
 
-This operates through the cooperation of v'Feed'/v'Consume' effects, which send and receive data,
-and the v'PipeTo' effects, which handles their routing.
-This is similar to the shell paradigm in POSIX.
-In the pipe operator, each action can be seen as a process that operates autonomously in parallel and
-communicates with other processes using channels.
+Mathematically, while the conventional one emulates a traced symmetric monoidal category,
+this emulates a compact closed category.
 -}
 module Data.Effect.Concurrent.Pipe.Invertible where
 
