@@ -74,22 +74,14 @@ data ConsumeF p a where
 data ConsumeH (p :: Type) f (a :: Type) where
     ConnectInPort :: f a -> ConsumeH p f a
 
-data Plumber (s :: Stream) (p :: Type) (q :: Type) f a where
-    RewriteExchange ::
-        forall s p q f a.
-        (Either p q -> Either p q) ->
-        f a ->
-        Plumber s p q f a
-    RewriteExchangeH ::
-        forall s p q f a.
-        (Either p q -> f (Either p q)) ->
-        f a ->
-        Plumber s p q f a
-    JoinToLeft :: forall s p q f a. Coercible p q => f a -> Plumber s p q f a
-    JoinToRight :: forall s p q f a. Coercible p q => f a -> Plumber s p q f a
-    SwapPipe :: forall s p q f a. Coercible p q => f a -> Plumber s p q f a
+data Plumber (p :: Type) (q :: Type) (a :: Type) where
+    RewriteExchange :: (Either p q -> Either p q) -> Plumber p q a
+    JoinToLeft :: Coercible p q => Plumber p q a
+    JoinToRight :: Coercible p q => Plumber p q a
+    SwapPipe :: Coercible p q => Plumber p q a
 
-data Stream = Upstream | Downstream
+data PlumberH (p :: Type) (q :: Type) f (a :: Type) where
+    RewriteExchangeH :: (Either p q -> f (Either p q)) -> PlumberH p q f a
 
 data PipeLoop (p :: Type) f (a :: Type) where
     PipeLoop :: f a -> PipeLoop p f a
@@ -97,8 +89,8 @@ data PipeLoop (p :: Type) f (a :: Type) where
 data Yield a where
     Yield :: Yield ()
 
-makeEffectF [''PipeF, ''FeedF, ''ConsumeF, ''Yield]
-makeEffectH [''PipeH, ''FeedH, ''ConsumeH, ''Plumber, ''PipeLoop]
+makeEffectF [''PipeF, ''FeedF, ''ConsumeF, ''Plumber, ''Yield]
+makeEffectH [''PipeH, ''FeedH, ''ConsumeH, ''PlumberH, ''PipeLoop]
 
 type PipeComm p f =
     ( PipeH <<: f
@@ -249,46 +241,28 @@ timesConcurrently n a = case n of
     1 -> a
     _ -> runConcurrently $ liftA2 (<>) (Concurrently a) (Concurrently $ timesConcurrently (n - 1) a)
 
-mergeToLeft :: forall s p q f a. Plumber s p q <<: f => (q -> p) -> f a -> f a
-mergeToLeft f = rewriteExchange @s $ either Left (Left . f)
+mergeToLeft :: forall p q f a. Plumber p q <: f => (q -> p) -> f a
+mergeToLeft f = rewriteExchange $ either Left (Left . f)
 {-# INLINE mergeToLeft #-}
 
-mergeToRight :: forall s p q f a. Plumber s p q <<: f => (p -> q) -> f a -> f a
-mergeToRight f = rewriteExchange @s $ either (Right . f) Right
+mergeToRight :: forall p q f a. Plumber p q <: f => (p -> q) -> f a
+mergeToRight f = rewriteExchange $ either (Right . f) Right
 {-# INLINE mergeToRight #-}
 
-exchangePipe ::
-    forall s p q f a.
-    Plumber s p q <<: f =>
-    (p -> q) ->
-    (q -> p) ->
-    f a ->
-    f a
-exchangePipe f g = rewriteExchange @s $ either (Right . f) (Left . g)
+exchangePipe :: forall p q f a. Plumber p q <: f => (p -> q) -> (q -> p) -> f a
+exchangePipe f g = rewriteExchange $ either (Right . f) (Left . g)
 {-# INLINE exchangePipe #-}
 
-defaultJoinToLeft ::
-    forall s p q f a.
-    (Plumber s p q <<: f, Coercible p q) =>
-    f a ->
-    f a
-defaultJoinToLeft = mergeToLeft @s @p @q coerce
+defaultJoinToLeft :: forall p q f a. (Plumber p q <: f, Coercible p q) => f a
+defaultJoinToLeft = mergeToLeft @p @q coerce
 {-# INLINE defaultJoinToLeft #-}
 
-defaultJoinToRight ::
-    forall s p q f a.
-    (Plumber s p q <<: f, Coercible p q) =>
-    f a ->
-    f a
-defaultJoinToRight = mergeToLeft @s @p @q coerce
+defaultJoinToRight :: forall p q f a. (Plumber p q <: f, Coercible p q) => f a
+defaultJoinToRight = mergeToLeft @p @q coerce
 {-# INLINE defaultJoinToRight #-}
 
-defaultSwapPipe ::
-    forall s p q f a.
-    (Plumber s p q <<: f, Coercible p q) =>
-    f a ->
-    f a
-defaultSwapPipe = exchangePipe @s @p @q coerce coerce
+defaultSwapPipe :: forall p q f a. (Plumber p q <: f, Coercible p q) => f a
+defaultSwapPipe = exchangePipe @p @q coerce coerce
 {-# INLINE defaultSwapPipe #-}
 
 defaultFolding :: (ConsumeF (Connection a) <: m, Monad m) => Folding a b -> m b

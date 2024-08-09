@@ -28,12 +28,12 @@ import Control.Arrow (app)
 import Control.Monad (forever, unless)
 import Control.Selective (Selective, select)
 import Data.Bifunctor (first)
-import Data.Coerce (Coercible)
+import Data.Coerce (Coercible, coerce)
+import Data.Data (Data)
 import Data.Effect.Concurrent.Pipe (
     Connection,
     PipeF,
     PipeH,
-    Stream,
     Yield,
     yield,
     (*|*),
@@ -50,7 +50,7 @@ import Data.Effect.Foldl (
 import Data.Foldable (for_)
 import Data.Function (fix)
 import Data.Functor ((<&>))
-import GHC.Generics (Generic, Generic1)
+import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
 
 data FeedF p a where
@@ -67,35 +67,30 @@ data ConsumeF p a where
 data ConsumeH (p :: Port) f (a :: Type) where
     ConnectInPort :: f a -> ConsumeH p f a
 
-data Plumber (s :: Stream) (p :: Port) (q :: Port) f a where
+data Plumber (p :: Port) (q :: Port) (a :: Type) where
     RewriteExchange ::
         (Either (Content p) (Content q) -> Either (Content p) (Content q)) ->
-        f a ->
-        Plumber s p q f a
+        Plumber p q a
+    JoinToLeft :: Coercible (Content p) (Content q) => Plumber p q a
+    JoinToRight :: Coercible (Content p) (Content q) => Plumber p q a
+    SwapPipe :: Coercible (Content p) (Content q) => Plumber p q a
+
+data PlumberH (p :: Port) (q :: Port) f (a :: Type) where
     RewriteExchangeH ::
         (Either (Content p) (Content q) -> f (Either (Content p) (Content q))) ->
-        f a ->
-        Plumber s p q f a
-    JoinToLeft :: Coercible (Content p) (Content q) => f a -> Plumber s p q f a
-    JoinToRight :: Coercible (Content p) (Content q) => f a -> Plumber s p q f a
-    SwapPipe :: Coercible (Content p) (Content q) => f a -> Plumber s p q f a
+        PlumberH p q f a
 
 data Port = RegularFlow Type | Inversion Type
 
 type family Content p = r | r -> p where
-    Content ( 'RegularFlow a) = Reg a
-    Content ( 'Inversion a) = Inv a
+    Content ( 'RegularFlow a) = (Reg, a)
+    Content ( 'Inversion a) = (Inv, a)
 
-newtype Reg a = Reg a
-    deriving newtype (Eq, Ord, Semigroup, Monoid)
-    deriving stock (Functor, Foldable, Traversable, Show, Read, Generic, Generic1)
+data Reg = Reg deriving stock (Eq, Ord, Show, Read, Generic, Data)
+newtype Inv = Inv Reg deriving stock (Eq, Ord, Show, Read, Generic, Data)
 
-newtype Inv a = Inv a
-    deriving newtype (Eq, Ord, Semigroup, Monoid)
-    deriving stock (Functor, Foldable, Traversable, Show, Read, Generic, Generic1)
-
-makeEffectF [''FeedF, ''ConsumeF]
-makeEffectH [''FeedH, ''ConsumeH, ''Plumber]
+makeEffectF [''FeedF, ''ConsumeF, ''Plumber]
+makeEffectH [''FeedH, ''ConsumeH, ''PlumberH]
 
 type PipeComm a f =
     ( PipeH <<: f
@@ -157,108 +152,58 @@ timesConcurrently n a = case n of
     1 -> a
     _ -> runConcurrently $ liftA2 (<>) (Concurrently a) (Concurrently $ timesConcurrently (n - 1) a)
 
-{-
-mergeInfluxToLeft :: forall p q f a. InPlumber p q <<: f => (Content q -> Content p) -> f a -> f a
-mergeInfluxToLeft f = rewriteInflux $ either Left (Left . f)
-{-# INLINE mergeInfluxToLeft #-}
+mergeToLeft :: forall p q f a. Plumber p q <: f => (Content q -> Content p) -> f a
+mergeToLeft f = rewriteExchange $ either Left (Left . f)
+{-# INLINE mergeToLeft #-}
 
-mergeInfluxToRight :: forall p q f a. InPlumber p q <<: f => (Content p -> Content q) -> f a -> f a
-mergeInfluxToRight f = rewriteInflux $ either (Right . f) Right
-{-# INLINE mergeInfluxToRight #-}
+mergeToRight :: forall p q f a. Plumber p q <: f => (Content p -> Content q) -> f a
+mergeToRight f = rewriteExchange $ either (Right . f) Right
+{-# INLINE mergeToRight #-}
 
-exchangeInflux ::
-    forall p q f a.
-    InPlumber p q <<: f =>
-    (Content p -> Content q) ->
-    (Content q -> Content p) ->
-    f a ->
-    f a
-exchangeInflux f g = rewriteInflux $ either (Right . f) (Left . g)
-{-# INLINE exchangeInflux #-}
+exchangePipe :: forall p q f a. Plumber p q <: f => (Content p -> Content q) -> (Content q -> Content p) -> f a
+exchangePipe f g = rewriteExchange $ either (Right . f) (Left . g)
+{-# INLINE exchangePipe #-}
 
-defaultJoinInfluxToLeft ::
-    forall p q f a.
-    (InPlumber p q <<: f, Coercible (Content p) (Content q)) =>
-    f a ->
-    f a
-defaultJoinInfluxToLeft = mergeInfluxToLeft @p @q coerce
-{-# INLINE defaultJoinInfluxToLeft #-}
+defaultJoinToLeft :: forall p q f a. (Plumber p q <: f, Coercible (Content p) (Content q)) => f a
+defaultJoinToLeft = mergeToLeft @p @q coerce
+{-# INLINE defaultJoinToLeft #-}
 
-defaultJoinInfluxToRight ::
-    forall p q f a.
-    (InPlumber p q <<: f, Coercible (Content p) (Content q)) =>
-    f a ->
-    f a
-defaultJoinInfluxToRight = mergeInfluxToLeft @p @q coerce
-{-# INLINE defaultJoinInfluxToRight #-}
+defaultJoinToRight :: forall p q f a. (Plumber p q <: f, Coercible (Content p) (Content q)) => f a
+defaultJoinToRight = mergeToLeft @p @q coerce
+{-# INLINE defaultJoinToRight #-}
 
-defaultSwapInflux ::
-    forall p q f a.
-    (InPlumber p q <<: f, Coercible (Content p) (Content q)) =>
-    f a ->
-    f a
-defaultSwapInflux = exchangeInflux @p @q coerce coerce
-{-# INLINE defaultSwapInflux #-}
+defaultSwapPipe :: forall p q f a. (Plumber p q <: f, Coercible (Content p) (Content q)) => f a
+defaultSwapPipe = exchangePipe @p @q coerce coerce
+{-# INLINE defaultSwapPipe #-}
 
-mergeOutfluxToLeft :: forall p q f a. OutPlumber p q <<: f => (Content q -> Content p) -> f a -> f a
-mergeOutfluxToLeft f = rewriteOutflux $ either Left (Left . f)
-{-# INLINE mergeOutfluxToLeft #-}
-
-mergeOutfluxToRight :: forall p q f a. OutPlumber p q <<: f => (Content p -> Content q) -> f a -> f a
-mergeOutfluxToRight f = rewriteOutflux $ either (Right . f) Right
-{-# INLINE mergeOutfluxToRight #-}
-
-exchangeOutflux ::
-    forall p q f a.
-    OutPlumber p q <<: f =>
-    (Content p -> Content q) ->
-    (Content q -> Content p) ->
-    f a ->
-    f a
-exchangeOutflux f g = rewriteOutflux $ either (Right . f) (Left . g)
-{-# INLINE exchangeOutflux #-}
-
-defaultJoinOutfluxToLeft ::
-    forall p q f a.
-    (OutPlumber p q <<: f, Coercible (Content p) (Content q)) =>
-    f a ->
-    f a
-defaultJoinOutfluxToLeft = mergeOutfluxToLeft @p @q coerce
-{-# INLINE defaultJoinOutfluxToLeft #-}
-
-defaultJoinOutfluxToRight ::
-    forall p q f a.
-    (OutPlumber p q <<: f, Coercible (Content p) (Content q)) =>
-    f a ->
-    f a
-defaultJoinOutfluxToRight = mergeOutfluxToLeft @p @q coerce
-{-# INLINE defaultJoinOutfluxToRight #-}
-
-defaultSwapOutflux ::
-    forall p q f a.
-    (OutPlumber p q <<: f, Coercible (Content p) (Content q)) =>
-    f a ->
-    f a
-defaultSwapOutflux = exchangeOutflux @p @q coerce coerce
-{-# INLINE defaultSwapOutflux #-}
--}
-
-defaultFolding :: (ConsumeF p <: m, Content p ~ Connection a, Monad m) => Folding a b -> m b
+defaultFolding ::
+    forall fl a b m p.
+    (ConsumeF p <: m, Content p ~ (fl, Connection a), Monad m) =>
+    Folding a b ->
+    m b
 defaultFolding (Folding step initial) =
     flip fix initial \next acc -> do
-        consume >>= \case
+        consume @p <&> snd >>= \case
             OpenPipe a -> next $ step acc a
             ClosePipe -> pure acc
 
-defaultFoldingH :: (ConsumeF p <: m, Content p ~ Connection a, Monad m) => FoldingH a m b -> m b
+defaultFoldingH ::
+    forall fl a b m p.
+    (ConsumeF p <: m, Content p ~ (fl, Connection a), Monad m) =>
+    FoldingH a m b ->
+    m b
 defaultFoldingH (FoldingH step initial) =
     flip fix initial \next acc -> do
-        consume >>= \case
+        consume @p <&> snd >>= \case
             OpenPipe a -> next =<< step acc a
             ClosePipe -> pure acc
 
-defaultFoldingMapH :: (ConsumeF p <: m, Content p ~ Connection a, Monad m) => FoldingMapH a m b -> m b
-defaultFoldingMapH = defaultFoldingH . toFoldingH
+defaultFoldingMapH ::
+    forall fl a b m p.
+    (ConsumeF p <: m, Content p ~ (fl, Connection a), Monad m) =>
+    FoldingMapH a m b ->
+    m b
+defaultFoldingMapH = defaultFoldingH @fl . toFoldingH
 {-# INLINE defaultFoldingMapH #-}
 
 defaultProcessing ::

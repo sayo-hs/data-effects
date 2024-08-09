@@ -14,7 +14,7 @@ import Data.Effect.Concurrent.Pipe (
     FeedF,
     PipeComm,
     Plumber,
-    Stream (Downstream),
+    PlumberH,
     joinToLeft,
     joinToRight,
     swapPipe,
@@ -115,7 +115,8 @@ type Shell f =
     , FoldingMapH Stdio <<: f
     , FoldingH Stdio <<: f
     , FeedF (Connection Stderr) <: f
-    , Plumber 'Downstream Stderr Stdio <<: f
+    , Plumber Stderr Stdio <: f
+    , PlumberH Stderr Stdio <<: f
     )
 
 newtype Stdio = Stdio {getStdio :: ByteString}
@@ -126,14 +127,14 @@ newtype Stderr = Stderr {getStderr :: ByteString}
     deriving newtype (Eq, Ord, Semigroup, Monoid, IsString)
     deriving stock (Show)
 
-stderrToOut :: Plumber 'Downstream Stderr Stdio <<: f => f a -> f a
-stderrToOut = joinToRight @( 'Downstream) @Stderr @Stdio
+stderrToOut :: Plumber Stderr Stdio <: f => f a
+stderrToOut = joinToRight @Stderr @Stdio
 {-# INLINE stderrToOut #-}
 
-stdoutToErr :: Plumber 'Downstream Stderr Stdio <<: f => f a -> f a
-stdoutToErr = joinToLeft @( 'Downstream) @Stderr @Stdio
+stdoutToErr :: Plumber Stderr Stdio <: f => f a
+stdoutToErr = joinToLeft @Stderr @Stdio
 {-# INLINE stdoutToErr #-}
 
-swapStdOE :: Plumber 'Downstream Stderr Stdio <<: f => f a -> f a
-swapStdOE = swapPipe @( 'Downstream) @Stderr @Stdio
+swapStdOE :: Plumber Stderr Stdio <: f => f a
+swapStdOE = swapPipe @Stderr @Stdio
 {-# INLINE swapStdOE #-}
