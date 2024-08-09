@@ -72,13 +72,13 @@ data ConsumeF p a where
 data ConsumeH (p :: Type) f (a :: Type) where
     ConnectInPort :: f a -> ConsumeH p f a
 
-data Plumber (p :: Type) (q :: Type) (a :: Type) where
+data Plumber p q (a :: Type) where
     RewriteExchange :: (Either p q -> Either p q) -> Plumber p q a
     JoinToLeft :: Coercible p q => Plumber p q a
     JoinToRight :: Coercible p q => Plumber p q a
     SwapPipe :: Coercible p q => Plumber p q a
 
-data PlumberH (p :: Type) (q :: Type) f (a :: Type) where
+data PlumberH p q f (a :: Type) where
     RewriteExchangeH :: (Either p q -> f (Either p q)) -> PlumberH p q f a
 
 data PipeLoop (p :: Type) f (a :: Type) where
