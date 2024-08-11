@@ -23,11 +23,7 @@ this emulates a compact closed category.
 -}
 module Data.Effect.Concurrent.Pipe.Invertible where
 
-import Control.Applicative (liftA2)
-import Control.Arrow (app)
 import Control.Monad (forever, unless)
-import Control.Selective (Selective, select)
-import Data.Bifunctor (first)
 import Data.Coerce (Coercible, coerce)
 import Data.Data (Data)
 import Data.Effect.Concurrent.Pipe (
@@ -36,7 +32,6 @@ import Data.Effect.Concurrent.Pipe (
     PipeH,
     Yield,
     yield,
-    (*|*),
     pattern ClosePipe,
     pattern OpenPipe,
  )
@@ -51,21 +46,20 @@ import Data.Foldable (for_)
 import Data.Function (fix)
 import Data.Functor ((<&>))
 import GHC.Generics (Generic)
-import Numeric.Natural (Natural)
 
 data FeedF p a where
     Feed :: Content p -> FeedF p ()
     TryFeed :: Content p -> FeedF p Bool
 
 data FeedH (p :: Port) f (a :: Type) where
-    ConnectOutPort :: f a -> FeedH p f a
+    ConnectOutput :: forall p f a. f a -> FeedH p f a
 
 data ConsumeF p a where
     Consume :: ConsumeF p (Content p)
     TryConsume :: ConsumeF p (Maybe (Content p))
 
 data ConsumeH (p :: Port) f (a :: Type) where
-    ConnectInPort :: f a -> ConsumeH p f a
+    ConnectInput :: forall p f a. f a -> ConsumeH p f a
 
 data Plumber (p :: Port) (q :: Port) (a :: Type) where
     RewriteExchange ::
@@ -123,34 +117,9 @@ defaultPassthrough =
         consume @p >>= feed
         yield
 
-newtype Concurrently f a = Concurrently {runConcurrently :: f a}
-    deriving (Functor)
-
-instance (PipeH <<: f, Applicative f) => Applicative (Concurrently f) where
-    pure = Concurrently . pure
-    liftA2 f (Concurrently a) (Concurrently b) =
-        Concurrently $ uncurry f <$> (a *|* b)
-    {-# INLINE pure #-}
-    {-# INLINE liftA2 #-}
-
-instance (PipeH <<: f, Selective f) => Selective (Concurrently f) where
-    select (Concurrently x) (Concurrently y) =
-        Concurrently $
-            select
-                (x *|* y <&> \(x', y') -> first (y',) x')
-                (pure app)
-    {-# INLINE select #-}
-
-timesConcurrently ::
-    forall f m.
-    (PipeH <<: f, Applicative f, Monoid m) =>
-    Natural ->
-    f m ->
-    f m
-timesConcurrently n a = case n of
-    0 -> pure mempty
-    1 -> a
-    _ -> runConcurrently $ liftA2 (<>) (Concurrently a) (Concurrently $ timesConcurrently (n - 1) a)
+connectPipe :: forall p f a. (FeedH p <<: f, ConsumeH p <<: f) => f a -> f a
+connectPipe = connectOutput @p . connectInput @p
+{-# INLINE connectPipe #-}
 
 mergeToLeft :: forall p q f a. Plumber p q <: f => (Content q -> Content p) -> f a
 mergeToLeft f = rewriteExchange $ either Left (Left . f)

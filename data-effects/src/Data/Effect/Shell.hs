@@ -11,7 +11,7 @@ import Data.Bifunctor (bimap)
 import Data.ByteString (ByteString)
 import Data.Effect.Concurrent.Pipe (
     Connection,
-    FeedF,
+    Feed,
     PipeComm,
     Plumber,
     PlumberH,
@@ -114,7 +114,7 @@ type Shell f =
     , Folding StdioLine <: f
     , FoldingMapH StdioLine <<: f
     , FoldingH StdioLine <<: f
-    , FeedF (Connection Stderr) <: f
+    , Feed (Connection Stderr) <: f
     , Plumber Stderr Stdio <: f
     , PlumberH Stderr Stdio <<: f
     )
