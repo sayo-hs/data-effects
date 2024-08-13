@@ -88,6 +88,9 @@ data PipeLine (p :: Type) f (a :: Type) where
     MaskPipe :: forall p f a. f a -> PipeLine p f a
     PipeLoop :: forall p f a. f a -> PipeLine p f a
 
+data PipeLineF (p :: Type) a where
+    IsPipeMasked :: PipeLineF p Bool
+
 data Feed p a where
     Feed :: p -> Feed p ()
     TryFeed :: p -> Feed p Bool
@@ -105,7 +108,7 @@ data Plumber p q (a :: Type) where
 data PlumberH p q f (a :: Type) where
     RewriteExchangeH :: (Either p q -> f (Either p q)) -> PlumberH p q f a
 
-makeEffectF [''PipeF, ''Feed, ''Consume, ''Yield, ''Plumber]
+makeEffectF [''PipeF, ''PipeLineF, ''Feed, ''Consume, ''Yield, ''Plumber]
 makeEffectH [''PipeH, ''PipeLine, ''PlumberH]
 
 type PipeComm p f =
