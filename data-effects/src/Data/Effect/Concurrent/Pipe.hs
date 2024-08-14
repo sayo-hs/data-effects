@@ -55,24 +55,18 @@ data PipeH f a where
     RacePipeTo :: f a -> f b -> PipeH f (Either a b)
     -- | Execute both actions in parallel and block until both are completed.
     WaitBoth ::
-        -- | Should the pipe distribute (duplicate contents) or split (contents are not duplicated)?
-        Bool ->
         f a ->
         f b ->
         PipeH f (a, b)
     -- | Execute both actions in parallel and block until the action of the first argument is completed.
     --  The action of the second argument is cancelled when the first argument's action finishes.
     ThenStop ::
-        -- | Should the pipe distribute (duplicate contents) or split (contents are not duplicated)?
-        Bool ->
         f a ->
         f b ->
         PipeH f (a, Maybe b)
     -- | Execute both actions in parallel and block until either action is completed.
     --  Once one finishes, the other is canceled.
     Race ::
-        -- | Should the pipe distribute (duplicate contents) or split (contents are not duplicated)?
-        Bool ->
         f a ->
         f b ->
         PipeH f (Either a b)
@@ -83,13 +77,27 @@ data PipeF (a :: Type) where
 data Yield a where
     Yield :: Yield ()
 
-data PipeLine (p :: Type) f (a :: Type) where
-    UnmaskPipe :: forall p f a. f a -> PipeLine p f a
-    MaskPipe :: forall p f a. f a -> PipeLine p f a
-    PipeLoop :: forall p f a. f a -> PipeLine p f a
+data PipeLineH (p :: Type) f (a :: Type) where
+    UnmaskPipe :: forall p f a. f a -> PipeLineH p f a
+    MaskPipe :: forall p f a. f a -> PipeLineH p f a
+    WithPipeBranchMode :: forall p f a. (PipeBranchMode -> PipeBranchMode) -> f a -> PipeLineH p f a
+    PipeLoop :: forall p f a. f a -> PipeLineH p f a
 
 data PipeLineF (p :: Type) a where
     IsPipeMasked :: PipeLineF p Bool
+    GetPipeBranchMode :: PipeLineF p PipeBranchMode
+
+{- | In 'WaitBoth', 'ThenStop', and 'Race' effects,
+    should the input pipe split (contents are not duplicated) or distribute (contents are duplicated)?
+-}
+data PipeBranchMode
+    = -- | The input pipe is split between each action.
+      --  The contents of the pipe are not duplicated,
+      --  meaning that content consumed by one action cannot be received by the other actions.
+      SplitPipe
+    | -- | The input pipe is distributed (contents are duplicated) to each action.
+      DistributePipe
+    deriving stock (Eq, Ord, Read, Show, Generic)
 
 data Feed p a where
     Feed :: p -> Feed p ()
@@ -109,12 +117,12 @@ data PlumberH p q f (a :: Type) where
     RewriteExchangeH :: (Either p q -> f (Either p q)) -> PlumberH p q f a
 
 makeEffectF [''PipeF, ''PipeLineF, ''Feed, ''Consume, ''Yield, ''Plumber]
-makeEffectH [''PipeH, ''PipeLine, ''PlumberH]
+makeEffectH [''PipeH, ''PipeLineH, ''PlumberH]
 
 type PipeComm p f =
     ( PipeH <<: f
     , PipeF <: f
-    , PipeLine p <<: f
+    , PipeLineH p <<: f
     , Feed p <: f
     , Consume p <: f
     , Yield <: f
@@ -193,88 +201,37 @@ infixl 1 *||
 infixr 0 ||*
 infixl 1 |||
 
-{- | Execute both actions in parallel and block until both are completed.
-
-    The input and output pipes are split between each action.
-    The contents of the pipes are not duplicated,
-    meaning that content consumed by one action cannot be received by the other actions.
--}
+-- | Execute both actions in parallel and block until both are completed.
 (*|*) :: PipeH <<: f => f a -> f b -> f (a, b)
-(*|*) = waitBoth False
+(*|*) = waitBoth
 {-# INLINE (*|*) #-}
 
 {- | Execute both actions in parallel and block until the action of the first argument is completed.
     The action of the second argument is cancelled when the first argument's action finishes.
-
-    The input and output pipes are split between each action.
-    The contents of the pipes are not duplicated,
-    meaning that content consumed by one action cannot be received by the other actions.
 -}
 (*||) :: PipeH <<: f => f a -> f b -> f (a, Maybe b)
-(*||) = thenStop False
+(*||) = thenStop
 {-# INLINE (*||) #-}
 
 {- | Execute both actions in parallel and block until the action of the second argument is completed.
     The action of the first argument is cancelled when the second argument's action finishes.
-
-    The input and output pipes are split between each action.
-    The contents of the pipes are not duplicated,
-    meaning that content consumed by one action cannot be received by the other actions.
 -}
 (||*) :: (PipeH <<: f, Functor f) => f a -> f b -> f (Maybe a, b)
-a ||* b = swap <$> thenStop False b a
+a ||* b = swap <$> thenStop b a
 {-# INLINE (||*) #-}
 
 {- | Execute both actions in parallel and block until either action is completed.
     Once one finishes, the other is canceled.
-
-    The input and output pipes are split between each action.
-    The contents of the pipes are not duplicated,
-    meaning that content consumed by one action cannot be received by the other actions.
 -}
 (|||) :: PipeH <<: f => f a -> f b -> f (Either a b)
-(|||) = race False
+(|||) = race
 {-# INLINE (|||) #-}
 
-infixl 1 *&*
-infixl 1 *&|
-infixr 0 |&*
-infixl 1 |&|
+withSplitMode :: forall p f a. PipeLineH p <<: f => f a -> f a
+withSplitMode = withPipeBranchMode @p $ const SplitPipe
 
-{- | Execute both actions in parallel and block until both are completed.
-
-    The input and output pipes are distributed (contents are duplicated) to each action.
--}
-(*&*) :: PipeH <<: f => f a -> f b -> f (a, b)
-(*&*) = waitBoth True
-{-# INLINE (*&*) #-}
-
-{- | Execute both actions in parallel and block until the action of the first argument is completed.
-    The action of the second argument is cancelled when the first argument's action finishes.
-
-    The input and output pipes are distributed (contents are duplicated) to each action.
--}
-(*&|) :: PipeH <<: f => f a -> f b -> f (a, Maybe b)
-(*&|) = thenStop True
-{-# INLINE (*&|) #-}
-
-{- | Execute both actions in parallel and block until the action of the second argument is completed.
-    The action of the first argument is cancelled when the second argument's action finishes.
-
-    The input and output pipes are distributed (contents are duplicated) to each action.
--}
-(|&*) :: (PipeH <<: f, Functor f) => f a -> f b -> f (Maybe a, b)
-a |&* b = swap <$> thenStop True b a
-{-# INLINE (|&*) #-}
-
-{- | Execute both actions in parallel and block until either action is completed.
-    Once one finishes, the other is canceled.
-
-    The input and output pipes are distributed (contents are duplicated) to each action.
--}
-(|&|) :: PipeH <<: f => f a -> f b -> f (Either a b)
-(|&|) = race True
-{-# INLINE (|&|) #-}
+withDistributeMode :: forall p f a. PipeLineH p <<: f => f a -> f a
+withDistributeMode = withPipeBranchMode @p $ const DistributePipe
 
 defaultFeed :: (Feed p <: m, Yield <: m, Monad m) => p -> m ()
 defaultFeed a = do
