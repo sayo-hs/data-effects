@@ -28,7 +28,7 @@ import Control.Arrow (app)
 import Control.Monad (MonadPlus, forever, unless)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.Zip (MonadZip)
-import Control.Selective (Selective, select, swapEither)
+import Control.Selective (Selective, select)
 import Data.Bifunctor (first)
 import Data.Coerce (Coercible, coerce)
 import Data.Effect.Foldl (
@@ -77,8 +77,7 @@ data PipeF (a :: Type) where
     Yield :: PipeF ()
 
 data PipeLineH (p :: Type) f (a :: Type) where
-    UnmaskPipe :: forall p f a. f a -> PipeLineH p f a
-    MaskPipe :: forall p f a. f a -> PipeLineH p f a
+    WithPipeMask :: forall p f a. (Bool -> Bool) -> f a -> PipeLineH p f a
     WithPipeBranchMode :: forall p f a. (PipeBranchMode -> PipeBranchMode) -> f a -> PipeLineH p f a
     PipeLoop :: forall p f a. f a -> PipeLineH p f a
 
@@ -155,10 +154,10 @@ pattern ClosePipe = Connection Nothing
 
 {-# COMPLETE OpenPipe, ClosePipe #-}
 
-infixl 1 |>
-(|>) :: PipeH <<: f => f a -> f b -> f (a, b)
-(|>) = pipeTo
-{-# INLINE (|>) #-}
+infixl 1 *|*>
+(*|*>) :: PipeH <<: f => f a -> f b -> f (a, b)
+(*|*>) = pipeTo
+{-# INLINE (*|*>) #-}
 
 infixl 1 *|>
 (*|>) :: PipeH <<: f => f a -> f b -> f (a, Maybe b)
@@ -170,15 +169,15 @@ infixl 1 |*>
 (|*>) = sndWaitPipeTo
 {-# INLINE (|*>) #-}
 
-infixl 1 ||>
-(||>) :: PipeH <<: f => f a -> f b -> f (Either a b)
-(||>) = racePipeTo
-{-# INLINE (||>) #-}
+infixl 1 |>
+(|>) :: (PipeH <<: f, Functor f) => f a -> f a -> f a
+a |> b = either id id <$> racePipeTo a b
+{-# INLINE (|>) #-}
 
-infixr 0 <|
-(<|) :: (PipeH <<: f, Functor f) => f a -> f b -> f (a, b)
-a <| b = swap <$> pipeTo b a
-{-# INLINE (<|) #-}
+infixr 0 <*|*
+(<*|*) :: (PipeH <<: f, Functor f) => f a -> f b -> f (a, b)
+a <*|* b = swap <$> pipeTo b a
+{-# INLINE (<*|*) #-}
 
 infixr 0 <|*
 (<|*) :: (PipeH <<: f, Functor f) => f a -> f b -> f (Maybe a, b)
@@ -190,10 +189,10 @@ infixr 0 <*|
 a <*| b = swap <$> sndWaitPipeTo b a
 {-# INLINE (<*|) #-}
 
-infixr 0 <||
-(<||) :: (PipeH <<: f, Functor f) => f a -> f b -> f (Either a b)
-a <|| b = swapEither <$> racePipeTo b a
-{-# INLINE (<||) #-}
+infixr 0 <|
+(<|) :: (PipeH <<: f, Functor f) => f a -> f a -> f a
+a <| b = either id id <$> racePipeTo b a
+{-# INLINE (<|) #-}
 
 infixl 1 *|*
 infixl 1 *||
@@ -226,11 +225,37 @@ a ||* b = swap <$> thenStop b a
 a ||| b = either id id <$> race a b
 {-# INLINE (|||) #-}
 
-withSplitMode :: forall p f a. PipeLineH p <<: f => f a -> f a
-withSplitMode = withPipeBranchMode @p $ const SplitPipe
+unmaskPipe_ :: forall p f a. PipeLineH p <<: f => f a -> f a
+unmaskPipe_ = withPipeMask @p $ const False
 
-withDistributeMode :: forall p f a. PipeLineH p <<: f => f a -> f a
-withDistributeMode = withPipeBranchMode @p $ const DistributePipe
+maskPipe_ :: forall p f a. PipeLineH p <<: f => f a -> f a
+maskPipe_ = withPipeMask @p $ const True
+
+splitPipe_ :: forall p f a. PipeLineH p <<: f => f a -> f a
+splitPipe_ = withPipeBranchMode @p $ const SplitPipe
+
+distributePipe_ :: forall p f a. PipeLineH p <<: f => f a -> f a
+distributePipe_ = withPipeBranchMode @p $ const DistributePipe
+
+unmaskPipe :: forall p m a. (PipeLineH p <<: m, PipeLineF p <: m, Monad m) => ((m ~> m) -> m a) -> m a
+unmaskPipe f = do
+    savedMode <- isPipeMasked @p
+    withPipeMask @p (const False) (f $ withPipeMask @p $ const savedMode)
+
+maskPipe :: forall p m a. (PipeLineH p <<: m, PipeLineF p <: m, Monad m) => ((m ~> m) -> m a) -> m a
+maskPipe f = do
+    savedMode <- isPipeMasked @p
+    withPipeMask @p (const True) (f $ withPipeMask @p $ const savedMode)
+
+splitPipe :: forall p m a. (PipeLineH p <<: m, PipeLineF p <: m, Monad m) => ((m ~> m) -> m a) -> m a
+splitPipe f = do
+    savedMode <- getPipeBranchMode @p
+    splitPipe_ @p (f $ withPipeBranchMode @p $ const savedMode)
+
+distributePipe :: forall p m a. (PipeLineH p <<: m, PipeLineF p <: m, Monad m) => ((m ~> m) -> m a) -> m a
+distributePipe f = do
+    savedMode <- getPipeBranchMode @p
+    distributePipe_ @p (f $ withPipeBranchMode @p $ const savedMode)
 
 defaultFeed :: (Feed p <: m, PipeF <: m, Monad m) => p -> m ()
 defaultFeed a = do
