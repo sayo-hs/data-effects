@@ -23,7 +23,7 @@ Mathematically, this emulates a traced symmetric monoidal category.
 -}
 module Data.Effect.Concurrent.Pipe where
 
-import Control.Applicative (Alternative, liftA2)
+import Control.Applicative (Alternative (empty, (<|>)), liftA2)
 import Control.Arrow (app)
 import Control.Monad (MonadPlus, forever, unless)
 import Control.Monad.Fix (MonadFix)
@@ -73,9 +73,8 @@ data PipeH f a where
 
 data PipeF (a :: Type) where
     Passthrough :: PipeF a
-
-data Yield a where
-    Yield :: Yield ()
+    Halt :: PipeF a
+    Yield :: PipeF ()
 
 data PipeLineH (p :: Type) f (a :: Type) where
     UnmaskPipe :: forall p f a. f a -> PipeLineH p f a
@@ -116,16 +115,16 @@ data Plumber p q (a :: Type) where
 data PlumberH p q f (a :: Type) where
     RewriteExchangeH :: (Either p q -> f (Either p q)) -> PlumberH p q f a
 
-makeEffectF [''PipeF, ''PipeLineF, ''Feed, ''Consume, ''Yield, ''Plumber]
+makeEffectF [''PipeF, ''PipeLineF, ''Feed, ''Consume, ''Plumber]
 makeEffectH [''PipeH, ''PipeLineH, ''PlumberH]
 
 type PipeComm p f =
     ( PipeH <<: f
     , PipeF <: f
+    , PipeLineF p <: f
     , PipeLineH p <<: f
     , Feed p <: f
     , Consume p <: f
-    , Yield <: f
     )
 
 newtype Connection a = Connection {unConnection :: Maybe a}
@@ -223,8 +222,8 @@ a ||* b = swap <$> thenStop b a
 {- | Execute both actions in parallel and block until either action is completed.
     Once one finishes, the other is canceled.
 -}
-(|||) :: PipeH <<: f => f a -> f b -> f (Either a b)
-(|||) = race
+(|||) :: (PipeH <<: f, Functor f) => f a -> f a -> f a
+a ||| b = either id id <$> race a b
 {-# INLINE (|||) #-}
 
 withSplitMode :: forall p f a. PipeLineH p <<: f => f a -> f a
@@ -233,14 +232,14 @@ withSplitMode = withPipeBranchMode @p $ const SplitPipe
 withDistributeMode :: forall p f a. PipeLineH p <<: f => f a -> f a
 withDistributeMode = withPipeBranchMode @p $ const DistributePipe
 
-defaultFeed :: (Feed p <: m, Yield <: m, Monad m) => p -> m ()
+defaultFeed :: (Feed p <: m, PipeF <: m, Monad m) => p -> m ()
 defaultFeed a = do
     success <- tryFeed a
     unless success do
         yield
         defaultFeed a
 
-defaultConsume :: (Consume p <: m, Yield <: m, Monad m) => m p
+defaultConsume :: (Consume p <: m, PipeF <: m, Monad m) => m p
 defaultConsume = do
     tryConsume >>= \case
         Just a -> pure a
@@ -248,7 +247,7 @@ defaultConsume = do
             yield
             defaultConsume
 
-defaultPassthrough :: forall p m a. (Feed p <: m, Consume p <: m, Yield <: m, Monad m) => m a
+defaultPassthrough :: forall p m a. (Feed p <: m, Consume p <: m, PipeF <: m, Monad m) => m a
 defaultPassthrough =
     forever do
         consume @p >>= feed
@@ -263,6 +262,12 @@ instance (PipeH <<: f, Applicative f) => Applicative (Concurrently f) where
         Concurrently $ uncurry f <$> (a *|* b)
     {-# INLINE pure #-}
     {-# INLINE liftA2 #-}
+
+instance (PipeH <<: f, PipeF <: f, Applicative f) => Alternative (Concurrently f) where
+    empty = Concurrently halt
+    Concurrently a <|> Concurrently b = Concurrently $ a ||| b
+    {-# INLINE empty #-}
+    {-# INLINE (<|>) #-}
 
 instance (PipeH <<: f, Selective f) => Selective (Concurrently f) where
     select (Concurrently x) (Concurrently y) =

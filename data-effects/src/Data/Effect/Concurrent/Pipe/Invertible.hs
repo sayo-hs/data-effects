@@ -28,9 +28,9 @@ import Data.Coerce (Coercible, coerce)
 import Data.Data (Data)
 import Data.Effect.Concurrent.Pipe (
     Connection,
+    PipeBranchMode,
     PipeF,
     PipeH,
-    Yield,
     yield,
     pattern ClosePipe,
     pattern OpenPipe,
@@ -47,19 +47,23 @@ import Data.Function (fix)
 import Data.Functor ((<&>))
 import GHC.Generics (Generic)
 
-data FeedF p a where
-    Feed :: Content p -> FeedF p ()
-    TryFeed :: Content p -> FeedF p Bool
+data PipeLineH (p :: Port) f (a :: Type) where
+    UnmaskPipe :: forall p f a. f a -> PipeLineH p f a
+    MaskPipe :: forall p f a. f a -> PipeLineH p f a
+    WithPipeBranchMode :: forall p f a. (PipeBranchMode -> PipeBranchMode) -> f a -> PipeLineH p f a
+    PipeLoop :: forall p f a. f a -> PipeLineH p f a
 
-data FeedH (p :: Port) f (a :: Type) where
-    ConnectOutput :: forall p f a. f a -> FeedH p f a
+data PipeLineF (p :: Port) a where
+    IsPipeMasked :: PipeLineF p Bool
+    GetPipeBranchMode :: PipeLineF p PipeBranchMode
 
-data ConsumeF p a where
-    Consume :: ConsumeF p (Content p)
-    TryConsume :: ConsumeF p (Maybe (Content p))
+data Feed p a where
+    Feed :: Content p -> Feed p ()
+    TryFeed :: Content p -> Feed p Bool
 
-data ConsumeH (p :: Port) f (a :: Type) where
-    ConnectInput :: forall p f a. f a -> ConsumeH p f a
+data Consume p a where
+    Consume :: Consume p (Content p)
+    TryConsume :: Consume p (Maybe (Content p))
 
 data Plumber (p :: Port) (q :: Port) (a :: Type) where
     RewriteExchange ::
@@ -83,27 +87,26 @@ type family Content p = r | r -> p where
 data Reg = Reg deriving stock (Eq, Ord, Show, Read, Generic, Data)
 newtype Inv = Inv Reg deriving stock (Eq, Ord, Show, Read, Generic, Data)
 
-makeEffectF [''FeedF, ''ConsumeF, ''Plumber]
-makeEffectH [''FeedH, ''ConsumeH, ''PlumberH]
+makeEffectF [''PipeLineF, ''Feed, ''Consume, ''Plumber]
+makeEffectH [''PipeLineH, ''PlumberH]
 
 type PipeComm a f =
     ( PipeH <<: f
     , PipeF <: f
-    , FeedF a <: f
-    , FeedH a <<: f
-    , ConsumeF a <: f
-    , ConsumeH a <<: f
-    , Yield <: f
+    , PipeLineF a <: f
+    , PipeLineH a <<: f
+    , Feed a <: f
+    , Consume a <: f
     )
 
-defaultFeed :: (FeedF p <: m, Yield <: m, Monad m) => Content p -> m ()
+defaultFeed :: (Feed p <: m, PipeF <: m, Monad m) => Content p -> m ()
 defaultFeed a = do
     success <- tryFeed a
     unless success do
         yield
         defaultFeed a
 
-defaultConsume :: (ConsumeF p <: m, Yield <: m, Monad m) => m (Content p)
+defaultConsume :: (Consume p <: m, PipeF <: m, Monad m) => m (Content p)
 defaultConsume = do
     tryConsume >>= \case
         Just a -> pure a
@@ -111,15 +114,11 @@ defaultConsume = do
             yield
             defaultConsume
 
-defaultPassthrough :: forall p m a. (FeedF p <: m, ConsumeF p <: m, Yield <: m, Monad m) => m a
+defaultPassthrough :: forall p m a. (Feed p <: m, Consume p <: m, PipeF <: m, Monad m) => m a
 defaultPassthrough =
     forever do
         consume @p >>= feed
         yield
-
-connectPipe :: forall p f a. (FeedH p <<: f, ConsumeH p <<: f) => f a -> f a
-connectPipe = connectOutput @p . connectInput @p
-{-# INLINE connectPipe #-}
 
 mergeToLeft :: forall p q f a. Plumber p q <: f => (Content q -> Content p) -> f a
 mergeToLeft f = rewriteExchange $ either Left (Left . f)
@@ -147,7 +146,7 @@ defaultSwapPipe = exchangePipe @p @q coerce coerce
 
 defaultFolding ::
     forall fl a b m p.
-    (ConsumeF p <: m, Content p ~ (fl, Connection a), Monad m) =>
+    (Consume p <: m, Content p ~ (fl, Connection a), Monad m) =>
     Folding a b ->
     m b
 defaultFolding (Folding step initial) =
@@ -158,7 +157,7 @@ defaultFolding (Folding step initial) =
 
 defaultFoldingH ::
     forall fl a b m p.
-    (ConsumeF p <: m, Content p ~ (fl, Connection a), Monad m) =>
+    (Consume p <: m, Content p ~ (fl, Connection a), Monad m) =>
     FoldingH a m b ->
     m b
 defaultFoldingH (FoldingH step initial) =
@@ -169,14 +168,14 @@ defaultFoldingH (FoldingH step initial) =
 
 defaultFoldingMapH ::
     forall fl a b m p.
-    (ConsumeF p <: m, Content p ~ (fl, Connection a), Monad m) =>
+    (Consume p <: m, Content p ~ (fl, Connection a), Monad m) =>
     FoldingMapH a m b ->
     m b
 defaultFoldingMapH = defaultFoldingH @fl . toFoldingH
 {-# INLINE defaultFoldingMapH #-}
 
 defaultProcessing ::
-    (Foldable t, FoldingMapH a <<: f, FeedF p <: f, Applicative f) =>
+    (Foldable t, FoldingMapH a <<: f, Feed p <: f, Applicative f) =>
     (a -> t (Content p)) ->
     f ()
 defaultProcessing f =
