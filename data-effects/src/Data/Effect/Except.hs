@@ -20,3 +20,19 @@ data Catch e f (a :: Type) where
     Catch :: f a -> (e -> f a) -> Catch e f a
 
 makeEffect [''Throw] [''Catch]
+
+liftEither :: (Throw e <: f, Applicative f) => Either e a -> f a
+liftEither = either throw pure
+{-# INLINE liftEither #-}
+
+joinEither :: (Throw e <: m, Monad m) => m (Either e a) -> m a
+joinEither = (>>= either throw pure)
+{-# INLINE joinEither #-}
+
+joinExcept :: Monad m => Either (m a) a -> m a
+joinExcept = either id pure
+{-# INLINE joinExcept #-}
+
+exc :: Monad m => m (Either (m a) a) -> m a
+exc = (>>= either id pure)
+{-# INLINE exc #-}
