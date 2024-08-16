@@ -33,11 +33,12 @@ measureTime m = withElapsedTime \elapsedTime -> do
     r <- m
     elapsedTime <&> (,r)
 
-sleepUntil :: (Timer <: m, Monad m) => DiffTime -> m ()
+sleepUntil :: (Timer <: m, Monad m) => DiffTime -> m (Maybe DiffTime)
 sleepUntil t = do
     now <- clock
     when (t > now) do
         sleep $ t - now
+    pure if t < now then Just (now - t) else Nothing
 
 runCyclic :: (Timer <: m, Monad m) => m DiffTime -> m () -> m a
 runCyclic deltaTime a = do
@@ -45,8 +46,8 @@ runCyclic deltaTime a = do
     flip fix t0 \next t -> do
         t' <- (t +) <$> deltaTime
         a
-        sleepUntil t'
-        next t'
+        delay <- sleepUntil t'
+        next $ maybe t' (t' +) delay
 
 runPeriodic :: (Timer <: m, Monad m) => DiffTime -> m () -> m a
 runPeriodic interval = runCyclic (pure interval)
