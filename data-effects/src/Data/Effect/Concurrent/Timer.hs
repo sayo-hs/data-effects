@@ -39,11 +39,15 @@ sleepUntil t = do
     when (t > now) do
         sleep $ t - now
 
-runPeriodic :: (Timer <: m, Monad m) => DiffTime -> m () -> m a
-runPeriodic interval a = do
+runCyclic :: (Timer <: m, Monad m) => m DiffTime -> m () -> m a
+runCyclic deltaTime a = do
     t0 <- clock
     flip fix t0 \next t -> do
-        let t' = t + interval
+        t' <- (t +) <$> deltaTime
         a
         sleepUntil t'
         next t'
+
+runPeriodic :: (Timer <: m, Monad m) => DiffTime -> m () -> m a
+runPeriodic interval = runCyclic (pure interval)
+{-# INLINE runPeriodic #-}
