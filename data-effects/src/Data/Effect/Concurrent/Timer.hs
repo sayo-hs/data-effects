@@ -14,6 +14,7 @@ Portability :  portable
 module Data.Effect.Concurrent.Timer where
 
 import Control.Monad (when)
+import Data.Effect.Coroutine (Yield, yield)
 import Data.Function (fix)
 import Data.Functor ((<&>))
 import Data.Time (DiffTime)
@@ -52,3 +53,15 @@ runCyclic deltaTime a = do
 runPeriodic :: (Timer <: m, Monad m) => DiffTime -> m () -> m a
 runPeriodic interval = runCyclic (pure interval)
 {-# INLINE runPeriodic #-}
+
+periodicTimer :: forall m a. (Timer <: m, Yield () () <: m, Monad m) => DiffTime -> m a
+periodicTimer interval = runPeriodic interval $ yield ()
+{-# INLINE periodicTimer #-}
+
+cyclicTimer :: forall m a. (Timer <: m, Yield () DiffTime <: m, Monad m) => m a
+cyclicTimer = runCyclic (yield ()) (pure ())
+{-# INLINE cyclicTimer #-}
+
+data CyclicTimer a where
+    Wait :: DiffTime -> CyclicTimer ()
+makeEffectF [''CyclicTimer]
