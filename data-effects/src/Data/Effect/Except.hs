@@ -36,3 +36,11 @@ joinExcept = either id pure
 exc :: Monad m => m (Either (m a) a) -> m a
 exc = (>>= either id pure)
 {-# INLINE exc #-}
+
+withExcept :: (Catch e <<: f, Throw e <: f, Applicative f) => f a -> (e -> f ()) -> f a
+withExcept thing after = thing `catch` \e -> after e *> throw e
+{-# INLINE withExcept #-}
+
+onExcept :: forall e f a. (Catch e <<: f, Throw e <: f, Applicative f) => f a -> f () -> f a
+onExcept thing after = thing `withExcept` \(_ :: e) -> after
+{-# INLINE onExcept #-}
