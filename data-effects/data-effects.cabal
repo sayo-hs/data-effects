@@ -60,14 +60,10 @@ library
         Data.Effect.Resource
         Data.Effect.Fresh
         Data.Effect.Concurrent.Thread
-        Data.Effect.Concurrent.Pipe
-        Data.Effect.Concurrent.Pipe.Invertible
         Data.Effect.Concurrent.Timer
         Data.Effect.Unlift
         Data.Effect.ShiftReset
         Data.Effect.KVStore
-        Data.Effect.Foldl
-        Data.Effect.Shell
 
     reexported-modules:
         Data.Effect,
@@ -94,14 +90,9 @@ library
         data-effects-th             ^>= 0.1,
         these                       ^>= 1.2,
         data-default                ^>= 0.7.1,
-        text,
-        lens,
-        process,
-        time,
-        selective,
-        bytestring,
-        vector,
-        foldl,
+        text                        ^>= 1.2.5,
+        lens                        ^>= 5.2.3,
+        time                        ^>= 1.11.1,
 
     hs-source-dirs:   src
     ghc-options:      -Wall
