@@ -15,7 +15,7 @@ Stability   :  experimental
 Portability :  portable
 
 This module provides @TemplateHaskell@ functions to derive an instance of
-t'Data.Effect.HFunctor.HFunctor'.
+ t'Data.Effect.HFunctor.HFunctor'.
 -}
 module Data.Effect.HFunctor.TH where
 
