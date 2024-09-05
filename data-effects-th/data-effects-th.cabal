@@ -1,6 +1,6 @@
 cabal-version:      2.4
 name:               data-effects-th
-version:            0.1.1.0
+version:            0.1.2.0
 
 -- A short (one-line) description of the package.
 synopsis: Template Haskell utilities for the data-effects library.
@@ -66,7 +66,7 @@ library
         extra                   ^>= 1.7.14,
         containers              ^>= 0.6.5,
         either                  ^>= 5.0.2,
-        text                    ^>= 1.2.5,
+        text                    >= 2.0 && < 2.2,
         data-default            ^>= 0.7.1,
         infinite-list           ^>= 0.1.1,
         formatting              ^>= 7.2.0,

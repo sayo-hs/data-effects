@@ -1,6 +1,6 @@
 cabal-version:      2.4
 name:               data-effects
-version:            0.1.1.0
+version:            0.1.2.0
 
 -- A short (one-line) description of the package.
 synopsis: A basic framework for effect systems based on effects represented by GADTs.
@@ -87,10 +87,10 @@ library
     build-depends:
         base                        ^>= 4.16.4.0,
         data-effects-core           ^>= 0.1,
-        data-effects-th             ^>= 0.1.1,
+        data-effects-th             ^>= 0.1.2,
         these                       ^>= 1.2,
         data-default                ^>= 0.7.1,
-        text                        ^>= 1.2.5,
+        text                        >= 2.0 && < 2.2,
         lens                        ^>= 5.2.3,
         time                        ^>= 1.11.1,
 
