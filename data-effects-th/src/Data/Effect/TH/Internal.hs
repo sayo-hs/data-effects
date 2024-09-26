@@ -7,7 +7,7 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 {- |
-Copyright   :  (c) 2023-2024 Yamada Ryo
+Copyright   :  (c) 2023-2024 Sayo Koyoneda
                (c) 2010-2011 Patrick Bahr, Tom Hvitved
                (c) 2020 Michael Szvetits
 License     :  MPL-2.0 (see the file LICENSE)

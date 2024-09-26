@@ -6,7 +6,7 @@
 
 {- |
 Copyright   : (c) 2016 Allele Dev; 2017 Ixperta Solutions s.r.o.; 2017 Alexis King
-              (c) 2023-2024 Yamada Ryo
+              (c) 2023-2024 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental

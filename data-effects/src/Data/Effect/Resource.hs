@@ -10,7 +10,7 @@
 
 {- |
 Copyright   :  (c) 2019-2023 The Polysemy Lounge
-               (c) 2023 Yamada Ryo
+               (c) 2023 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental

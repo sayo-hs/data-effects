@@ -3,7 +3,7 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 {- |
-Copyright   :  (c) 2023-2024 Yamada Ryo
+Copyright   :  (c) 2023-2024 Sayo Koyoneda
                (c) 2023 Casper Bach Poulsen and Cas van der Rest
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp

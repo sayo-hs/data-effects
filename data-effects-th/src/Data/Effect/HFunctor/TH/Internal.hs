@@ -48,7 +48,7 @@
 
 {- |
 Copyright   :  (c) 2010-2011 Patrick Bahr, Tom Hvitved
-               (c) 2023 Yamada Ryo
+               (c) 2023 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental

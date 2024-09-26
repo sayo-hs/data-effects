@@ -13,8 +13,8 @@ the [Heftia](https://github.com/sayo-hs/heftia) extensible effects library.
 ## Your contributions are welcome!
 Please see [CONTRIBUTING.md](https://github.com/sayo-hs/data-effects/blob/ef706ef3fa547de01ce6bb5636af911354e53b58/CONTRIBUTING.md).
 
-## Credits
-Parts of this project have been adapted or inspired by the following resources:
+## Citations
+The following is a list of existing works that have been modified and used within this library:
 
 * **[compdata](https://github.com/pa-ba/compdata)**
     * **Copyright** (c) 2010--2011 Patrick Bahr, Tom Hvitved
