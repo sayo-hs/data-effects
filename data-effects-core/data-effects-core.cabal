@@ -56,9 +56,9 @@ library
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends:
-        base                          ^>= 4.16.4.0,
-        compdata                      ^>= 0.13.1,
-        mtl                           ^>= 2.2.2,
+        base                          >= 4.16.4 && < 4.21,
+        compdata                      >= 0.13.1 && < 0.14,
+        mtl                           >= 2.2.2 && < 2.4,
 
     hs-source-dirs:   src
     ghc-options:      -Wall
@@ -81,7 +81,7 @@ test-suite test
     build-depends:
         data-effects-core,
         base,
-        tasty                         ^>= 1.4,
+        tasty                         >= 1.4 && < 1.6,
         tasty-hunit                   ^>= 0.10,
 
     type: exitcode-stdio-1.0

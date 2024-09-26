@@ -91,6 +91,7 @@ import Language.Haskell.TH (
     reportWarning,
  )
 import Language.Haskell.TH qualified as TH
+import Language.Haskell.TH.Datatype.TyVarBndr (pattern BndrReq)
 
 data EffClsInfo = EffClsInfo
     { ecName :: Name
@@ -269,11 +270,11 @@ genSenders EffectClassConf{..} ec@EffClsInfo{..} = do
                             <> nameBase ecName
                             <> "’.\nConsider separating the first-order effect into an instruction class data type."
 
-genNormalSender ::
-    EffectOrder ->
-    SenderFunctionConf ->
-    EffConInfo ->
-    WriterT [Dec] Q ()
+genNormalSender
+    :: EffectOrder
+    -> SenderFunctionConf
+    -> EffConInfo
+    -> WriterT [Dec] Q ()
 genNormalSender order = genSender order send sendCxt id
   where
     (send, sendCxt) = case order of
@@ -286,11 +287,11 @@ genNormalSender order = genSender order send sendCxt id
             , \effDataType carrier -> ConT ''SendSig `AppT` effDataType `AppT` carrier
             )
 
-genTaggedSender ::
-    EffectOrder ->
-    SenderFunctionConf ->
-    EffConInfo ->
-    WriterT [Dec] Q ()
+genTaggedSender
+    :: EffectOrder
+    -> SenderFunctionConf
+    -> EffConInfo
+    -> WriterT [Dec] Q ()
 genTaggedSender order conf eff = do
     nTag <- newName "tag" & lift
     let tag = VarT nTag
@@ -309,11 +310,11 @@ genTaggedSender order conf eff = do
 
     genSender order send sendCxt (PlainTV nTag SpecifiedSpec :) conf eff
 
-genKeyedSender ::
-    EffectOrder ->
-    SenderFunctionConf ->
-    EffConInfo ->
-    WriterT [Dec] Q ()
+genKeyedSender
+    :: EffectOrder
+    -> SenderFunctionConf
+    -> EffConInfo
+    -> WriterT [Dec] Q ()
 genKeyedSender order conf eff = do
     nKey <- newName "key" & lift
     let key = VarT nKey
@@ -332,14 +333,14 @@ genKeyedSender order conf eff = do
 
     genSender order send sendCxt (PlainTV nKey SpecifiedSpec :) conf eff
 
-genSender ::
-    EffectOrder ->
-    (Exp -> Exp) ->
-    (TH.Type -> TH.Type -> TH.Type) ->
-    ([TyVarBndrSpec] -> [TyVarBndrSpec]) ->
-    SenderFunctionConf ->
-    EffConInfo ->
-    WriterT [Dec] Q ()
+genSender
+    :: EffectOrder
+    -> (Exp -> Exp)
+    -> (TH.Type -> TH.Type -> TH.Type)
+    -> ([TyVarBndrSpec] -> [TyVarBndrSpec])
+    -> SenderFunctionConf
+    -> EffConInfo
+    -> WriterT [Dec] Q ()
 genSender order send sendCxt alterFnSigTVs conf@SenderFunctionConf{..} con@EffConInfo{..} = do
     genSenderArmor sendCxt alterFnSigTVs conf con \f -> do
         args <- replicateM (length effParamTypes) (newName "x")
@@ -358,13 +359,13 @@ genSender order send sendCxt alterFnSigTVs conf@SenderFunctionConf{..} con@EffCo
 
         pure $ Clause (map VarP args) (NormalB body) []
 
-genSenderArmor ::
-    (TH.Type -> TH.Type -> TH.Type) ->
-    ([TyVarBndrSpec] -> [TyVarBndrSpec]) ->
-    SenderFunctionConf ->
-    EffConInfo ->
-    (Type -> Q Clause) ->
-    WriterT [Dec] Q ()
+genSenderArmor
+    :: (TH.Type -> TH.Type -> TH.Type)
+    -> ([TyVarBndrSpec] -> [TyVarBndrSpec])
+    -> SenderFunctionConf
+    -> EffConInfo
+    -> (Type -> Q Clause)
+    -> WriterT [Dec] Q ()
 genSenderArmor sendCxt alterFnSigTVs SenderFunctionConf{..} EffConInfo{..} clause = do
     carrier <- maybe ((`PlainTV` ()) <$> newName "f") pure effCarrier & lift
 
@@ -400,7 +401,7 @@ genSenderArmor sendCxt alterFnSigTVs SenderFunctionConf{..} EffConInfo{..} claus
     when _doesGenerateSenderFnSignature $ tell [funSig]
     tell [funDef, funInline]
 
-arrowChain :: Foldable t => t TH.Type -> TH.Type -> TH.Type
+arrowChain :: (Foldable t) => t TH.Type -> TH.Type -> TH.Type
 arrowChain = flip $ foldr \l r -> ArrowT `AppT` l `AppT` r
 
 -- | A reified information of a datatype.
@@ -478,8 +479,8 @@ analyzeEffCls order DataInfo{..} = do
                     , effCxt = conCxt
                     }
           where
-            decomposeGadtReturnType ::
-                TH.Type -> Either [T.Text] (TH.Type, Maybe (TyVarBndr ()), TH.Type)
+            decomposeGadtReturnType
+                :: TH.Type -> Either [T.Text] (TH.Type, Maybe (TyVarBndr ()), TH.Type)
             decomposeGadtReturnType =
                 unkindType >>> case order of
                     FirstOrder ->
@@ -542,15 +543,15 @@ genLiftInsPatternSynonyms EffClsInfo{..} = do
                         -- For some reason, if I don't write constraints in this form, the type is
                         -- not inferred properly (why?).
                         [t|
-                            () =>
-                            ( $(pure a) ~ $(pure effResultType)
-                            , $(pure $ foldl AppT (TupleT (length effCxt)) effCxt)
-                            ) =>
-                            $( pure $
-                                arrowChain
-                                    effParamTypes
-                                    ((ConT ''LiftIns `AppT` effDataType) `AppT` f `AppT` a)
-                             )
+                            ()
+                            => ( $(pure a) ~ $(pure effResultType)
+                               , $(pure $ foldl AppT (TupleT (length effCxt)) effCxt)
+                               )
+                            => $( pure $
+                                    arrowChain
+                                        effParamTypes
+                                        ((ConT ''LiftIns `AppT` effDataType) `AppT` f `AppT` a)
+                                )
                             |]
                     , pure $
                         PatSynD
@@ -571,7 +572,7 @@ genLiftInsTypeSynonym :: EffClsInfo -> Dec
 genLiftInsTypeSynonym EffClsInfo{..} = do
     TySynD
         (mkName $ 'L' : nameBase ecName)
-        (pvs <&> (`PlainTV` ()))
+        (pvs <&> (`PlainTV` BndrReq))
         (ConT ''LiftIns `AppT` foldl AppT (ConT ecName) (map VarT pvs))
   where
     pvs = tyVarName <$> ecParamVars
@@ -710,9 +711,9 @@ This function abstracts away @newtype@ declaration, it turns them into
 analyzeData :: Info -> Maybe DataInfo
 analyzeData = \case
     TyConI (NewtypeD cxt name args _ constr _) ->
-        Just $ DataInfo cxt name args (normalizeCon constr)
+        Just $ DataInfo cxt name (map ($> ()) args) (normalizeCon constr)
     TyConI (DataD cxt name args _ constrs _) ->
-        Just $ DataInfo cxt name args (concatMap normalizeCon constrs)
+        Just $ DataInfo cxt name (map ($> ()) args) (concatMap normalizeCon constrs)
     _ -> Nothing
 
 normalizeCon :: Con -> [ConInfo]

@@ -54,6 +54,7 @@ import Language.Haskell.TH (
     mkName,
     nameBase,
  )
+import Language.Haskell.TH.Datatype.TyVarBndr (pattern BndrReq)
 
 makeKeyedEffect :: [Name] -> [Name] -> Q [Dec]
 makeKeyedEffect =
@@ -93,7 +94,7 @@ genEffectKey order _ _ EffClsInfo{..} EffectClassConf{..} = execWriterT do
     tell
         [ TySynD
             (mkName ecNamePlain)
-            (pvs <&> (`PlainTV` ()))
+            (pvs <&> (`PlainTV` BndrReq))
             (InfixT key keyedOp (foldl AppT (ConT ecName) (map VarT pvs)))
         ]
 

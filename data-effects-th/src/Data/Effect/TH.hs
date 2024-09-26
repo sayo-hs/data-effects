@@ -51,7 +51,7 @@ module Data.Effect.TH (
     noGenerateSenderFunctionSignature,
 ) where
 
-import Control.Monad.Writer (execWriterT, forM_, lift, tell, when)
+import Control.Monad.Writer (execWriterT, lift, tell)
 import Data.Default (Default (def))
 import Data.Effect.HFunctor.TH.Internal (deriveHFunctor)
 import Data.Effect.TH.Internal (
@@ -114,6 +114,7 @@ import Data.Effect.TH.Internal (
 import Data.Function ((&))
 import Data.List (singleton)
 import Language.Haskell.TH (Dec, Info, Name, Q, Type (TupleT))
+import Control.Monad (forM_, when)
 
 makeEffect' ::
     MakeEffectConf ->

@@ -57,14 +57,14 @@ library
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends:
-        base                    ^>= 4.16.4.0,
+        base                    >= 4.16.4 && < 4.21,
         data-effects-core       ^>= 0.1,
-        template-haskell        ^>= 2.18,
-        th-abstraction          >= 0.4 && < 0.7,
-        lens                    ^>= 5.2.3,
-        mtl                     ^>= 2.2.2,
+        template-haskell        >= 2.18 && < 2.23,
+        th-abstraction          >= 0.4 && < 0.8,
+        lens                    >= 5.2.3 && < 5.4,
+        mtl                     >= 2.2.2 && < 2.4,
         extra                   ^>= 1.7.14,
-        containers              ^>= 0.6.5,
+        containers              >= 0.6.5 && < 0.8,
         either                  ^>= 5.0.2,
         text                    >= 2.0 && < 2.2,
         data-default            ^>= 0.7.1,
@@ -83,7 +83,8 @@ library
         BlockArguments,
         FunctionalDependencies,
         RecordWildCards,
-        DefaultSignatures
+        DefaultSignatures,
+        PatternSynonyms
 
 
 test-suite Example
@@ -96,7 +97,7 @@ test-suite Example
         data-effects-th,
         base,
         data-effects-core,
-        tasty       ^>= 1.4,
+        tasty       >= 1.4 && < 1.6,
         tasty-hunit ^>= 0.10,
         data-default,
         infinite-list,
