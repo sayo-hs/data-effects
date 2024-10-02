@@ -51,6 +51,7 @@ module Data.Effect.TH (
     noGenerateSenderFunctionSignature,
 ) where
 
+import Control.Monad (forM_, when)
 import Control.Monad.Writer (execWriterT, lift, tell)
 import Data.Default (Default (def))
 import Data.Effect.HFunctor.TH.Internal (deriveHFunctor)
@@ -86,6 +87,7 @@ import Data.Effect.TH.Internal (
     doesGenerateLiftInsPatternSynonyms,
     doesGenerateLiftInsTypeSynonym,
     doesGenerateSenderFnSignature,
+    genIsHFunctorTypeFamily,
     genLiftInsPatternSynonyms,
     genLiftInsTypeSynonym,
     genSenders,
@@ -114,14 +116,13 @@ import Data.Effect.TH.Internal (
 import Data.Function ((&))
 import Data.List (singleton)
 import Language.Haskell.TH (Dec, Info, Name, Q, Type (TupleT))
-import Control.Monad (forM_, when)
 
-makeEffect' ::
-    MakeEffectConf ->
-    (EffectOrder -> Info -> DataInfo -> EffClsInfo -> EffectClassConf -> Q [Dec]) ->
-    [Name] ->
-    [Name] ->
-    Q [Dec]
+makeEffect'
+    :: MakeEffectConf
+    -> (EffectOrder -> Info -> DataInfo -> EffClsInfo -> EffectClassConf -> Q [Dec])
+    -> [Name]
+    -> [Name]
+    -> Q [Dec]
 makeEffect' (MakeEffectConf conf) extTemplate inss sigs = execWriterT do
     forM_ inss \ins -> do
         (info, dataInfo, effClsInfo) <- reifyEffCls FirstOrder ins & lift
@@ -145,6 +146,8 @@ makeEffect' (MakeEffectConf conf) extTemplate inss sigs = execWriterT do
 
         when _doesDeriveHFunctor do
             deriveHFunctor (const $ pure $ TupleT 0) dataInfo & lift >>= tell
+
+        genIsHFunctorTypeFamily effClsInfo _doesDeriveHFunctor & lift >>= tell
 
         extTemplate HigherOrder info dataInfo effClsInfo ecConf & lift >>= tell
 

@@ -38,3 +38,5 @@ data Nop :: InsClass
 
 -- | A /signature class/ with no effects.
 type LNop = LiftIns Nop
+
+type family IsHFunctor (e :: SigClass) :: Bool

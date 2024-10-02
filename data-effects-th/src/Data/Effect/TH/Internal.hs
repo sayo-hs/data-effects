@@ -52,9 +52,10 @@ import Control.Arrow ((>>>))
 import Control.Effect (SendIns, SendSig, sendIns, sendSig)
 import Control.Effect.Key (SendInsBy, SendSigBy, sendInsBy, sendSigBy)
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
+import Data.Bool (bool)
 import Data.Char (toLower)
 import Data.Default (Default, def)
-import Data.Effect (LiftIns (LiftIns))
+import Data.Effect (IsHFunctor, LiftIns (LiftIns))
 import Data.Effect.Tag (Tag (Tag), TagH (TagH))
 import Data.Either.Extra (mapLeft, maybeToEither)
 import Data.Either.Validation (Validation, eitherToValidation, validationToEither)
@@ -576,6 +577,15 @@ genLiftInsTypeSynonym EffClsInfo{..} = do
         (ConT ''LiftIns `AppT` foldl AppT (ConT ecName) (map VarT pvs))
   where
     pvs = tyVarName <$> ecParamVars
+
+genIsHFunctorTypeFamily :: EffClsInfo -> Bool -> Q [Dec]
+genIsHFunctorTypeFamily EffClsInfo{..} isHFunctor = do
+    [d|
+        type instance
+            IsHFunctor
+                $(pure $ foldl AppT (ConT ecName) (map (VarT . tyVarName) ecParamVars)) =
+                $(bool [t|'False|] [t|'True|] isHFunctor)
+        |]
 
 -- * Utility functions
 
