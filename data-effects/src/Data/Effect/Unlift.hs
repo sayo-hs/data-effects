@@ -19,14 +19,14 @@ pattern WithRunInIO :: (f ~> IO -> IO a) -> UnliftIO f a
 pattern WithRunInIO f = WithRunInBase f
 {-# COMPLETE WithRunInIO #-}
 
-withRunInIO :: UnliftIO <<: f => (f ~> IO -> IO a) -> f a
+withRunInIO :: (UnliftIO <<: f) => (f ~> IO -> IO a) -> f a
 withRunInIO = withRunInBase
 {-# INLINE withRunInIO #-}
 
-withRunInIO' :: forall tag f a. UnliftIO ## tag <<: f => (f ~> IO -> IO a) -> f a
+withRunInIO' :: forall tag f a. (UnliftIO ## tag <<: f) => (f ~> IO -> IO a) -> f a
 withRunInIO' = withRunInBase' @tag
 {-# INLINE withRunInIO' #-}
 
-withRunInIO'' :: forall key f a. SendSigBy key UnliftIO f => (f ~> IO -> IO a) -> f a
+withRunInIO'' :: forall key f a. (SendHOEBy key UnliftIO f) => (f ~> IO -> IO a) -> f a
 withRunInIO'' = withRunInBase'' @key
 {-# INLINE withRunInIO'' #-}

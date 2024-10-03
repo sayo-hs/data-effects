@@ -20,14 +20,14 @@ makeEffect'
     []
     [''Shift']
 
-callCC :: forall r m a. (SendSigBy ShiftKey (Shift' r) m, Monad m) => ((a -> m r) -> m a) -> m a
+callCC :: forall r m a. (SendHOEBy ShiftKey (Shift' r) m, Monad m) => ((a -> m r) -> m a) -> m a
 callCC f = shift \k -> f (k >=> exit) >>= k
 
-exit :: (SendSigBy ShiftKey (Shift' r) f, Applicative f) => r -> f a
+exit :: (SendHOEBy ShiftKey (Shift' r) f, Applicative f) => r -> f a
 exit r = shift \_ -> pure r
 {-# INLINE exit #-}
 
-getCC :: (SendSigBy ShiftKey (Shift' r) m, Monad m) => m (m r)
+getCC :: (SendHOEBy ShiftKey (Shift' r) m, Monad m) => m (m r)
 getCC = callCC \exit' -> let a = exit' a in pure a
 
 data Shift_ m a where

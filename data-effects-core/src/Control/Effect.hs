@@ -11,32 +11,32 @@ Portability :  portable
 -}
 module Control.Effect where
 
-import Data.Effect (InsClass, LiftIns (unliftIns), SigClass)
+import Data.Effect (EffectF, EffectH, LiftFOE (unliftFOE))
 import Data.Kind (Type)
 
--- | A type class that represents the ability to send an /instruction/ @ins@ to carrier @f@.
-class SendIns (ins :: InsClass) f where
+-- | A type class that represents the ability to send an first-order effect @ins@ to carrier @f@.
+class SendFOE (ins :: EffectF) f where
     -- | Send an /instruction/ @ins@ to carrier @f@.
-    sendIns :: ins a -> f a
+    sendFOE :: ins a -> f a
 
--- | The operator version of `SendIns`.
-type (<:) = SendIns
+-- | The operator version of `SendFOE`.
+type (<:) = SendFOE
 
 infix 2 <:
 
--- | A type class that represents the ability to send a /signature/ @sig@ to carrier @f@.
-class SendSig (sig :: SigClass) f where
-    -- | Send a /signature/ @sig@ to carrier @f@.
-    sendSig :: sig f a -> f a
+-- | A type class that represents the ability to send a higher-order effect @sig@ to carrier @f@.
+class SendHOE (sig :: EffectH) f where
+    -- | Send a higher-order effect @sig@ to carrier @f@.
+    sendHOE :: sig f a -> f a
 
--- | The operator version of `SendSig`.
-type (<<:) = SendSig
+-- | The operator version of `SendHOE`.
+type (<<:) = SendHOE
 
 infix 2 <<:
 
-instance SendIns ins f => SendSig (LiftIns ins) f where
-    sendSig = sendIns . unliftIns
-    {-# INLINE sendSig #-}
+instance (SendFOE ins f) => SendHOE (LiftFOE ins) f where
+    sendHOE = sendFOE . unliftFOE
+    {-# INLINE sendHOE #-}
 
 -- | A natural transformation.
 type f ~> g = forall (x :: Type). f x -> g x

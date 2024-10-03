@@ -14,34 +14,34 @@ Portability :  portable
 module Data.Effect.Tag where
 
 import Data.Comp.Multi.HFunctor (HFunctor)
-import Data.Effect (InsClass, IsHFunctor, SigClass)
+import Data.Effect (EffectF, EffectH, IsHFunctor)
 
--- | Tagged /instruction class/.
-newtype Tag (ins :: InsClass) tag a = Tag {unTag :: ins a}
+-- | Tagged first-order effect.
+newtype Tag (ins :: EffectF) tag a = Tag {unTag :: ins a}
     deriving stock (Functor, Foldable, Traversable)
 
--- | Tagged /instruction class/.
+-- | Tagged first-order effect.
 type (#) = Tag
 
 infixl 8 #
 
--- | Tagged /instruction class/.
+-- | Tagged first-order effect.
 pattern T :: forall tag ins a. ins a -> Tag ins tag a
 pattern T e = Tag e
 
 {-# COMPLETE T #-}
 
--- | Tagged /signature class/.
-newtype TagH (sig :: SigClass) tag f a = TagH {unTagH :: sig f a}
+-- | Tagged higher-order effect.
+newtype TagH (sig :: EffectH) tag f a = TagH {unTagH :: sig f a}
     deriving stock (Functor, Foldable, Traversable)
     deriving newtype (HFunctor)
 
--- | Tagged /signature class/.
+-- | Tagged higher-order effect.
 type (##) = TagH
 
 infixl 8 ##
 
--- | Tagged /signature class/.
+-- | Tagged higher-order effect.
 pattern TH :: forall tag sig f a. sig f a -> TagH sig tag f a
 pattern TH e = TagH e
 

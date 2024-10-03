@@ -15,8 +15,8 @@ Portability :  portable
 module Control.Effect.Tag where
 
 import Control.Applicative (Alternative)
-import Control.Effect (SendIns (sendIns), SendSig (sendSig))
-import Control.Effect.Key (SendInsBy, SendSigBy, sendInsBy, sendSigBy)
+import Control.Effect (SendFOE (sendFOE), SendHOE (sendHOE))
+import Control.Effect.Key (SendFOEBy, SendHOEBy, sendFOEBy, sendHOEBy)
 import Control.Monad (MonadPlus)
 import Control.Monad.Except (MonadError)
 import Control.Monad.Fix (MonadFix)
@@ -53,18 +53,18 @@ tag :: forall tag f a. ViaTag tag f a -> f a
 tag = runViaTag
 {-# INLINE tag #-}
 
-instance SendIns (ins # tag) f => SendIns ins (ViaTag tag f) where
-    sendIns = ViaTag . sendIns . T @tag
-    {-# INLINE sendIns #-}
+instance (SendFOE (ins # tag) f) => SendFOE ins (ViaTag tag f) where
+    sendFOE = ViaTag . sendFOE . T @tag
+    {-# INLINE sendFOE #-}
 
-instance (SendSig (sig ## tag) f, HFunctor sig) => SendSig sig (ViaTag tag f) where
-    sendSig = ViaTag . sendSig . TH @tag . hfmap coerce
-    {-# INLINE sendSig #-}
+instance (SendHOE (sig ## tag) f, HFunctor sig) => SendHOE sig (ViaTag tag f) where
+    sendHOE = ViaTag . sendHOE . TH @tag . hfmap coerce
+    {-# INLINE sendHOE #-}
 
-instance SendInsBy key (ins # tag) f => SendInsBy key ins (ViaTag tag f) where
-    sendInsBy = ViaTag . sendInsBy @key . T @tag
-    {-# INLINE sendInsBy #-}
+instance (SendFOEBy key (ins # tag) f) => SendFOEBy key ins (ViaTag tag f) where
+    sendFOEBy = ViaTag . sendFOEBy @key . T @tag
+    {-# INLINE sendFOEBy #-}
 
-instance (SendSigBy key (sig ## tag) f, HFunctor sig) => SendSigBy key sig (ViaTag tag f) where
-    sendSigBy = ViaTag . sendSigBy @key . TH @tag . hfmap coerce
-    {-# INLINE sendSigBy #-}
+instance (SendHOEBy key (sig ## tag) f, HFunctor sig) => SendHOEBy key sig (ViaTag tag f) where
+    sendHOEBy = ViaTag . sendHOEBy @key . TH @tag . hfmap coerce
+    {-# INLINE sendHOEBy #-}

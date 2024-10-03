@@ -25,21 +25,21 @@ data Yield a b (c :: Type) where
 
 makeEffectF [''Yield]
 
-yield_ :: Yield a () <: f => a -> f ()
+yield_ :: (Yield a () <: f) => a -> f ()
 yield_ = yield
 {-# INLINE yield_ #-}
 
 data Status f a b r
     = Done r
-    | Coroutine a (b -> f (Status f a b r))
+    | Continue a (b -> f (Status f a b r))
     deriving (Functor)
 
-continueStatus :: Monad m => (x -> m (Status m a b r)) -> Status m a b x -> m (Status m a b r)
+continueStatus :: (Monad m) => (x -> m (Status m a b r)) -> Status m a b x -> m (Status m a b r)
 continueStatus kk = \case
     Done x -> kk x
-    Coroutine a k -> pure . Coroutine a $ k >=> continueStatus kk
+    Continue a k -> pure . Continue a $ k >=> continueStatus kk
 
-loopStatus :: Monad m => (a -> m b) -> Status m a b r -> m r
+loopStatus :: (Monad m) => (a -> m b) -> Status m a b r -> m r
 loopStatus f = \case
     Done r -> pure r
-    Coroutine a k -> f a >>= k >>= loopStatus f
+    Continue a k -> f a >>= k >>= loopStatus f

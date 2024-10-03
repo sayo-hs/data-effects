@@ -18,10 +18,10 @@ in the @effectful@ package.
 module Data.Effect.Provider where
 
 data Provider' c i ctx e (f :: Type -> Type) (a :: Type) where
-    Provide ::
-        i ->
-        (forall g. (c g, e g) => (forall x. f x -> g x) -> g a) ->
-        Provider' c i ctx e f (ctx a)
+    Provide
+        :: i
+        -> (forall g. (c g, e g) => (forall x. f x -> g x) -> g a)
+        -> Provider' c i ctx e f (ctx a)
 
 makeKeyedEffect [] [''Provider']
 
@@ -31,20 +31,20 @@ type ApplicativeProvider' = Provider' Applicative
 type MonadProvider i ctx e = Provider Monad i ctx e
 type ApplicativeProvider i ctx e = Provider Applicative i ctx e
 
-mprovide ::
-    forall e i ctx f a.
-    SendSigBy ProviderKey (MonadProvider' i ctx e) f =>
-    i ->
-    (forall g. (Monad g, e g) => f ~> g -> g a) ->
-    f (ctx a)
+mprovide
+    :: forall e i ctx f a
+     . (SendHOEBy ProviderKey (MonadProvider' i ctx e) f)
+    => i
+    -> (forall g. (Monad g, e g) => f ~> g -> g a)
+    -> f (ctx a)
 mprovide = provide
 {-# INLINE mprovide #-}
 
-aprovide ::
-    forall e i ctx f a.
-    SendSigBy ProviderKey (ApplicativeProvider' i ctx e) f =>
-    i ->
-    (forall h. (Applicative h, e h) => f ~> h -> h a) ->
-    f (ctx a)
+aprovide
+    :: forall e i ctx f a
+     . (SendHOEBy ProviderKey (ApplicativeProvider' i ctx e) f)
+    => i
+    -> (forall h. (Applicative h, e h) => f ~> h -> h a)
+    -> f (ctx a)
 aprovide = provide
 {-# INLINE aprovide #-}

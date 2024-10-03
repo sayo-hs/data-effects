@@ -7,7 +7,7 @@
 
 module Data.Effect.Key.TH where
 
-import Control.Effect.Key (SendInsBy, SendSigBy)
+import Control.Effect.Key (SendFOEBy, SendHOEBy)
 import Control.Lens ((%~), (<&>), _Just, _head)
 import Control.Monad (forM_)
 import Control.Monad.Writer (execWriterT, tell)
@@ -102,8 +102,8 @@ genEffectKey order _ _ EffClsInfo{..} EffectClassConf{..} = execWriterT do
         let EffectConf{..} = _confByEffect effName
         forM_ _keyedSenderGenConf \conf@SenderFunctionConf{..} -> do
             let sendCxt effDataType carrier = case order of
-                    FirstOrder -> ConT ''SendInsBy `AppT` key `AppT` effDataType `AppT` carrier
-                    HigherOrder -> ConT ''SendSigBy `AppT` key `AppT` effDataType `AppT` carrier
+                    FirstOrder -> ConT ''SendFOEBy `AppT` key `AppT` effDataType `AppT` carrier
+                    HigherOrder -> ConT ''SendHOEBy `AppT` key `AppT` effDataType `AppT` carrier
 
             genSenderArmor sendCxt id conf{_senderFnName = nameBase effName & _head %~ toLower} con \_f ->
                 pure $ Clause [] (NormalB $ VarE (mkName _senderFnName) `AppTypeE` key) []

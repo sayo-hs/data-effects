@@ -1,6 +1,6 @@
 cabal-version:      2.4
 name:               data-effects-th
-version:            0.1.2.1
+version:            0.2.0.0
 
 -- A short (one-line) description of the package.
 synopsis: Template Haskell utilities for the data-effects library.
@@ -41,7 +41,7 @@ tested-with:
 source-repository head
     type: git
     location: https://github.com/sayo-hs/data-effects
-    tag: v0.1.0
+    tag: v0.2.0
     subdir: data-effects-th
 
 library
@@ -59,7 +59,7 @@ library
     -- other-extensions:
     build-depends:
         base                    >= 4.16.4 && < 4.21,
-        data-effects-core       ^>= 0.1,
+        data-effects-core       ^>= 0.2,
         template-haskell        >= 2.18 && < 2.23,
         th-abstraction          >= 0.4 && < 0.8,
         lens                    >= 5.2.3 && < 5.4,

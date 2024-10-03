@@ -15,28 +15,28 @@ module Data.Effect where
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Kind (Type)
 
--- | A kind of /signature class/ (a datatype of higher-order effect).
-type SigClass = (Type -> Type) -> Type -> Type
+-- | The kind of first-order effects.
+type EffectF = Type -> Type
 
--- | A kind of /instruction class/ (a datatype of first-order effect).
-type InsClass = Type -> Type
+-- | The kind of higher-order effects.
+type EffectH = (Type -> Type) -> Type -> Type
 
-{- | Lift an /instruction class/ to a /signature class/.
+{- | Lift first-order effects to higher-order effects.
 
      Come from [heft-lang\/POPL2023\/haskell\/src\/Elab.hs]
     (https://github.com/heft-lang/POPL2023/blob/74afe1d5ce0b491cffe40cc5c73a2a5ee6a94d9c/haskell/src/Elab.hs#L9-L10).
 -}
-newtype LiftIns (ins :: InsClass) (f :: Type -> Type) a = LiftIns {unliftIns :: ins a}
+newtype LiftFOE (ins :: EffectF) (f :: Type -> Type) a = LiftFOE {unliftFOE :: ins a}
     deriving stock (Functor, Foldable, Traversable)
 
-instance HFunctor (LiftIns ins) where
-    hfmap _ (LiftIns e) = LiftIns e
+instance HFunctor (LiftFOE ins) where
+    hfmap _ (LiftFOE e) = LiftFOE e
     {-# INLINE hfmap #-}
 
--- | An /instruction class/ with no effects.
-data Nop :: InsClass
+-- | A first-order effect with no operations.
+data Nop :: EffectF
 
--- | A /signature class/ with no effects.
-type LNop = LiftIns Nop
+-- | A higher-order effect with no operations.
+type LNop = LiftFOE Nop
 
-type family IsHFunctor (e :: SigClass) :: Bool
+type family IsHFunctor (e :: EffectH) :: Bool

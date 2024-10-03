@@ -49,13 +49,13 @@ import Language.Haskell.TH.Syntax (
  )
 
 import Control.Arrow ((>>>))
-import Control.Effect (SendIns, SendSig, sendIns, sendSig)
-import Control.Effect.Key (SendInsBy, SendSigBy, sendInsBy, sendSigBy)
+import Control.Effect (SendFOE, SendHOE, sendFOE, sendHOE)
+import Control.Effect.Key (SendFOEBy, SendHOEBy, sendFOEBy, sendHOEBy)
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Data.Bool (bool)
 import Data.Char (toLower)
 import Data.Default (Default, def)
-import Data.Effect (IsHFunctor, LiftIns (LiftIns))
+import Data.Effect (IsHFunctor, LiftFOE (LiftFOE))
 import Data.Effect.Tag (Tag (Tag), TagH (TagH))
 import Data.Either.Extra (mapLeft, maybeToEither)
 import Data.Either.Validation (Validation, eitherToValidation, validationToEither)
@@ -134,15 +134,15 @@ alterEffectConf f = alterEffectClassConf \conf ->
 data EffectClassConf = EffectClassConf
     { _confByEffect :: Name -> EffectConf
     , _doesDeriveHFunctor :: Bool
-    , _doesGenerateLiftInsTypeSynonym :: Bool
-    , _doesGenerateLiftInsPatternSynonyms :: Bool
+    , _doesGenerateLiftFOETypeSynonym :: Bool
+    , _doesGenerateLiftFOEPatternSynonyms :: Bool
     }
 
 data EffectConf = EffectConf
     { _normalSenderGenConf :: Maybe SenderFunctionConf
     , _taggedSenderGenConf :: Maybe SenderFunctionConf
     , _keyedSenderGenConf :: Maybe SenderFunctionConf
-    , _warnFirstOrderInSigCls :: Bool
+    , _warnFirstOrderInHOE :: Bool
     }
 
 data SenderFunctionConf = SenderFunctionConf
@@ -162,7 +162,7 @@ senderFnConfs f EffectConf{..} = do
             { _normalSenderGenConf = normal
             , _taggedSenderGenConf = tagged
             , _keyedSenderGenConf = keyed
-            , _warnFirstOrderInSigCls
+            , _warnFirstOrderInHOE
             }
 
 makeLenses ''EffectClassConf
@@ -177,22 +177,22 @@ noDeriveHFunctor :: MakeEffectConf -> MakeEffectConf
 noDeriveHFunctor = alterEffectClassConf $ doesDeriveHFunctor .~ False
 {-# INLINE noDeriveHFunctor #-}
 
-generateLiftInsTypeSynonym :: MakeEffectConf -> MakeEffectConf
-generateLiftInsTypeSynonym = alterEffectClassConf $ doesGenerateLiftInsTypeSynonym .~ True
-{-# INLINE generateLiftInsTypeSynonym #-}
+generateLiftFOETypeSynonym :: MakeEffectConf -> MakeEffectConf
+generateLiftFOETypeSynonym = alterEffectClassConf $ doesGenerateLiftFOETypeSynonym .~ True
+{-# INLINE generateLiftFOETypeSynonym #-}
 
-noGenerateLiftInsTypeSynonym :: MakeEffectConf -> MakeEffectConf
-noGenerateLiftInsTypeSynonym = alterEffectClassConf $ doesGenerateLiftInsTypeSynonym .~ False
-{-# INLINE noGenerateLiftInsTypeSynonym #-}
+noGenerateLiftFOETypeSynonym :: MakeEffectConf -> MakeEffectConf
+noGenerateLiftFOETypeSynonym = alterEffectClassConf $ doesGenerateLiftFOETypeSynonym .~ False
+{-# INLINE noGenerateLiftFOETypeSynonym #-}
 
-generateLiftInsPatternSynonyms :: MakeEffectConf -> MakeEffectConf
-generateLiftInsPatternSynonyms = alterEffectClassConf $ doesGenerateLiftInsPatternSynonyms .~ True
-{-# INLINE generateLiftInsPatternSynonyms #-}
+generateLiftFOEPatternSynonyms :: MakeEffectConf -> MakeEffectConf
+generateLiftFOEPatternSynonyms = alterEffectClassConf $ doesGenerateLiftFOEPatternSynonyms .~ True
+{-# INLINE generateLiftFOEPatternSynonyms #-}
 
-noGenerateLiftInsPatternSynonyms :: MakeEffectConf -> MakeEffectConf
-noGenerateLiftInsPatternSynonyms =
-    alterEffectClassConf $ doesGenerateLiftInsPatternSynonyms .~ False
-{-# INLINE noGenerateLiftInsPatternSynonyms #-}
+noGenerateLiftFOEPatternSynonyms :: MakeEffectConf -> MakeEffectConf
+noGenerateLiftFOEPatternSynonyms =
+    alterEffectClassConf $ doesGenerateLiftFOEPatternSynonyms .~ False
+{-# INLINE noGenerateLiftFOEPatternSynonyms #-}
 
 noGenerateNormalSenderFunction :: MakeEffectConf -> MakeEffectConf
 noGenerateNormalSenderFunction = alterEffectConf $ normalSenderGenConf .~ Nothing
@@ -206,9 +206,9 @@ noGenerateKeyedSenderFunction :: MakeEffectConf -> MakeEffectConf
 noGenerateKeyedSenderFunction = alterEffectConf $ keyedSenderGenConf .~ Nothing
 {-# INLINE noGenerateKeyedSenderFunction #-}
 
-suppressFirstOrderInSignatureClassWarning :: MakeEffectConf -> MakeEffectConf
-suppressFirstOrderInSignatureClassWarning = alterEffectConf $ warnFirstOrderInSigCls .~ False
-{-# INLINE suppressFirstOrderInSignatureClassWarning #-}
+suppressFirstOrderInHigherOrderEffectWarning :: MakeEffectConf -> MakeEffectConf
+suppressFirstOrderInHigherOrderEffectWarning = alterEffectConf $ warnFirstOrderInHOE .~ False
+{-# INLINE suppressFirstOrderInHigherOrderEffectWarning #-}
 
 noGenerateSenderFunctionSignature :: MakeEffectConf -> MakeEffectConf
 noGenerateSenderFunctionSignature =
@@ -240,11 +240,11 @@ instance Default EffectClassConf where
                             Just $ normalSenderFnConf & senderFnName %~ (++ "'")
                         , _keyedSenderGenConf =
                             Just $ normalSenderFnConf & senderFnName %~ (++ "''")
-                        , _warnFirstOrderInSigCls = True
+                        , _warnFirstOrderInHOE = True
                         }
             , _doesDeriveHFunctor = True
-            , _doesGenerateLiftInsTypeSynonym = True
-            , _doesGenerateLiftInsPatternSynonyms = True
+            , _doesGenerateLiftFOETypeSynonym = True
+            , _doesGenerateLiftFOEPatternSynonyms = True
             }
 
 genSenders :: EffectClassConf -> EffClsInfo -> Q [Dec]
@@ -258,18 +258,18 @@ genSenders EffectClassConf{..} ec@EffClsInfo{..} = do
         forM_ _taggedSenderGenConf \conf -> genTaggedSender order conf con
         forM_ _keyedSenderGenConf \conf -> genKeyedSender order conf con
 
-        -- Check for First Order in Signature Class warning
-        when (_warnFirstOrderInSigCls && order == HigherOrder) do
+        -- Check for First Order in Higher Order effect warning
+        when (_warnFirstOrderInHOE && order == HigherOrder) do
             let isHigherOrderEffect = any (tyVarName (fromJust effCarrier) `occurs`) effParamTypes
 
             unless isHigherOrderEffect do
                 lift $
                     reportWarning $
-                        "The first-order effect ‘"
+                        "The first-order operation ‘"
                             <> nameBase effName
-                            <> "’ has been found within the signature class data type ‘"
+                            <> "’ has been found within the higher-order effect data type ‘"
                             <> nameBase ecName
-                            <> "’.\nConsider separating the first-order effect into an instruction class data type."
+                            <> "’.\nConsider separating the first-order operation into an first-order effect data type."
 
 genNormalSender
     :: EffectOrder
@@ -280,12 +280,12 @@ genNormalSender order = genSender order send sendCxt id
   where
     (send, sendCxt) = case order of
         FirstOrder ->
-            ( (VarE 'sendIns `AppE`)
-            , \effDataType carrier -> ConT ''SendIns `AppT` effDataType `AppT` carrier
+            ( (VarE 'sendFOE `AppE`)
+            , \effDataType carrier -> ConT ''SendFOE `AppT` effDataType `AppT` carrier
             )
         HigherOrder ->
-            ( (VarE 'sendSig `AppE`)
-            , \effDataType carrier -> ConT ''SendSig `AppT` effDataType `AppT` carrier
+            ( (VarE 'sendHOE `AppE`)
+            , \effDataType carrier -> ConT ''SendHOE `AppT` effDataType `AppT` carrier
             )
 
 genTaggedSender
@@ -299,14 +299,14 @@ genTaggedSender order conf eff = do
 
         (send, sendCxt) = case order of
             FirstOrder ->
-                ( (VarE 'sendIns `AppE`) . (ConE 'Tag `AppTypeE` WildCardT `AppTypeE` tag `AppE`)
+                ( (VarE 'sendFOE `AppE`) . (ConE 'Tag `AppTypeE` WildCardT `AppTypeE` tag `AppE`)
                 , \effDataType carrier ->
-                    ConT ''SendIns `AppT` (ConT ''Tag `AppT` effDataType `AppT` tag) `AppT` carrier
+                    ConT ''SendFOE `AppT` (ConT ''Tag `AppT` effDataType `AppT` tag) `AppT` carrier
                 )
             HigherOrder ->
-                ( (VarE 'sendSig `AppE`) . (ConE 'TagH `AppTypeE` WildCardT `AppTypeE` tag `AppE`)
+                ( (VarE 'sendHOE `AppE`) . (ConE 'TagH `AppTypeE` WildCardT `AppTypeE` tag `AppE`)
                 , \effDataType carrier ->
-                    ConT ''SendSig `AppT` (ConT ''TagH `AppT` effDataType `AppT` tag) `AppT` carrier
+                    ConT ''SendHOE `AppT` (ConT ''TagH `AppT` effDataType `AppT` tag) `AppT` carrier
                 )
 
     genSender order send sendCxt (PlainTV nTag SpecifiedSpec :) conf eff
@@ -322,14 +322,14 @@ genKeyedSender order conf eff = do
 
         (send, sendCxt) = case order of
             FirstOrder ->
-                ( (VarE 'sendInsBy `AppTypeE` key `AppE`)
+                ( (VarE 'sendFOEBy `AppTypeE` key `AppE`)
                 , \effDataType carrier ->
-                    ConT ''SendInsBy `AppT` key `AppT` effDataType `AppT` carrier
+                    ConT ''SendFOEBy `AppT` key `AppT` effDataType `AppT` carrier
                 )
             HigherOrder ->
-                ( (VarE 'sendSigBy `AppTypeE` key `AppE`)
+                ( (VarE 'sendHOEBy `AppTypeE` key `AppE`)
                 , \effDataType carrier ->
-                    ConT ''SendSigBy `AppT` key `AppT` effDataType `AppT` carrier
+                    ConT ''SendHOEBy `AppT` key `AppT` effDataType `AppT` carrier
                 )
 
     genSender order send sendCxt (PlainTV nKey SpecifiedSpec :) conf eff
@@ -489,7 +489,7 @@ analyzeEffCls order DataInfo{..} = do
                             ins `AppT` x -> Right (ins, Nothing, x)
                             t ->
                                 Left
-                                    [ "Unexpected form of GADT return type for the instruction ‘"
+                                    [ "Unexpected form of GADT return type for the first-order operation ‘"
                                         <> T.pack (nameBase conName)
                                         <> "’: "
                                         <> T.pack (pprint t)
@@ -501,7 +501,7 @@ analyzeEffCls order DataInfo{..} = do
                             Right (sig, Just (PlainTV f ()), x)
                         t ->
                             Left
-                                [ "Unexpected form of GADT return type for the signature ‘"
+                                [ "Unexpected form of GADT return type for the higher-order operation ‘"
                                     <> T.pack (nameBase conName)
                                     <> "’: "
                                     <> T.pack (pprint t)
@@ -520,15 +520,15 @@ analyzeEffCls order DataInfo{..} = do
             , ecEffs = effCons
             }
 
--- ** Generating Synonyms about LiftIns
+-- ** Generating Synonyms about LiftFOE
 
 {- |
-Generate the pattern synonyms for instruction constructors:
+Generate the pattern synonyms for operation constructors:
 
-    @pattern LBaz ... = LiftIns (Baz ...)@
+    @pattern LBaz ... = LiftFOE (Baz ...)@
 -}
-genLiftInsPatternSynonyms :: EffClsInfo -> Q [Dec]
-genLiftInsPatternSynonyms EffClsInfo{..} = do
+genLiftFOEPatternSynonyms :: EffClsInfo -> Q [Dec]
+genLiftFOEPatternSynonyms EffClsInfo{..} = do
     patSyns <-
         forM ecEffs \EffConInfo{..} -> do
             let newConName = mkName $ 'L' : nameBase effName
@@ -551,7 +551,7 @@ genLiftInsPatternSynonyms EffClsInfo{..} = do
                             => $( pure $
                                     arrowChain
                                         effParamTypes
-                                        ((ConT ''LiftIns `AppT` effDataType) `AppT` f `AppT` a)
+                                        ((ConT ''LiftFOE `AppT` effDataType) `AppT` f `AppT` a)
                                 )
                             |]
                     , pure $
@@ -559,22 +559,22 @@ genLiftInsPatternSynonyms EffClsInfo{..} = do
                             newConName
                             (PrefixPatSyn args)
                             ImplBidir
-                            (ConP 'LiftIns [] [ConP effName [] (VarP <$> args)])
+                            (ConP 'LiftFOE [] [ConP effName [] (VarP <$> args)])
                     ]
 
     pure $ concatMap snd patSyns ++ [PragmaD $ CompleteP (fst <$> patSyns) Nothing]
 
 {- |
-Generate the type synonym for an instruction class datatype:
+Generate the type synonym for an first-order effect datatype:
 
-    @type (LFoobar ...) = LiftIns (Foobar ...)@
+    @type (LFoobar ...) = LiftFOE (Foobar ...)@
 -}
-genLiftInsTypeSynonym :: EffClsInfo -> Dec
-genLiftInsTypeSynonym EffClsInfo{..} = do
+genLiftFOETypeSynonym :: EffClsInfo -> Dec
+genLiftFOETypeSynonym EffClsInfo{..} = do
     TySynD
         (mkName $ 'L' : nameBase ecName)
         (pvs <&> (`PlainTV` BndrReq))
-        (ConT ''LiftIns `AppT` foldl AppT (ConT ecName) (map VarT pvs))
+        (ConT ''LiftFOE `AppT` foldl AppT (ConT ecName) (map VarT pvs))
   where
     pvs = tyVarName <$> ecParamVars
 

@@ -25,13 +25,13 @@ module Data.Effect.TH (
     EffectClassConf (..),
     confByEffect,
     doesDeriveHFunctor,
-    doesGenerateLiftInsPatternSynonyms,
-    doesGenerateLiftInsTypeSynonym,
+    doesGenerateLiftFOEPatternSynonyms,
+    doesGenerateLiftFOETypeSynonym,
     EffectConf (..),
     keyedSenderGenConf,
     normalSenderGenConf,
     taggedSenderGenConf,
-    warnFirstOrderInSigCls,
+    warnFirstOrderInHOE,
     SenderFunctionConf (..),
     senderFnName,
     doesGenerateSenderFnSignature,
@@ -40,14 +40,14 @@ module Data.Effect.TH (
     senderFnConfs,
     deriveHFunctor,
     noDeriveHFunctor,
-    generateLiftInsTypeSynonym,
-    noGenerateLiftInsTypeSynonym,
-    generateLiftInsPatternSynonyms,
-    noGenerateLiftInsPatternSynonyms,
+    generateLiftFOETypeSynonym,
+    noGenerateLiftFOETypeSynonym,
+    generateLiftFOEPatternSynonyms,
+    noGenerateLiftFOEPatternSynonyms,
     noGenerateNormalSenderFunction,
     noGenerateTaggedSenderFunction,
     noGenerateKeyedSenderFunction,
-    suppressFirstOrderInSignatureClassWarning,
+    suppressFirstOrderInHigherOrderEffectWarning,
     noGenerateSenderFunctionSignature,
 ) where
 
@@ -62,15 +62,15 @@ import Data.Effect.TH.Internal (
         EffectClassConf,
         _confByEffect,
         _doesDeriveHFunctor,
-        _doesGenerateLiftInsPatternSynonyms,
-        _doesGenerateLiftInsTypeSynonym
+        _doesGenerateLiftFOEPatternSynonyms,
+        _doesGenerateLiftFOETypeSynonym
     ),
     EffectConf (
         EffectConf,
         _keyedSenderGenConf,
         _normalSenderGenConf,
         _taggedSenderGenConf,
-        _warnFirstOrderInSigCls
+        _warnFirstOrderInHOE
     ),
     EffectOrder (FirstOrder, HigherOrder),
     MakeEffectConf (MakeEffectConf, unMakeEffectConf),
@@ -84,20 +84,20 @@ import Data.Effect.TH.Internal (
     alterEffectConf,
     confByEffect,
     doesDeriveHFunctor,
-    doesGenerateLiftInsPatternSynonyms,
-    doesGenerateLiftInsTypeSynonym,
+    doesGenerateLiftFOEPatternSynonyms,
+    doesGenerateLiftFOETypeSynonym,
     doesGenerateSenderFnSignature,
     genIsHFunctorTypeFamily,
-    genLiftInsPatternSynonyms,
-    genLiftInsTypeSynonym,
+    genLiftFOEPatternSynonyms,
+    genLiftFOETypeSynonym,
     genSenders,
-    generateLiftInsPatternSynonyms,
-    generateLiftInsTypeSynonym,
+    generateLiftFOEPatternSynonyms,
+    generateLiftFOETypeSynonym,
     keyedSenderGenConf,
     noDeriveHFunctor,
     noGenerateKeyedSenderFunction,
-    noGenerateLiftInsPatternSynonyms,
-    noGenerateLiftInsTypeSynonym,
+    noGenerateLiftFOEPatternSynonyms,
+    noGenerateLiftFOETypeSynonym,
     noGenerateNormalSenderFunction,
     noGenerateSenderFunctionSignature,
     noGenerateTaggedSenderFunction,
@@ -108,10 +108,10 @@ import Data.Effect.TH.Internal (
     senderFnConfs,
     senderFnDoc,
     senderFnName,
-    suppressFirstOrderInSignatureClassWarning,
+    suppressFirstOrderInHigherOrderEffectWarning,
     taggedSenderGenConf,
     unMakeEffectConf,
-    warnFirstOrderInSigCls,
+    warnFirstOrderInHOE,
  )
 import Data.Function ((&))
 import Data.List (singleton)
@@ -130,11 +130,11 @@ makeEffect' (MakeEffectConf conf) extTemplate inss sigs = execWriterT do
 
         genSenders ecConf effClsInfo & lift >>= tell
 
-        when _doesGenerateLiftInsTypeSynonym do
-            genLiftInsTypeSynonym effClsInfo & singleton & tell
+        when _doesGenerateLiftFOETypeSynonym do
+            genLiftFOETypeSynonym effClsInfo & singleton & tell
 
-        when _doesGenerateLiftInsPatternSynonyms do
-            genLiftInsPatternSynonyms effClsInfo & lift >>= tell
+        when _doesGenerateLiftFOEPatternSynonyms do
+            genLiftFOEPatternSynonyms effClsInfo & lift >>= tell
 
         extTemplate FirstOrder info dataInfo effClsInfo ecConf & lift >>= tell
 

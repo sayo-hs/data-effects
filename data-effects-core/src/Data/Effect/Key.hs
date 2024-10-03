@@ -14,34 +14,34 @@ Portability :  portable
 module Data.Effect.Key where
 
 import Data.Comp.Multi.HFunctor (HFunctor)
-import Data.Effect (InsClass, IsHFunctor, SigClass)
+import Data.Effect (EffectF, EffectH, IsHFunctor)
 
--- | Keyed /instruction class/.
-newtype Key key (ins :: InsClass) a = Key {unKey :: ins a}
+-- | Keyed first-order effect.
+newtype Key key (ins :: EffectF) a = Key {unKey :: ins a}
     deriving stock (Functor, Foldable, Traversable)
 
--- | Keyed /instruction class/.
+-- | Keyed first-order effect.
 type (#>) = Key
 
 infixr 7 #>
 
--- | Keyed /instruction class/.
+-- | Keyed first-order effect.
 pattern K :: forall key ins a. ins a -> Key key ins a
 pattern K e = Key e
 
 {-# COMPLETE K #-}
 
--- | Keyed /signature class/.
-newtype KeyH key (sig :: SigClass) f a = KeyH {unKeyH :: sig f a}
+-- | Keyed higher-order effect.
+newtype KeyH key (sig :: EffectH) f a = KeyH {unKeyH :: sig f a}
     deriving stock (Functor, Foldable, Traversable)
     deriving newtype (HFunctor)
 
--- | Keyed /signature class/.
+-- | Keyed higher-order effect.
 type (##>) = KeyH
 
 infixr 7 ##>
 
--- | Keyed /signature class/.
+-- | Keyed higher-order effect.
 pattern KH :: forall key sig f a. sig f a -> KeyH key sig f a
 pattern KH e = KeyH e
 
