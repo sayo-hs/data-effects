@@ -53,7 +53,6 @@ library
         Data.Effect.Input
         Data.Effect.Output
         Data.Effect.Provider
-        Data.Effect.Provider.Implicit
         Data.Effect.Fix
         Data.Effect.Fail
         Data.Effect.Cont

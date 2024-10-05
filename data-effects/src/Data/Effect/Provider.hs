@@ -16,6 +16,32 @@ in the @effectful@ package.
 -}
 module Data.Effect.Provider where
 
+import Data.Functor.Identity (Identity, runIdentity)
+
 data Provider ctx i hdls (f :: Type -> Type) (a :: Type) where
     Provide :: i -> (hdls f -> f a) -> Provider ctx i hdls f (ctx a)
 makeEffectH_ [''Provider]
+
+type Provider_ = Provider Identity
+
+infixl 2 .!
+
+(.!)
+    :: forall i hdls f a
+     . (Provider_ i hdls <<: f, Functor f)
+    => i
+    -> (hdls f -> f a)
+    -> f a
+i .! f = runIdentity <$> provide i f
+{-# INLINE (.!) #-}
+
+infixl 2 ..!
+
+(..!)
+    :: forall ctx i hdls f a
+     . (Provider ctx i hdls <<: f)
+    => i
+    -> (hdls f -> f a)
+    -> f (ctx a)
+i ..! f = provide i f
+{-# INLINE (..!) #-}
