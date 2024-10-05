@@ -14,7 +14,7 @@ import Control.Monad.Writer (execWriterT, tell)
 import Data.Char (toLower)
 import Data.Default (def)
 import Data.Effect.Key (type (##>), type (#>))
-import Data.Effect.TH (makeEffect')
+import Data.Effect.TH (makeEffect', noDeriveHFunctor)
 import Data.Effect.TH.Internal (
     DataInfo,
     EffClsInfo (EffClsInfo),
@@ -62,6 +62,13 @@ makeKeyedEffect =
         (def & changeNormalSenderFnNameFormat)
         genEffectKey
 {-# INLINE makeKeyedEffect #-}
+
+makeKeyedEffect_ :: [Name] -> [Name] -> Q [Dec]
+makeKeyedEffect_ =
+    makeEffect'
+        (def & noDeriveHFunctor & changeNormalSenderFnNameFormat)
+        genEffectKey
+{-# INLINE makeKeyedEffect_ #-}
 
 changeNormalSenderFnNameFormat :: MakeEffectConf -> MakeEffectConf
 changeNormalSenderFnNameFormat =

@@ -5,46 +5,17 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 {- |
-Copyright   :  (c) 2023 Sayo Koyoneda
+Copyright   :  (c) 2023-2024 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
 Portability :  portable
 
-This module provides the `Provider` effect, comes
-from [@Effectful.Provider@](https://hackage.haskell.org/package/effectful-core-2.3.0.0/docs/Effectful-Provider.html)
+This module provides the `Provider` effect, like [@Effectful.Provider@](https://hackage.haskell.org/package/effectful-core-2.3.0.0/docs/Effectful-Provider.html)
 in the @effectful@ package.
 -}
 module Data.Effect.Provider where
 
-data Provider' c i ctx e (f :: Type -> Type) (a :: Type) where
-    Provide
-        :: i
-        -> (forall g. (c g, e g) => (forall x. f x -> g x) -> g a)
-        -> Provider' c i ctx e f (ctx a)
-
-makeKeyedEffect [] [''Provider']
-
-type MonadProvider' = Provider' Monad
-type ApplicativeProvider' = Provider' Applicative
-
-type MonadProvider i ctx e = Provider Monad i ctx e
-type ApplicativeProvider i ctx e = Provider Applicative i ctx e
-
-mprovide
-    :: forall e i ctx f a
-     . (SendHOEBy ProviderKey (MonadProvider' i ctx e) f)
-    => i
-    -> (forall g. (Monad g, e g) => f ~> g -> g a)
-    -> f (ctx a)
-mprovide = provide
-{-# INLINE mprovide #-}
-
-aprovide
-    :: forall e i ctx f a
-     . (SendHOEBy ProviderKey (ApplicativeProvider' i ctx e) f)
-    => i
-    -> (forall h. (Applicative h, e h) => f ~> h -> h a)
-    -> f (ctx a)
-aprovide = provide
-{-# INLINE aprovide #-}
+data Provider ctx i hdls (f :: Type -> Type) (a :: Type) where
+    Provide :: i -> (hdls f -> f a) -> Provider ctx i hdls f (ctx a)
+makeEffectH_ [''Provider]

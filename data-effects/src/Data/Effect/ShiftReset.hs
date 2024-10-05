@@ -8,7 +8,6 @@ module Data.Effect.ShiftReset where
 
 import Control.Monad (void, (>=>))
 import Data.Effect.Key.TH qualified as Keyed
-import Data.Effect.TH (makeEffectH_)
 import Data.Effect.TH.Internal (noDeriveHFunctor)
 
 data Shift' (r :: Type) m a where

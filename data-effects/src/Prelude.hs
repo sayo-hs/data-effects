@@ -18,8 +18,8 @@ module Prelude (
 import Control.Effect (type (<:), type (<<:), type (~>))
 import Control.Effect.Key (SendFOEBy, SendHOEBy)
 import Data.Default (Default (def))
-import Data.Effect.Key.TH (makeKeyedEffect)
-import Data.Effect.TH (makeEffect, makeEffect', makeEffectF, makeEffectH)
+import Data.Effect.Key.TH (makeKeyedEffect, makeKeyedEffect_)
+import Data.Effect.TH (makeEffect, makeEffect', makeEffectF, makeEffectH, makeEffectH_)
 import Data.Function ((&))
 import Data.Kind (Type)
 
