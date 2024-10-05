@@ -166,3 +166,11 @@ makeEffectF inss = makeEffect inss []
 makeEffectH :: [Name] -> Q [Dec]
 makeEffectH sigs = makeEffect [] sigs
 {-# INLINE makeEffectH #-}
+
+makeEffect_ :: [Name] -> [Name] -> Q [Dec]
+makeEffect_ = makeEffect' (def & noDeriveHFunctor) noExtTemplate
+{-# INLINE makeEffect_ #-}
+
+makeEffectH_ :: [Name] -> Q [Dec]
+makeEffectH_ sigs = makeEffect_ [] sigs
+{-# INLINE makeEffectH_ #-}

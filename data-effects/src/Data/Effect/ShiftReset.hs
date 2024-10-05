@@ -8,7 +8,7 @@ module Data.Effect.ShiftReset where
 
 import Control.Monad (void, (>=>))
 import Data.Effect.Key.TH qualified as Keyed
-import Data.Effect.TH (noExtTemplate)
+import Data.Effect.TH (makeEffectH_)
 import Data.Effect.TH.Internal (noDeriveHFunctor)
 
 data Shift' (r :: Type) m a where
@@ -33,7 +33,7 @@ getCC = callCC \exit' -> let a = exit' a in pure a
 data Shift_ m a where
     Shift_ :: (forall (r :: Type). (a -> m r) -> m r) -> Shift_ m a
 
-makeEffect' (def & noDeriveHFunctor) noExtTemplate [] [''Shift_]
+makeEffectH_ [''Shift_]
 
 getCC_ :: (Shift_ <<: m, Monad m) => m (m ())
 getCC_ = shift_ \k -> let k' = k $ void k' in k'
