@@ -10,47 +10,34 @@ import Control.Monad ((>=>))
 import Data.Functor (void)
 
 data Shift' (r :: Type) b m a where
-    Shift :: forall r b m a. ((a -> b r) -> m r) -> Shift' r b m a
+    Shift :: forall r b m a. ((a -> b r) -> (forall x. m x -> b x) -> b r) -> Shift' r b m a
 
 makeKeyedEffect [] [''Shift']
 
 callCC
     :: forall r b m a
-     . ( SendHOEBy ShiftKey (Shift' r b) m
-       , Monad m
-       , SendHOEBy ShiftKey (Shift' r b) b
-       , Monad b
-       )
-    => (b ~> m)
-    -> ((a -> b r) -> m a)
+     . (SendHOEBy ShiftKey (Shift' r b) m, Monad m, Monad b)
+    => ((a -> b r) -> m a)
     -> m a
-callCC lift f = shift \k -> f (k >=> exit) >>= lift . k
+callCC f = shift \k run -> run (f $ k >=> run . exit) >>= k
 
-exit :: (SendHOEBy ShiftKey (Shift' r b) m, Applicative m) => r -> m a
-exit r = shift \_ -> pure r
+exit :: (SendHOEBy ShiftKey (Shift' r b) m, Applicative b) => r -> m a
+exit r = shift \_ _ -> pure r
 {-# INLINE exit #-}
 
 getCC
     :: forall r b m
-     . ( SendHOEBy ShiftKey (Shift' r b) m
-       , SendHOEBy ShiftKey (Shift' r b) b
-       , Monad m
-       , Monad b
-       )
-    => (b ~> m)
-    -> m (m r)
-getCC lift = callCC @r @b @m lift \exit' ->
-    let a = exit' a'
-        a' = lift a
-     in pure a'
+     . (SendHOEBy ShiftKey (Shift' r b) m, Monad m, Monad b)
+    => m (b r)
+getCC = callCC \exit' -> let a = exit' a in pure a
 
 data Shift_' b m a where
-    Shift_' :: (forall (r :: Type). (a -> b r) -> m r) -> Shift_' b m a
+    Shift_' :: (forall (r :: Type). (a -> b r) -> (forall x. m x -> b x) -> b r) -> Shift_' b m a
 
 makeKeyedEffect [] [''Shift_']
 
-getCC_ :: (SendHOEBy Shift_Key (Shift_' b) m, Monad m, Functor b) => b ~> m -> m (b ())
-getCC_ lift = shift_' \k -> let k' = k $ void k' in lift k'
+getCC_ :: (SendHOEBy Shift_Key (Shift_' b) m, Functor b) => m (b ())
+getCC_ = shift_' \k _ -> let k' = k $ void k' in k'
 
 data Reset m (a :: Type) where
     Reset :: m a -> Reset m a

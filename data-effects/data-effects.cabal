@@ -61,7 +61,7 @@ library
         Data.Effect.Concurrent.Thread
         Data.Effect.Concurrent.Timer
         Data.Effect.Unlift
-        Data.Effect.Unlift.Provider
+        Data.Effect.Provider
         Data.Effect.ShiftReset
         Data.Effect.KVStore
 

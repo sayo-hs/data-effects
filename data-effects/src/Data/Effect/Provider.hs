@@ -14,7 +14,7 @@ Portability :  portable
 This module provides the `Provider` effect, like [@Effectful.Provider@](https://hackage.haskell.org/package/effectful-core-2.3.0.0/docs/Effectful-Provider.html)
 in the @effectful@ package.
 -}
-module Data.Effect.Unlift.Provider where
+module Data.Effect.Provider where
 
 import Data.Effect.Key (type (##>))
 import Data.Functor.Identity (Identity, runIdentity)
