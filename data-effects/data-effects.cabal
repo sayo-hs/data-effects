@@ -52,7 +52,6 @@ library
         Data.Effect.Coroutine
         Data.Effect.Input
         Data.Effect.Output
-        Data.Effect.Provider
         Data.Effect.Fix
         Data.Effect.Fail
         Data.Effect.Cont
@@ -62,6 +61,7 @@ library
         Data.Effect.Concurrent.Thread
         Data.Effect.Concurrent.Timer
         Data.Effect.Unlift
+        Data.Effect.Unlift.Provider
         Data.Effect.ShiftReset
         Data.Effect.KVStore
 
