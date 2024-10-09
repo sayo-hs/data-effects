@@ -6,36 +6,51 @@
 
 module Data.Effect.ShiftReset where
 
-import Control.Monad (void, (>=>))
-import Data.Effect.Key.TH qualified as Keyed
-import Data.Effect.TH.Internal (noDeriveHFunctor)
+import Control.Monad ((>=>))
+import Data.Functor (void)
 
-data Shift' (r :: Type) m a where
-    Shift :: forall r m a. ((a -> m r) -> m r) -> Shift' r m a
+data Shift' (r :: Type) b m a where
+    Shift :: forall r b m a. ((a -> b r) -> m r) -> Shift' r b m a
 
-makeEffect'
-    (def & noDeriveHFunctor & Keyed.changeNormalSenderFnNameFormat)
-    Keyed.genEffectKey
-    []
-    [''Shift']
+makeKeyedEffect [] [''Shift']
 
-callCC :: forall r m a. (SendHOEBy ShiftKey (Shift' r) m, Monad m) => ((a -> m r) -> m a) -> m a
-callCC f = shift \k -> f (k >=> exit) >>= k
+callCC
+    :: forall r b m a
+     . ( SendHOEBy ShiftKey (Shift' r b) m
+       , Monad m
+       , SendHOEBy ShiftKey (Shift' r b) b
+       , Monad b
+       )
+    => (b ~> m)
+    -> ((a -> b r) -> m a)
+    -> m a
+callCC lift f = shift \k -> f (k >=> exit) >>= lift . k
 
-exit :: (SendHOEBy ShiftKey (Shift' r) f, Applicative f) => r -> f a
+exit :: (SendHOEBy ShiftKey (Shift' r b) m, Applicative m) => r -> m a
 exit r = shift \_ -> pure r
 {-# INLINE exit #-}
 
-getCC :: (SendHOEBy ShiftKey (Shift' r) m, Monad m) => m (m r)
-getCC = callCC \exit' -> let a = exit' a in pure a
+getCC
+    :: forall r b m
+     . ( SendHOEBy ShiftKey (Shift' r b) m
+       , SendHOEBy ShiftKey (Shift' r b) b
+       , Monad m
+       , Monad b
+       )
+    => (b ~> m)
+    -> m (m r)
+getCC lift = callCC @r @b @m lift \exit' ->
+    let a = exit' a'
+        a' = lift a
+     in pure a'
 
-data Shift_ m a where
-    Shift_ :: (forall (r :: Type). (a -> m r) -> m r) -> Shift_ m a
+data Shift_' b m a where
+    Shift_' :: (forall (r :: Type). (a -> b r) -> m r) -> Shift_' b m a
 
-makeEffectH_ [''Shift_]
+makeKeyedEffect [] [''Shift_']
 
-getCC_ :: (Shift_ <<: m, Monad m) => m (m ())
-getCC_ = shift_ \k -> let k' = k $ void k' in k'
+getCC_ :: (SendHOEBy Shift_Key (Shift_' b) m, Monad m, Functor b) => b ~> m -> m (b ())
+getCC_ lift = shift_' \k -> let k' = k $ void k' in lift k'
 
 data Reset m (a :: Type) where
     Reset :: m a -> Reset m a
