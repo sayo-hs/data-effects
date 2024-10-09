@@ -87,7 +87,6 @@ import Data.Effect.TH.Internal (
     doesGenerateLiftFOEPatternSynonyms,
     doesGenerateLiftFOETypeSynonym,
     doesGenerateSenderFnSignature,
-    genIsHFunctorTypeFamily,
     genLiftFOEPatternSynonyms,
     genLiftFOETypeSynonym,
     genSenders,
@@ -146,8 +145,6 @@ makeEffect' (MakeEffectConf conf) extTemplate inss sigs = execWriterT do
 
         when _doesDeriveHFunctor do
             deriveHFunctor (const $ pure $ TupleT 0) dataInfo & lift >>= tell
-
-        genIsHFunctorTypeFamily effClsInfo _doesDeriveHFunctor & lift >>= tell
 
         extTemplate HigherOrder info dataInfo effClsInfo ecConf & lift >>= tell
 

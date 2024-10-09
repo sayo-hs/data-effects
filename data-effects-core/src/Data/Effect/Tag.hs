@@ -14,7 +14,7 @@ Portability :  portable
 module Data.Effect.Tag where
 
 import Data.Comp.Multi.HFunctor (HFunctor)
-import Data.Effect (EffectF, EffectH, IsHFunctor)
+import Data.Effect (EffectF, EffectH)
 
 -- | Tagged first-order effect.
 newtype Tag (ins :: EffectF) tag a = Tag {unTag :: ins a}
@@ -46,5 +46,3 @@ pattern TH :: forall tag sig f a. sig f a -> TagH sig tag f a
 pattern TH e = TagH e
 
 {-# COMPLETE TH #-}
-
-type instance IsHFunctor (TagH sig tag) = IsHFunctor sig

@@ -14,7 +14,7 @@ Portability :  portable
 module Data.Effect.Key where
 
 import Data.Comp.Multi.HFunctor (HFunctor)
-import Data.Effect (EffectF, EffectH, IsHFunctor)
+import Data.Effect (EffectF, EffectH)
 
 -- | Keyed first-order effect.
 newtype Key key (ins :: EffectF) a = Key {unKey :: ins a}
@@ -46,5 +46,3 @@ pattern KH :: forall key sig f a. sig f a -> KeyH key sig f a
 pattern KH e = KeyH e
 
 {-# COMPLETE KH #-}
-
-type instance IsHFunctor (KeyH key sig) = IsHFunctor sig

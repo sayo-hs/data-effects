@@ -38,5 +38,3 @@ data Nop :: EffectF
 
 -- | A higher-order effect with no operations.
 type LNop = LiftFOE Nop
-
-type family IsHFunctor (e :: EffectH) :: Bool

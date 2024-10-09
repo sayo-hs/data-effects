@@ -14,7 +14,6 @@ Portability :  portable
 module Data.Effect.HFunctor.HCont where
 
 import Control.Effect (type (~>))
-import Data.Effect (IsHFunctor)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Kind (Type)
 
@@ -25,5 +24,3 @@ newtype HCont ff b f (a :: Type) = HCont {unHCont :: (f ~> b) -> ff b a}
 instance HFunctor (HCont ff g) where
     hfmap phi (HCont f) = HCont \k -> f $ k . phi
     {-# INLINE hfmap #-}
-
-type instance IsHFunctor (HCont ff b) = 'True
