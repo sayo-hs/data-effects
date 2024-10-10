@@ -8,5 +8,6 @@
 * Fix an issue where constraints in the effect constructor were not properly reflected in 'genLiftFOEPatternSynonyms'.
 * Fixed an issue where the auto-generation would fail when the name of the effect constructor started with a colon (:) operator.
 
-## 0.1.2.1 -- 2024-09-26
-* Bump outdated dependency versions for GHC 9.8.2.
+## 0.2.0.0 -- 2024-10-10
+* Support for the core version upgrade to 0.2.
+    * Support for GHC 9.8.2.

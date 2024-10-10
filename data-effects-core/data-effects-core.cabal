@@ -25,13 +25,14 @@ copyright:
 
 category: Control, Effect
 
-extra-source-files:
+extra-doc-files:
     ChangeLog.md
     NOTICE
     README.md
 
 tested-with:
     GHC == 9.8.2
+    GHC == 9.4.1
     GHC == 9.2.8
 
 source-repository head
