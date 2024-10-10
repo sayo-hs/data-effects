@@ -13,10 +13,13 @@ the [Heftia](https://github.com/sayo-hs/heftia) extensible effects library.
 ## Your contributions are welcome!
 Please see [CONTRIBUTING.md](https://github.com/sayo-hs/data-effects/blob/ef706ef3fa547de01ce6bb5636af911354e53b58/CONTRIBUTING.md).
 
-## Citations
-The following is a list of existing works that have been modified and used within this library:
+## Acknowledgements, citations, and related work
+The following is a non-exhaustive list of people and works that have had a significant impact, directly or indirectly, on its design and implementation:
 
-* **[compdata](https://github.com/pa-ba/compdata)**
-    * **Copyright** (c) 2010--2011 Patrick Bahr, Tom Hvitved
-    * **License**: BSD-3-Clause
-    * **Modifications**: Used TemplateHaskell code to derive instances of the `HFunctor` type class.
+- Casper Bach Poulsen and Cas van der Rest — [Hefty Algebras: Modular Elaboration of Higher-Order Algebraic Effects][casper:hefty]
+- Patrick Bahr and Tom Hvitved — [`compdata`: Compositional Data Types][gh:compdata]
+- Michael Szvetits — [`effet`][gh:effet]
+
+[casper:hefty]: https://dl.acm.org/doi/10.1145/3571255
+[gh:compdata]: https://github.com/pa-ba/compdata
+[gh:effet]: https://github.com/typedbyte/effet
