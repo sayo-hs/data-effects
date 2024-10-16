@@ -9,3 +9,7 @@
     * Support for GHC 9.8.2.
 * Changed Shift/Reset and Provider effects to unlift form, making all effects HFunctor.
 * Renamed the 'Coroutine' constructor (incorrect) of the 'Status' type in coroutines to 'Continue'.
+
+## 0.2.0.0 -- 2024-10-16
+* Added parallelism effects.
+* Added an effect for the `co-log` logging.

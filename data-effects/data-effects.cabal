@@ -66,6 +66,7 @@ library
         Data.Effect.Provider
         Data.Effect.ShiftReset
         Data.Effect.KVStore
+        Data.Effect.Log
 
     reexported-modules:
         Data.Effect,
