@@ -28,3 +28,25 @@ parallelToAsync (LiftP2 f a b) =
             y <- b
             x <- await recv
             pure $ f x y
+
+liftAsync2
+    :: forall a b c m ans f
+     . (SendFOEBy AsyncKey (Async' f ans) m, Monad m)
+    => (a -> b -> c)
+    -> m a
+    -> m b
+    -> m c
+liftAsync2 f a b = parallelToAsync $ LiftP2 f a b
+{-# INLINE liftAsync2 #-}
+
+liftAsync3
+    :: forall a b c d m ans f
+     . (SendFOEBy AsyncKey (Async' f ans) m, Monad m)
+    => (a -> b -> c -> d)
+    -> m a
+    -> m b
+    -> m c
+    -> m d
+liftAsync3 f a b c =
+    parallelToAsync $ LiftP2 ($) (parallelToAsync $ LiftP2 f a b) c
+{-# INLINE liftAsync3 #-}
