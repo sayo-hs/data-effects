@@ -1,8 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
--- This Source Code Form is subject to the terms of the Mozilla Public
--- License, v. 2.0. If a copy of the MPL was not distributed with this
--- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- SPDX-License-Identifier: MPL-2.0
 
 {- |
 Copyright   :  (c) 2024 Sayo Koyoneda
@@ -13,6 +11,19 @@ module Data.Effect.Concurrent.Async where
 
 import Data.Effect.Concurrent.Parallel (Parallel (LiftP2))
 
+{-
+
+This is inspired by the following ideas:
+
+- By https://github.com/kory33
+    - https://x.com/Kory__3/status/1847712676295954673
+    - https://x.com/Kory__3/status/1847715858304639349
+    - https://x.com/Kory__3/status/1847722148665970791
+
+- Daan Leijen, Structured Asynchrony with Algebraic Effects (2017)
+
+-}
+
 data Async' f ans a where
     Fork :: Async' f ans (Either (a -> f ans) (f a))
     Finish :: f ans -> Async' f ans a
@@ -20,7 +31,10 @@ data Async' f ans a where
 
 makeKeyedEffect [''Async'] []
 
-parallelToAsync :: forall m f ans. (SendFOEBy AsyncKey (Async' f ans) m, Monad m) => Parallel m ~> m
+parallelToAsync
+    :: forall m ans f
+     . (SendFOEBy AsyncKey (Async' f ans) m, Monad m)
+    => Parallel m ~> m
 parallelToAsync (LiftP2 f a b) =
     fork >>= \case
         Left send -> finish . send =<< a
@@ -28,6 +42,16 @@ parallelToAsync (LiftP2 f a b) =
             y <- b
             x <- await recv
             pure $ f x y
+
+async
+    :: forall a m ans f
+     . (SendFOEBy AsyncKey (Async' f ans) m, Monad m)
+    => m a
+    -> m (f a)
+async a =
+    fork >>= \case
+        Left send -> finish . send =<< a
+        Right recv -> pure recv
 
 liftAsync2
     :: forall a b c m ans f
