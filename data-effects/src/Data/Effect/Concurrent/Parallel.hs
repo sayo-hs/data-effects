@@ -4,7 +4,7 @@
 
 module Data.Effect.Concurrent.Parallel where
 
-import Control.Applicative (Alternative (empty, (<|>)), liftA3)
+import Control.Applicative (Alternative (empty, (<|>)))
 
 data Parallel f a where
     LiftP2 :: (a -> b -> c) -> f a -> f b -> Parallel f c
@@ -35,7 +35,7 @@ instance (Race <<: f, Halt <: f, Parallel <<: f, Applicative f) => Alternative (
     {-# INLINE (<|>) #-}
 
 liftP3 :: (Parallel <<: f, Applicative f) => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
-liftP3 f a b c = runConcurrently $ liftA3 f (Concurrently a) (Concurrently b) (Concurrently c)
+liftP3 f a b = liftP2 ($) (liftP2 f a b)
 {-# INLINE liftP3 #-}
 
 data For (t :: Type -> Type) f a where
