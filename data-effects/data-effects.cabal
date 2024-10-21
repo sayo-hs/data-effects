@@ -49,6 +49,7 @@ library
         Data.Effect.State
         Data.Effect.Except
         Data.Effect.Accum
+        Data.Effect.Select
         Data.Effect.NonDet
         Data.Effect.Coroutine
         Data.Effect.Input
@@ -60,8 +61,8 @@ library
         Data.Effect.Resource
         Data.Effect.Fresh
         Data.Effect.Concurrent.Parallel
+        Data.Effect.Concurrent.Async
         Data.Effect.Concurrent.Timer
-        Data.Effect.Concurrent.Thread
         Data.Effect.Unlift
         Data.Effect.Provider
         Data.Effect.ShiftReset
