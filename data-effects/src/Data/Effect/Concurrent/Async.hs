@@ -10,6 +10,7 @@ Maintainer  :  ymdfield@outlook.jp
 module Data.Effect.Concurrent.Async where
 
 import Data.Effect.Concurrent.Parallel (Parallel (LiftP2))
+import Data.Void (Void, absurd)
 
 {-
 
@@ -24,38 +25,44 @@ This is inspired by the following ideas:
 
 -}
 
-data Async' f ans a where
-    Fork :: Async' f ans (Either (a -> f ans) (f a))
-    Finish :: f ans -> Async' f ans a
-    Await :: forall f ans a. f a -> Async' f ans a
+data Async' f a where
+    Fork :: forall a f. Async' f (Either (a -> f Void) (Future f a))
+    Perform :: forall a f. f a -> Async' f a
+
+data Future f a
+    = Future {await :: f a, poll :: f (Maybe a), cancel :: f ()}
 
 makeKeyedEffect [''Async'] []
 
+finish :: (SendFOEBy AsyncKey (Async' f) m, Functor m) => f Void -> m a
+finish = fmap absurd . perform
+{-# INLINE finish #-}
+
 parallelToAsync
-    :: forall m ans f
-     . (SendFOEBy AsyncKey (Async' f ans) m, Monad m)
+    :: forall m f
+     . (SendFOEBy AsyncKey (Async' f) m, Monad m)
     => Parallel m ~> m
 parallelToAsync (LiftP2 f a b) =
     fork >>= \case
         Left send -> finish . send =<< a
-        Right recv -> do
+        Right Future{await} -> do
             y <- b
-            x <- await recv
+            x <- perform await
             pure $ f x y
 
 async
-    :: forall a m ans f
-     . (SendFOEBy AsyncKey (Async' f ans) m, Monad m)
+    :: forall a m f
+     . (SendFOEBy AsyncKey (Async' f) m, Monad m)
     => m a
-    -> m (f a)
+    -> m (Future f a)
 async a =
     fork >>= \case
         Left send -> finish . send =<< a
         Right recv -> pure recv
 
 liftAsync2
-    :: forall a b c m ans f
-     . (SendFOEBy AsyncKey (Async' f ans) m, Monad m)
+    :: forall a b c m f
+     . (SendFOEBy AsyncKey (Async' f) m, Monad m)
     => (a -> b -> c)
     -> m a
     -> m b
@@ -64,8 +71,8 @@ liftAsync2 f a b = parallelToAsync $ LiftP2 f a b
 {-# INLINE liftAsync2 #-}
 
 liftAsync3
-    :: forall a b c d m ans f
-     . (SendFOEBy AsyncKey (Async' f ans) m, Monad m)
+    :: forall a b c d m f
+     . (SendFOEBy AsyncKey (Async' f) m, Monad m)
     => (a -> b -> c -> d)
     -> m a
     -> m b
