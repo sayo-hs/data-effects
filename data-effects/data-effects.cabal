@@ -61,7 +61,6 @@ library
         Data.Effect.Resource
         Data.Effect.Fresh
         Data.Effect.Concurrent.Parallel
-        Data.Effect.Concurrent.Async
         Data.Effect.Concurrent.Timer
         Data.Effect.Unlift
         Data.Effect.Provider
