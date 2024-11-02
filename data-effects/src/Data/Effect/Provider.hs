@@ -15,14 +15,15 @@ in the @effectful@ package.
 module Data.Effect.Provider where
 
 import Data.Effect.Key (type (##>))
+import Data.Functor.Const (Const (Const))
 import Data.Functor.Identity (Identity, runIdentity)
 
 -- | An effect to introduce a new local scope that provides effect context @b@.
 data Provider' ctx i b (f :: Type -> Type) (a :: Type) where
-    -- | Introduces a new local scope that provides an effect context @b@ parameterized by type @i@ and with results wrapped in @ctx@.
+    -- | Introduces a new local scope that provides an effect context @b p@ parameterized by type @i p@ and with results wrapped in @ctx@.
     Provide
-        :: i
-        -> ((forall x. f x -> b x) -> b a)
+        :: i p
+        -> ((forall x. f x -> b p x) -> b p a)
         -> Provider' ctx i b f (ctx a)
 
 makeEffectH [''Provider']
@@ -37,7 +38,9 @@ type Provider ctx i b = ProviderKey ctx i ##> Provider' ctx i b
 An effect to introduce a new local scope that provides effect context @b@.
 A version of `Provider` where the result is not wrapped in a specific container.
 -}
-type Provider_ i b = ProviderKey Identity i ##> Provider' Identity i b
+type Provider_ i b = ProviderKey Identity i ##> Provider' Identity (Const i :: () -> Type) (Const1 b)
+
+newtype Const1 f x a = Const1 {getConst1 :: f a}
 
 infix 2 .!
 
@@ -46,23 +49,29 @@ A version of `..!` where the result is not wrapped in a specific container.
 -}
 (.!)
     :: forall i f a b
-     . ( SendHOEBy (ProviderKey Identity i) (Provider' Identity i b) f
+     . ( SendHOEBy
+            (ProviderKey Identity (Const i :: () -> Type))
+            (Provider' Identity (Const i) (Const1 b))
+            f
        , Functor f
        )
     => i
     -> ((f ~> b) -> b a)
     -> f a
-i .! f = runIdentity <$> provide'' @(ProviderKey Identity i) i f
+i .! f =
+    runIdentity <$> provide'' @(ProviderKey Identity (Const i :: () -> Type))
+        (Const i)
+        \run -> Const1 $ f $ getConst1 . run
 {-# INLINE (.!) #-}
 
 infix 2 ..!
 
 -- | A operator to introduce a new local scope that provides effect context @b@.
 (..!)
-    :: forall ctx i f a b
+    :: forall ctx i p f a b
      . (SendHOEBy (ProviderKey ctx i) (Provider' ctx i b) f)
-    => i
-    -> ((f ~> b) -> b a)
+    => i p
+    -> ((f ~> b p) -> b p a)
     -> f (ctx a)
 i ..! f = provide'' @(ProviderKey ctx i) i f
 {-# INLINE (..!) #-}
