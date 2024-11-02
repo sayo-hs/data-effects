@@ -8,16 +8,18 @@
 Copyright   :  (c) 2023 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
-Stability   :  experimental
-Portability :  portable
 
 This module provides the t`Output` effect, comes
 from [@Polysemy.Output@](https://hackage.haskell.org/package/polysemy-1.9.1.1/docs/Polysemy-Output.html)
 in the @polysemy@ package.
+
+Realizes output of values to the external world.
 -}
 module Data.Effect.Output where
 
+-- | A general effect representing output of values to the external world.
 data Output o a where
+    -- | Output a value to the external world.
     Output :: o -> Output o ()
 
 makeEffectF [''Output]

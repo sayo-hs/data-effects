@@ -8,19 +8,24 @@
 Copyright   :  (c) 2023 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
-Stability   :  experimental
-Portability :  portable
+
+Effects for holding mutable state values in the context.
 -}
 module Data.Effect.State where
 
+-- | An effect for holding mutable state values in the context.
 data State s a where
+    -- | Retrieves the current state value from the context.
     Get :: State s s
+    -- | Overwrites the state value in the context.
     Put :: s -> State s ()
 
 makeEffectF [''State]
 
+-- | Retrieves the current state value from the context and returns the value transformed based on the given function.
 gets :: (State s <: f, Functor f) => (s -> a) -> f a
 gets f = f <$> get
 
+-- | Modifies the current state value in the context based on the given function.
 modify :: (State s <: m, Monad m) => (s -> s) -> m ()
 modify f = put . f =<< get

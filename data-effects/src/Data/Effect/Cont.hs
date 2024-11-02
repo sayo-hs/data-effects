@@ -6,9 +6,6 @@
 
 module Data.Effect.Cont where
 
-import Data.Effect.TH (noExtTemplate)
-import Data.Effect.TH.Internal (noDeriveHFunctor)
-
 data CallCC m a where
     CallCC :: (forall r. (a -> m r) -> m a) -> CallCC m a
 

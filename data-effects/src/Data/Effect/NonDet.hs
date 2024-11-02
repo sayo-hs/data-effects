@@ -8,22 +8,33 @@
 Copyright   : (c) 2024 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
-Stability   :  experimental
-Portability :  portable
+
+Effects that realize non-deterministic computations.
 -}
 module Data.Effect.NonDet where
 
+-- | An effect that eliminates a branch by causing the current branch context of a non-deterministic computation to fail.
 data Empty (a :: Type) where
+    -- | Eliminates a branch by causing the current branch context of a non-deterministic computation to fail.
     Empty :: Empty a
 
 makeEffectF [''Empty]
 
+-- | An effect that splits the computation into two branches.
 data Choose (a :: Type) where
+    -- | Splits the computation into two branches.
+    -- As a result of executing @choose@, the world branches into one where `False` is returned and one where `True` is returned.
     Choose :: Choose Bool
 
 makeEffectF [''Choose]
 
+{- |
+An effect that executes two branches as scopes.
+A higher-order version of the t`Choose` effect.
+-}
 data ChooseH f (a :: Type) where
+    -- | Executes the given two scopes as branches.
+    -- Even if one fails due to the `empty` operation, the whole does not fail as long as the other does not fail.
     ChooseH :: f a -> f a -> ChooseH f a
 
 makeEffectH [''ChooseH]
