@@ -14,6 +14,7 @@ in the @effectful@ package.
 -}
 module Data.Effect.Provider where
 
+import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.Key (type (##>))
 import Data.Functor.Const (Const (Const))
 import Data.Functor.Identity (Identity, runIdentity)
@@ -41,6 +42,11 @@ A version of `Provider` where the result is not wrapped in a specific container.
 type Provider_ i b = Provider (Const1 Identity) (Const i :: () -> Type) (Const1 b)
 
 newtype Const1 f x a = Const1 {getConst1 :: f a}
+
+newtype Const2 ff x f a = Const2 {getConst2 :: ff f a}
+instance (HFunctor ff) => HFunctor (Const2 ff x) where
+    hfmap phi (Const2 ff) = Const2 $ hfmap phi ff
+    {-# INLINE hfmap #-}
 
 infix 2 .!
 
