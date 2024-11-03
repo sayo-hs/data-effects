@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE CPP #-}
 
 -- SPDX-License-Identifier: MPL-2.0
 
@@ -11,6 +12,9 @@ Effects for parallel computations.
 -}
 module Data.Effect.Concurrent.Parallel where
 
+#if ( __GLASGOW_HASKELL__ < 906 )
+import Control.Applicative (liftA2)
+#endif
 import Control.Applicative (Alternative (empty, (<|>)))
 import Data.Tuple (swap)
 

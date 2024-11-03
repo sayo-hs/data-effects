@@ -14,3 +14,6 @@
 * Added parallelism effects.
 * Added an effect for the `co-log` logging.
 * Generalize the 'Provider' effect.
+
+## 0.3.0.1 -- 2024-11-03
+* Fixed build error for GHC 9.4.1.
