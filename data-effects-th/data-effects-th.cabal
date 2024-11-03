@@ -1,4 +1,4 @@
-cabal-version:      2.4
+cabal-version:      3.0
 name:               data-effects-th
 version:            0.2.0.0
 
@@ -34,10 +34,7 @@ extra-doc-files:
     NOTICE
     README.md
 
-tested-with:
-    GHC == 9.8.2
-    GHC == 9.4.1
-    GHC == 9.2.8
+tested-with: GHC == {9.2.8, 9.4.1, 9.6.6, 9.8.2}
 
 source-repository head
     type: git
