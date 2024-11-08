@@ -22,15 +22,15 @@ callCC
      . (SendHOEBy ShiftKey (Shift' ans n) m, Monad m, Monad n)
     => ((a -> n ans) -> m a)
     -> m a
-callCC f = shift \k run -> run (f $ k >=> run . exit) >>= k
+callCC f = shift \k run -> run (f $ k >=> run . abort) >>= k
 
-exit
+abort
     :: forall a m ans n
      . (SendHOEBy ShiftKey (Shift' ans n) m, Applicative n)
     => ans
     -> m a
-exit ans = shift \_ _ -> pure ans
-{-# INLINE exit #-}
+abort ans = shift \_ _ -> pure ans
+{-# INLINE abort #-}
 
 getCC
     :: forall m ans n
@@ -42,21 +42,25 @@ embed :: forall m ans n. (SendHOEBy ShiftKey (Shift' ans n) m, Monad n) => n ~> 
 embed m = shift \k _ -> m >>= k
 {-# INLINE embed #-}
 
-data Shift_' n m a where
-    Shift_'
-        :: (forall (ans :: Type). (a -> n ans) -> (forall x. m x -> n x) -> n ans)
-        -> Shift_' n m a
-makeKeyedEffect [] [''Shift_']
-
-getCC_ :: forall m n. (SendHOEBy Shift_Key (Shift_' n) m, Functor n) => m (n ())
-getCC_ = shift_' \k _ -> let k' = k $ void k' in k'
-
 data Reset m (a :: Type) where
     Reset :: m a -> Reset m a
 makeEffectH [''Reset]
 
+data Shift_' n m a where
+    Shift_'
+        :: (forall (ans :: Type). (a -> n ans) -> (forall x. m x -> n x) -> n ans)
+        -> Shift_' n m a
+{-# DEPRECATED Shift_' "Use Data.Effect.SubJump" #-}
+
+makeKeyedEffect [] [''Shift_']
+
+getCC_ :: forall m n. (SendHOEBy Shift_Key (Shift_' n) m, Functor n) => m (n ())
+getCC_ = shift_' \k _ -> let k' = k $ void k' in k'
+{-# DEPRECATED Shift_, Shift_Key, shift_', shift_'', shift_''', getCC_ "Use Data.Effect.SubJump" #-}
+
 data ShiftF ans a where
     ShiftF :: forall ans a. ((a -> ans) -> ans) -> ShiftF ans a
+{-# DEPRECATED ShiftF "Use Data.Effect.SubJump" #-}
 makeEffectF [''ShiftF]
 
 fromShiftF :: ShiftF (n ans) ~> Shift ans n m
@@ -70,3 +74,4 @@ exitF ans = shiftF @ans $ const ans
 embedF :: forall ans n m. (ShiftF (n ans) <: m, Monad n) => n ~> m
 embedF m = shiftF @(n ans) (m >>=)
 {-# INLINE embedF #-}
+{-# DEPRECATED shiftF, shiftF', shiftF'', fromShiftF, exitF, embedF "Use Data.Effect.SubJump" #-}

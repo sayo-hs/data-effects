@@ -1,5 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
+-- SPDX-License-Identifier: MPL-2.0
+
 module Data.Effect.SubJump where
 
 import Data.Function (fix)
