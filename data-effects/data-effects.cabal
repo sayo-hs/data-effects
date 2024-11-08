@@ -61,6 +61,7 @@ library
         Data.Effect.Concurrent.Timer
         Data.Effect.Unlift
         Data.Effect.Provider
+        Data.Effect.SubJump
         Data.Effect.ShiftReset
         Data.Effect.KVStore
         Data.Effect.Log
