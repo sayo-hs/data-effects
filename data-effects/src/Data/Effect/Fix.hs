@@ -9,4 +9,4 @@ module Data.Effect.Fix where
 data Fix f a where
     Mfix :: (a -> f a) -> Fix f a
 
-makeEffectH [''Fix]
+makeEffectH ''Fix

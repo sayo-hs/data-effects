@@ -8,6 +8,7 @@ module Prelude (
     module Prelude,
     module Control.Effect,
     module Control.Effect.Key,
+    module Data.Effect,
     module Data.Effect.TH,
     module Data.Effect.HFunctor.TH,
     module Data.Effect.Key.TH,
@@ -15,10 +16,11 @@ module Prelude (
     Infinite ((:<)),
 ) where
 
-import Control.Effect (type (<:), type (<<:), type (~>))
-import Control.Effect.Key (SendFOEBy, SendHOEBy)
+import Control.Effect (type (<!), type (~>))
+import Control.Effect.Key (PerformBy)
+import Data.Effect (Effect)
 import Data.Effect.HFunctor.TH
-import Data.Effect.Key.TH (makeKeyedEffect, makeKeyedEffect_)
+import Data.Effect.Key.TH
 import Data.Effect.TH
 import Data.Kind (Type)
 import Data.List.Infinite (Infinite ((:<)))

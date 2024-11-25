@@ -18,20 +18,10 @@ module Data.Effect.TH (
     module Data.Default,
     module Data.Function,
     EffectOrder (..),
-    orderOf,
-    MakeEffectConf (..),
-    alterEffectClassConf,
-    alterEffectConf,
-    EffectClassConf (..),
-    confByEffect,
-    doesDeriveHFunctor,
-    doesGenerateLiftFOEPatternSynonyms,
-    doesGenerateLiftFOETypeSynonym,
     EffectConf (..),
     keyedSenderGenConf,
     normalSenderGenConf,
     taggedSenderGenConf,
-    warnFirstOrderInHOE,
     SenderFunctionConf (..),
     senderFnName,
     doesGenerateSenderFnSignature,
@@ -39,135 +29,73 @@ module Data.Effect.TH (
     senderFnArgDoc,
     senderFnConfs,
     deriveHFunctor,
-    noDeriveHFunctor,
-    generateLiftFOETypeSynonym,
-    noGenerateLiftFOETypeSynonym,
-    generateLiftFOEPatternSynonyms,
-    noGenerateLiftFOEPatternSynonyms,
     noGenerateNormalSenderFunction,
     noGenerateTaggedSenderFunction,
     noGenerateKeyedSenderFunction,
-    suppressFirstOrderInHigherOrderEffectWarning,
     noGenerateSenderFunctionSignature,
 ) where
 
-import Control.Monad (forM_, when)
-import Control.Monad.Writer (execWriterT, lift, tell)
+import Control.Monad.Reader (ask, runReaderT)
+import Control.Monad.Writer.CPS (execWriterT, lift, tell)
 import Data.Default (Default (def))
+import Data.Effect (EffectOrder (FirstOrder, HigherOrder))
 import Data.Effect.HFunctor.TH.Internal (deriveHFunctor)
 import Data.Effect.TH.Internal (
-    DataInfo,
-    EffClsInfo,
-    EffectClassConf (
-        EffectClassConf,
-        _confByEffect,
-        _doesDeriveHFunctor,
-        _doesGenerateLiftFOEPatternSynonyms,
-        _doesGenerateLiftFOETypeSynonym
-    ),
-    EffectConf (
-        EffectConf,
-        _keyedSenderGenConf,
-        _normalSenderGenConf,
-        _taggedSenderGenConf,
-        _warnFirstOrderInHOE
-    ),
-    EffectOrder (FirstOrder, HigherOrder),
-    MakeEffectConf (MakeEffectConf, unMakeEffectConf),
-    SenderFunctionConf (
-        _doesGenerateSenderFnSignature,
-        _senderFnArgDoc,
-        _senderFnDoc,
-        _senderFnName
-    ),
-    alterEffectClassConf,
-    alterEffectConf,
-    confByEffect,
-    doesDeriveHFunctor,
-    doesGenerateLiftFOEPatternSynonyms,
-    doesGenerateLiftFOETypeSynonym,
+    EffectConf (..),
+    EffectGenerator,
+    SenderFunctionConf (..),
     doesGenerateSenderFnSignature,
-    genLiftFOEPatternSynonyms,
-    genLiftFOETypeSynonym,
-    genSenders,
-    generateLiftFOEPatternSynonyms,
-    generateLiftFOETypeSynonym,
+    genFOE,
+    genHOE,
     keyedSenderGenConf,
-    noDeriveHFunctor,
     noGenerateKeyedSenderFunction,
-    noGenerateLiftFOEPatternSynonyms,
-    noGenerateLiftFOETypeSynonym,
     noGenerateNormalSenderFunction,
     noGenerateSenderFunctionSignature,
     noGenerateTaggedSenderFunction,
     normalSenderGenConf,
-    orderOf,
-    reifyEffCls,
+    reifyEffect,
     senderFnArgDoc,
     senderFnConfs,
     senderFnDoc,
     senderFnName,
-    suppressFirstOrderInHigherOrderEffectWarning,
     taggedSenderGenConf,
-    unMakeEffectConf,
-    warnFirstOrderInHOE,
  )
 import Data.Function ((&))
-import Data.List (singleton)
-import Language.Haskell.TH (Dec, Info, Name, Q, Type (TupleT))
+import Language.Haskell.TH (Dec, Name, Q, Type (TupleT))
 
-makeEffect'
-    :: MakeEffectConf
-    -> (EffectOrder -> Info -> DataInfo -> EffClsInfo -> EffectClassConf -> Q [Dec])
-    -> [Name]
-    -> [Name]
-    -> Q [Dec]
-makeEffect' (MakeEffectConf conf) extTemplate inss sigs = execWriterT do
-    forM_ inss \ins -> do
-        (info, dataInfo, effClsInfo) <- reifyEffCls FirstOrder ins & lift
-        ecConf@EffectClassConf{..} <- conf effClsInfo & lift
+makeEffectF :: Name -> Q [Dec]
+makeEffectsF :: [Name] -> Q [Dec]
+makeEffectF' :: EffectConf -> Name -> Q [Dec]
+(makeEffectF, makeEffectsF, makeEffectF') = effectMakers genFOE
 
-        genSenders ecConf effClsInfo & lift >>= tell
+makeEffectH :: Name -> Q [Dec]
+makeEffectsH :: [Name] -> Q [Dec]
+makeEffectH' :: EffectConf -> Name -> Q [Dec]
+(makeEffectH, makeEffectsH, makeEffectH') = effectMakers genHOEwithHFunctor
 
-        when _doesGenerateLiftFOETypeSynonym do
-            genLiftFOETypeSynonym effClsInfo & singleton & tell
+makeEffectH_ :: Name -> Q [Dec]
+makeEffectsH_ :: [Name] -> Q [Dec]
+makeEffectH_' :: EffectConf -> Name -> Q [Dec]
+(makeEffectH_, makeEffectsH_, makeEffectH_') = effectMakers genHOE
 
-        when _doesGenerateLiftFOEPatternSynonyms do
-            genLiftFOEPatternSynonyms effClsInfo & lift >>= tell
+effectMakers
+    :: EffectGenerator
+    -> ( Name -> Q [Dec]
+       , [Name] -> Q [Dec]
+       , EffectConf -> Name -> Q [Dec]
+       )
+effectMakers gen =
+    ( execWriterT . gen' def
+    , execWriterT . mapM (gen' def)
+    , \conf -> execWriterT . gen' conf
+    )
+  where
+    gen' conf e = do
+        (info, dataInfo, eInfo) <- reifyEffect e & lift
+        runReaderT gen (conf, e, info, dataInfo, eInfo)
 
-        extTemplate FirstOrder info dataInfo effClsInfo ecConf & lift >>= tell
-
-    forM_ sigs \sig -> do
-        (info, dataInfo, effClsInfo) <- reifyEffCls HigherOrder sig & lift
-        ecConf@EffectClassConf{..} <- conf effClsInfo & lift
-
-        genSenders ecConf effClsInfo & lift >>= tell
-
-        when _doesDeriveHFunctor do
-            deriveHFunctor (const $ pure $ TupleT 0) dataInfo & lift >>= tell
-
-        extTemplate HigherOrder info dataInfo effClsInfo ecConf & lift >>= tell
-
-noExtTemplate :: EffectOrder -> Info -> DataInfo -> EffClsInfo -> EffectClassConf -> Q [Dec]
-noExtTemplate = mempty
-{-# INLINE noExtTemplate #-}
-
-makeEffect :: [Name] -> [Name] -> Q [Dec]
-makeEffect = makeEffect' def noExtTemplate
-{-# INLINE makeEffect #-}
-
-makeEffectF :: [Name] -> Q [Dec]
-makeEffectF inss = makeEffect inss []
-{-# INLINE makeEffectF #-}
-
-makeEffectH :: [Name] -> Q [Dec]
-makeEffectH sigs = makeEffect [] sigs
-{-# INLINE makeEffectH #-}
-
-makeEffect_ :: [Name] -> [Name] -> Q [Dec]
-makeEffect_ = makeEffect' (def & noDeriveHFunctor) noExtTemplate
-{-# INLINE makeEffect_ #-}
-
-makeEffectH_ :: [Name] -> Q [Dec]
-makeEffectH_ sigs = makeEffect_ [] sigs
-{-# INLINE makeEffectH_ #-}
+genHOEwithHFunctor :: EffectGenerator
+genHOEwithHFunctor = do
+    genHOE
+    (_, _, _, dataInfo, _) <- ask
+    deriveHFunctor (const $ pure $ TupleT 0) dataInfo & lift & lift >>= tell

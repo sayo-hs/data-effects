@@ -6,7 +6,7 @@
 
 module Data.Effect.Select where
 
-data Select r a where
-    Select :: ((a -> r) -> a) -> Select r a
+data Select r :: Effect where
+    Select :: ((a -> r) -> a) -> Select r f a
 
-makeEffectF [''Select]
+makeEffectF ''Select

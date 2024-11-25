@@ -14,7 +14,7 @@ Portability :  portable
 module Control.Effect.Key where
 
 import Control.Applicative (Alternative)
-import Control.Effect (SendFOE (sendFOE), SendHOE (sendHOE))
+import Control.Effect (Perform (perform))
 import Control.Monad (MonadPlus)
 import Control.Monad.Except (MonadError)
 import Control.Monad.Fix (MonadFix)
@@ -24,17 +24,14 @@ import Control.Monad.Reader (MonadReader)
 import Control.Monad.State (MonadState)
 import Control.Monad.Writer (MonadWriter)
 import Data.Coerce (coerce)
-import Data.Effect (EffectF, EffectH)
+import Data.Effect (Effect)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Kind (Type)
 
-class SendFOEBy key (ins :: EffectF) f | key f -> ins where
-    sendFOEBy :: ins a -> f a
+class PerformBy key (e :: Effect) f | key f -> e where
+    performBy :: e f a -> f a
 
-class SendHOEBy key (sig :: EffectH) f | key f -> sig where
-    sendHOEBy :: sig f a -> f a
-
--- | A wrapper data type to represent sending an effect to the carrier @f@ with the specified key.
+-- | A wrapper data type to represent performing an effect to the carrier @f@ with the specified key.
 newtype ByKey key (f :: Type -> Type) a = ByKey {runByKey :: f a}
     deriving newtype
         ( Functor
@@ -52,15 +49,11 @@ newtype ByKey key (f :: Type -> Type) a = ByKey {runByKey :: f a}
         , MonadError e
         )
 
--- | Send all effects within the scope, keyed, to carrier @f@.
+-- | Perform all effects within the scope, keyed, on the carrier @f@.
 key :: forall key f a. ByKey key f a -> f a
 key = runByKey
 {-# INLINE key #-}
 
-instance (SendFOEBy key ins f) => SendFOE ins (ByKey key f) where
-    sendFOE = ByKey . sendFOEBy @key
-    {-# INLINE sendFOE #-}
-
-instance (SendHOEBy key sig f, HFunctor sig) => SendHOE sig (ByKey key f) where
-    sendHOE = ByKey . sendHOEBy @key . hfmap coerce
-    {-# INLINE sendHOE #-}
+instance (PerformBy key e f, HFunctor e) => Perform e (ByKey key f) where
+    perform = ByKey . performBy @key . hfmap coerce
+    {-# INLINE perform #-}

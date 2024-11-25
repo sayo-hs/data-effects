@@ -14,9 +14,9 @@ Effects that can accumulate values monoidally in a context.
 module Data.Effect.Writer where
 
 -- | An effect that can accumulate values monoidally in a context.
-data Tell w a where
+data Tell w :: Effect where
     -- | Accumulates new values to the cumulative value held in the context.
-    Tell :: w -> Tell w ()
+    Tell :: w -> Tell w f ()
 
 -- | An effect that performs local operations on accumulations in the context on a per-scope basis.
 data WriterH w f a where
@@ -33,7 +33,8 @@ data WriterH w f a where
         -- ^ The scope where the modification is applied.
         -> WriterH w f a
 
-makeEffect [''Tell] [''WriterH]
+makeEffectF ''Tell
+makeEffectH ''WriterH
 
 {- |
 For a given scope, uses the function (the first component of the pair returned
@@ -47,7 +48,7 @@ pass m = do
     pure a
 @
 -}
-pass :: (Tell w <: m, WriterH w <<: m, Monad m) => m (w -> w, a) -> m a
+pass :: (Tell w <! m, WriterH w <! m, Monad m) => m (w -> w, a) -> m a
 pass m = do
     (w, (f, a)) <- listen m
     tell $ f w

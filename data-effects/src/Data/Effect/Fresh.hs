@@ -13,7 +13,7 @@ Portability :  portable
 -}
 module Data.Effect.Fresh where
 
-data Fresh i (a :: Type) where
-    Fresh :: Fresh i i
+data Fresh i :: Effect where
+    Fresh :: Fresh i f i
 
-makeEffectF [''Fresh]
+makeEffectF ''Fresh

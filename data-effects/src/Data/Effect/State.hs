@@ -14,18 +14,18 @@ Effects for holding mutable state values in the context.
 module Data.Effect.State where
 
 -- | An effect for holding mutable state values in the context.
-data State s a where
+data State s :: Effect where
     -- | Retrieves the current state value from the context.
-    Get :: State s s
+    Get :: State s f s
     -- | Overwrites the state value in the context.
-    Put :: s -> State s ()
+    Put :: s -> State s f ()
 
-makeEffectF [''State]
+makeEffectF ''State
 
 -- | Retrieves the current state value from the context and returns the value transformed based on the given function.
-gets :: (State s <: f, Functor f) => (s -> a) -> f a
+gets :: (State s <! f, Functor f) => (s -> a) -> f a
 gets f = f <$> get
 
 -- | Modifies the current state value in the context based on the given function.
-modify :: (State s <: m, Monad m) => (s -> s) -> m ()
+modify :: (State s <! m, Monad m) => (s -> s) -> m ()
 modify f = put . f =<< get

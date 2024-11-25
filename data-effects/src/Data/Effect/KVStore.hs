@@ -20,29 +20,29 @@ module Data.Effect.KVStore where
 import Data.Effect.Except (Throw, throw)
 import Data.Maybe (isJust)
 
-data KVStore k v a where
-    LookupKV :: k -> KVStore k v (Maybe v)
-    UpdateKV :: k -> Maybe v -> KVStore k v ()
+data KVStore k v :: Effect where
+    LookupKV :: k -> KVStore k v f (Maybe v)
+    UpdateKV :: k -> Maybe v -> KVStore k v f ()
 
-makeEffectF [''KVStore]
+makeEffectF ''KVStore
 
-lookupOrThrowKV :: (KVStore k v <: m, Throw e <: m, Monad m) => (k -> e) -> k -> m v
+lookupOrThrowKV :: (KVStore k v <! m, Throw e <! m, Monad m) => (k -> e) -> k -> m v
 lookupOrThrowKV err k =
     lookupKV k >>= maybe (throw $ err k) pure
 
-existsKV :: forall v k f. (KVStore k v <: f, Functor f) => k -> f Bool
+existsKV :: forall v k f. (KVStore k v <! f, Functor f) => k -> f Bool
 existsKV = fmap isJust . lookupKV @k @v
 {-# INLINE existsKV #-}
 
-writeKV :: KVStore k v <: f => k -> v -> f ()
+writeKV :: (KVStore k v <! f) => k -> v -> f ()
 writeKV k v = updateKV k (Just v)
 {-# INLINE writeKV #-}
 
-deleteKV :: forall v k f. KVStore k v <: f => k -> f ()
+deleteKV :: forall v k f. (KVStore k v <! f) => k -> f ()
 deleteKV k = updateKV @k @v k Nothing
 {-# INLINE deleteKV #-}
 
-modifyKV :: (KVStore k v <: m, Monad m) => v -> (v -> v) -> k -> m ()
+modifyKV :: (KVStore k v <! m, Monad m) => v -> (v -> v) -> k -> m ()
 modifyKV vDefault f k = do
     v <- lookupKV k
     updateKV k (Just $ maybe vDefault f v)

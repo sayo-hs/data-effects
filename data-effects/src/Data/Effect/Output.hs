@@ -18,8 +18,8 @@ Realizes output of values to the external world.
 module Data.Effect.Output where
 
 -- | A general effect representing output of values to the external world.
-data Output o a where
+data Output o :: Effect where
     -- | Output a value to the external world.
-    Output :: o -> Output o ()
+    Output :: o -> Output o f ()
 
-makeEffectF [''Output]
+makeEffectF ''Output

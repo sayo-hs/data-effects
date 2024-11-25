@@ -23,14 +23,14 @@ An effect for coroutines.
 Realizes an operation that transfers control to the caller of the computation with coroutines along with a value of type @a@,
 and receives a value of type @b@ from the caller.
 -}
-data Yield a b (c :: Type) where
+data Yield a b :: Effect where
     -- | Transfers control to the caller of the computation with coroutines along with a value of type @a@, and receives a value of type @b@ from the caller.
-    Yield :: a -> Yield a b b
+    Yield :: a -> Yield a b f b
 
-makeEffectF [''Yield]
+makeEffectF ''Yield
 
 -- | A version of `yield` where the value returned from the caller of the computation with coroutines is unit.
-yield_ :: (Yield a () <: f) => a -> f ()
+yield_ :: (Yield a () <! f) => a -> f ()
 yield_ = yield
 {-# INLINE yield_ #-}
 

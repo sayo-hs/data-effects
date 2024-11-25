@@ -7,37 +7,55 @@
 
 module Data.Effect.Key.TH where
 
-import Control.Effect.Key (SendFOEBy, SendHOEBy)
-import Control.Lens ((%~), (<&>), _Just, _head)
+import Control.Effect.Key (PerformBy)
+import Control.Lens ((%~), (<&>), _1, _Just, _head)
 import Control.Monad (forM_)
-import Control.Monad.Writer (execWriterT, tell)
+import Control.Monad.Reader (ask, local)
+import Control.Monad.Trans (lift)
+import Control.Monad.Writer.CPS (tell)
 import Data.Char (toLower)
-import Data.Default (def)
-import Data.Effect.Key (type (##>), type (#>))
-import Data.Effect.TH (makeEffect', noDeriveHFunctor)
-import Data.Effect.TH.Internal (
-    DataInfo,
-    EffClsInfo (EffClsInfo),
-    EffConInfo (EffConInfo),
-    EffectClassConf (EffectClassConf),
-    EffectConf (EffectConf, _keyedSenderGenConf),
-    EffectOrder (FirstOrder, HigherOrder),
-    MakeEffectConf,
-    SenderFunctionConf (SenderFunctionConf),
-    alterEffectConf,
-    ecEffs,
-    ecName,
-    ecParamVars,
-    effName,
-    genSenderArmor,
+import Data.Effect.Key (type (#>))
+import Data.Effect.TH (
+    EffectConf (..),
+    SenderFunctionConf (
+        SenderFunctionConf,
+        _doesGenerateSenderFnSignature,
+        _senderFnArgDoc,
+        _senderFnDoc,
+        _senderFnName
+    ),
+    effectMakers,
+    genHOEwithHFunctor,
     normalSenderGenConf,
     senderFnName,
-    tyVarName,
-    _confByEffect,
-    _keyedSenderGenConf,
-    _senderFnName,
+    (&),
  )
-import Data.Function ((&))
+import Data.Effect.TH.Internal (
+    EffectGenerator,
+    EffectInfo (..),
+    OpConf (
+        OpConf,
+        _keyedSenderGenConf,
+        _normalSenderGenConf,
+        _taggedSenderGenConf
+    ),
+    OpInfo (
+        OpInfo,
+        opCarrier,
+        opCxt,
+        opDataType,
+        opName,
+        opOrder,
+        opParamTypes,
+        opResultType,
+        opTyVars
+    ),
+    alterOpConf,
+    genFOE,
+    genHOE,
+    genSenderArmor,
+    tyVarName,
+ )
 import Data.List.Extra (stripSuffix)
 import Data.Text qualified as T
 import Formatting (sformat, string, (%))
@@ -46,7 +64,6 @@ import Language.Haskell.TH (
     Clause (Clause),
     Dec (DataD, TySynD),
     Exp (AppTypeE, VarE),
-    Info,
     Name,
     Q,
     TyVarBndr (PlainTV),
@@ -56,40 +73,46 @@ import Language.Haskell.TH (
  )
 import Language.Haskell.TH.Datatype.TyVarBndr (pattern BndrReq)
 
-makeKeyedEffect :: [Name] -> [Name] -> Q [Dec]
-makeKeyedEffect =
-    makeEffect'
-        (def & changeNormalSenderFnNameFormat)
-        genEffectKey
-{-# INLINE makeKeyedEffect #-}
+makeKeyedEffectF :: Name -> Q [Dec]
+makeKeyedEffectsF :: [Name] -> Q [Dec]
+makeKeyedEffectF' :: EffectConf -> Name -> Q [Dec]
+(makeKeyedEffectF, makeKeyedEffectsF, makeKeyedEffectF') = effectMakers $ genKeyedEffect genFOE
 
-makeKeyedEffect_ :: [Name] -> [Name] -> Q [Dec]
-makeKeyedEffect_ =
-    makeEffect'
-        (def & noDeriveHFunctor & changeNormalSenderFnNameFormat)
-        genEffectKey
-{-# INLINE makeKeyedEffect_ #-}
+makeKeyedEffectH :: Name -> Q [Dec]
+makeKeyedEffectsH :: [Name] -> Q [Dec]
+makeKeyedEffectH' :: EffectConf -> Name -> Q [Dec]
+(makeKeyedEffectH, makeKeyedEffectsH, makeKeyedEffectH') = effectMakers $ genKeyedEffect genHOEwithHFunctor
 
-changeNormalSenderFnNameFormat :: MakeEffectConf -> MakeEffectConf
+makeKeyedEffectH_ :: Name -> Q [Dec]
+makeKeyedEffectsH_ :: [Name] -> Q [Dec]
+makeKeyedEffectH_' :: EffectConf -> Name -> Q [Dec]
+(makeKeyedEffectH_, makeKeyedEffectsH_, makeKeyedEffectH_') = effectMakers $ genKeyedEffect genHOE
+
+genKeyedEffect :: EffectGenerator -> EffectGenerator
+genKeyedEffect gen = do
+    local (_1 %~ changeNormalSenderFnNameFormat) gen
+    genEffectKey
+
+changeNormalSenderFnNameFormat :: EffectConf -> EffectConf
 changeNormalSenderFnNameFormat =
-    alterEffectConf $ normalSenderGenConf . _Just . senderFnName %~ (++ "'_")
+    alterOpConf $ normalSenderGenConf . _Just . senderFnName %~ (++ "'_")
 {-# INLINE changeNormalSenderFnNameFormat #-}
 
-genEffectKey :: EffectOrder -> Info -> DataInfo -> EffClsInfo -> EffectClassConf -> Q [Dec]
-genEffectKey order _ _ EffClsInfo{..} EffectClassConf{..} = execWriterT do
-    let keyedOp = case order of
-            FirstOrder -> ''(#>)
-            HigherOrder -> ''(##>)
+genEffectKey :: EffectGenerator
+genEffectKey = do
+    (EffectConf{..}, _, _, _, EffectInfo{..}) <- ask
 
-        pvs = tyVarName <$> ecParamVars
+    let keyedOp = ''(#>)
+
+        pvs = tyVarName <$> eParamVars
 
     ecNamePlain <-
-        removeLastApostrophe (nameBase ecName)
+        removeLastApostrophe (nameBase eName)
             & maybe
                 ( fail . T.unpack $
                     sformat
                         ("No last apostrophe on the effect class ‘" % string % "’.")
-                        (nameBase ecName)
+                        (nameBase eName)
                 )
                 pure
 
@@ -102,17 +125,16 @@ genEffectKey order _ _ EffClsInfo{..} EffectClassConf{..} = execWriterT do
         [ TySynD
             (mkName ecNamePlain)
             (pvs <&> (`PlainTV` BndrReq))
-            (InfixT key keyedOp (foldl AppT (ConT ecName) (map VarT pvs)))
+            (InfixT key keyedOp (foldl AppT (ConT eName) (map VarT pvs)))
         ]
 
-    forM_ ecEffs \con@EffConInfo{..} -> do
-        let EffectConf{..} = _confByEffect effName
+    forM_ eOps \op@OpInfo{..} -> do
+        let OpConf{..} = opConf opName
         forM_ _keyedSenderGenConf \conf@SenderFunctionConf{..} -> do
-            let sendCxt effDataType carrier = case order of
-                    FirstOrder -> ConT ''SendFOEBy `AppT` key `AppT` effDataType `AppT` carrier
-                    HigherOrder -> ConT ''SendHOEBy `AppT` key `AppT` effDataType `AppT` carrier
+            let sendCxt effDataType carrier =
+                    ConT ''PerformBy `AppT` key `AppT` effDataType `AppT` carrier
 
-            genSenderArmor sendCxt id conf{_senderFnName = nameBase effName & _head %~ toLower} con \_f ->
+            lift $ genSenderArmor sendCxt id op conf{_senderFnName = nameBase opName & _head %~ toLower} \_f ->
                 pure $ Clause [] (NormalB $ VarE (mkName _senderFnName) `AppTypeE` key) []
 
 removeLastApostrophe :: String -> Maybe String

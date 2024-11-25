@@ -6,7 +6,7 @@
 
 module Data.Effect.Fail where
 
-data Fail (a :: Type) where
-    Fail :: String -> Fail a
+data Fail :: Effect where
+    Fail :: String -> Fail f a
 
-makeEffectF [''Fail]
+makeEffectF ''Fail

@@ -14,12 +14,12 @@ An effect to escape from the normal control structure with an exception value in
 module Data.Effect.Except where
 
 -- | An effect to escape from the normal control structure with an exception value of type @e@ in the middle of a context.
-data Throw e (a :: Type) where
+data Throw e :: Effect where
     -- | Throws an exception; that is, escapes from the normal control structure with an exception value in the middle of a context.
-    Throw :: e -> Throw e a
+    Throw :: e -> Throw e f a
 
 -- | An effect to catch exceptions.
-data Catch e f (a :: Type) where
+data Catch e :: Effect where
     -- | Catches exceptions within a scope and processes them according to the given exception handler.
     Catch
         :: f a
@@ -28,15 +28,16 @@ data Catch e f (a :: Type) where
         -- ^ Exception handler. Defines the processing to perform when an exception is thrown within the scope.
         -> Catch e f a
 
-makeEffect [''Throw] [''Catch]
+makeEffectF ''Throw
+makeEffectH ''Catch
 
 -- | Throws the given `Either` value as an exception if it is `Left`.
-liftEither :: (Throw e <: f, Applicative f) => Either e a -> f a
+liftEither :: (Throw e <! f, Applicative f) => Either e a -> f a
 liftEither = either throw pure
 {-# INLINE liftEither #-}
 
 -- | Throws the result of the given action as an exception if it is `Left`.
-joinEither :: (Throw e <: m, Monad m) => m (Either e a) -> m a
+joinEither :: (Throw e <! m, Monad m) => m (Either e a) -> m a
 joinEither = (>>= either throw pure)
 {-# INLINE joinEither #-}
 
@@ -52,7 +53,7 @@ exc = (>>= either id pure)
 
 -- | If an exception occurs, executes the given exception handler, but the exception is not stopped there and is rethrown.
 withExcept
-    :: (Catch e <<: f, Throw e <: f, Applicative f)
+    :: (Catch e <! f, Throw e <! f, Applicative f)
     => f a
     -- ^ Scope to which the exception handler applies
     -> (e -> f ())
@@ -64,7 +65,7 @@ withExcept thing after = thing `catch` \e -> after e *> throw e
 -- | If an exception occurs, executes the specified action, but the exception is not stopped there and is rethrown.
 onExcept
     :: forall e f a
-     . (Catch e <<: f, Throw e <: f, Applicative f)
+     . (Catch e <! f, Throw e <! f, Applicative f)
     => f a
     -- ^ Scope in which to detect exceptions
     -> f ()

@@ -19,7 +19,7 @@ import Control.Applicative (Alternative (empty, (<|>)))
 import Data.Tuple (swap)
 
 -- | An `Applicative`-based effect for executing computations in parallel.
-data Parallel f a where
+data Parallel :: Effect where
     -- | Executes two actions in parallel and blocks until both are complete.
     -- Finally, aggregates the execution results based on the specified function.
     LiftP2
@@ -32,9 +32,9 @@ data Parallel f a where
         -> Parallel f c
 
 -- | An effect that blocks a computation indefinitely.
-data Halt (a :: Type) where
+data Halt :: Effect where
     -- | Blocks a computation indefinitely.
-    Halt :: Halt a
+    Halt :: Halt f a
 
 {- |
 An effect that adopts the result of the computation that finishes first among
@@ -45,7 +45,8 @@ data Race f (a :: Type) where
     --   computations and cancels the other.
     Race :: f a -> f a -> Race f a
 
-makeEffect [''Halt] [''Parallel, ''Race]
+makeEffectF ''Halt
+makeEffectsH [''Parallel, ''Race]
 
 {- |
 A wrapper that allows using the `Parallel` effect in the form of `Applicative` /
@@ -54,14 +55,14 @@ A wrapper that allows using the `Parallel` effect in the form of `Applicative` /
 newtype Concurrently f a = Concurrently {runConcurrently :: f a}
     deriving (Functor)
 
-instance (Parallel <<: f, Applicative f) => Applicative (Concurrently f) where
+instance (Parallel <! f, Applicative f) => Applicative (Concurrently f) where
     pure = Concurrently . pure
     {-# INLINE pure #-}
 
     liftA2 f (Concurrently a) (Concurrently b) = Concurrently $ liftP2 f a b
     {-# INLINE liftA2 #-}
 
-instance (Race <<: f, Halt <: f, Parallel <<: f, Applicative f) => Alternative (Concurrently f) where
+instance (Race <! f, Halt <! f, Parallel <! f, Applicative f) => Alternative (Concurrently f) where
     empty = Concurrently halt
     {-# INLINE empty #-}
 
@@ -73,7 +74,7 @@ Executes three actions in parallel and blocks until all are complete.
 Finally, aggregates the execution results based on the specified function.
 -}
 liftP3
-    :: (Parallel <<: f, Applicative f)
+    :: (Parallel <! f, Applicative f)
     => (a -> b -> c -> d)
     -- ^ A function that aggregates the three execution results.
     -> f a
@@ -107,11 +108,11 @@ data Poll f a where
         -- ^ The second action to be executed in parallel; the target of polling.
         -> Poll f r
 
-makeEffectH [''Poll]
+makeEffectH ''Poll
 
 -- | Executes two actions in parallel. If the first action completes before the second, the second action is canceled.
 cancels
-    :: (Poll <<: f, Applicative f)
+    :: (Poll <! f, Applicative f)
     => f a
     -- ^ The action that controls the cancellation.
     -> f b
@@ -122,7 +123,7 @@ cancels = poldl $ curry $ pure . Left
 
 -- | Executes two actions in parallel. If the second action completes before the first, the first action is canceled.
 cancelBy
-    :: (Poll <<: f, Applicative f)
+    :: (Poll <! f, Applicative f)
     => f a
     -- ^ The action to be canceled.
     -> f b
@@ -136,10 +137,10 @@ data For (t :: Type -> Type) f a where
     -- | Executes in parallel the actions stored within a `Traversable` container @t@.
     For :: t (f a) -> For t f (t a)
 
-makeEffectH_ [''For]
+makeEffectH_ ''For
 makeHFunctor' ''For \(t :< _) -> [t|Functor $t|]
 
 -- | Converts the `Traversable` container-based parallel computation effect t`For` into the `Applicative`-based parallel computation effect `Parallel`.
-forToParallel :: (Parallel <<: f, Traversable t, Applicative f) => For t f ~> f
+forToParallel :: (Parallel <! f, Traversable t, Applicative f) => For t f ~> f
 forToParallel (For iters) = runConcurrently $ traverse Concurrently iters
 {-# INLINE forToParallel #-}

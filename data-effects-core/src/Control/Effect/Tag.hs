@@ -15,8 +15,8 @@ Portability :  portable
 module Control.Effect.Tag where
 
 import Control.Applicative (Alternative)
-import Control.Effect (SendFOE (sendFOE), SendHOE (sendHOE))
-import Control.Effect.Key (SendFOEBy, SendHOEBy, sendFOEBy, sendHOEBy)
+import Control.Effect (Perform (perform))
+import Control.Effect.Key (PerformBy (performBy))
 import Control.Monad (MonadPlus)
 import Control.Monad.Except (MonadError)
 import Control.Monad.Fix (MonadFix)
@@ -27,10 +27,10 @@ import Control.Monad.State (MonadState)
 import Control.Monad.Writer (MonadWriter)
 import Data.Coerce (coerce)
 import Data.Effect.HFunctor (HFunctor, hfmap)
-import Data.Effect.Tag (pattern T, pattern TH, type (#), type (##))
+import Data.Effect.Tag (pattern Tag, type (#))
 import Data.Kind (Type)
 
--- | A wrapper data type to represent sending an effect to the carrier @f@ with the specified tag.
+-- | A wrapper data type to represent performing an effect on the carrier @f@ with the specified tag.
 newtype ViaTag tag (f :: Type -> Type) a = ViaTag {runViaTag :: f a}
     deriving newtype
         ( Functor
@@ -48,23 +48,15 @@ newtype ViaTag tag (f :: Type -> Type) a = ViaTag {runViaTag :: f a}
         , MonadError e
         )
 
--- | Send all effects within the scope, tagged, to carrier @f@.
+-- | Perform all effects within the scope, tagged, on the carrier @f@.
 tag :: forall tag f a. ViaTag tag f a -> f a
 tag = runViaTag
 {-# INLINE tag #-}
 
-instance (SendFOE (ins # tag) f) => SendFOE ins (ViaTag tag f) where
-    sendFOE = ViaTag . sendFOE . T @tag
-    {-# INLINE sendFOE #-}
+instance (Perform (e # tag) f, HFunctor e) => Perform e (ViaTag tag f) where
+    perform = ViaTag . perform . Tag @tag . hfmap coerce
+    {-# INLINE perform #-}
 
-instance (SendHOE (sig ## tag) f, HFunctor sig) => SendHOE sig (ViaTag tag f) where
-    sendHOE = ViaTag . sendHOE . TH @tag . hfmap coerce
-    {-# INLINE sendHOE #-}
-
-instance (SendFOEBy key (ins # tag) f) => SendFOEBy key ins (ViaTag tag f) where
-    sendFOEBy = ViaTag . sendFOEBy @key . T @tag
-    {-# INLINE sendFOEBy #-}
-
-instance (SendHOEBy key (sig ## tag) f, HFunctor sig) => SendHOEBy key sig (ViaTag tag f) where
-    sendHOEBy = ViaTag . sendHOEBy @key . TH @tag . hfmap coerce
-    {-# INLINE sendHOEBy #-}
+instance (PerformBy key (e # tag) f, HFunctor e) => PerformBy key e (ViaTag tag f) where
+    performBy = ViaTag . performBy @key . Tag @tag . hfmap coerce
+    {-# INLINE performBy #-}

@@ -4,6 +4,6 @@
 
 module Data.Effect.Log where
 
-data Log msg a where
-    Log :: msg -> Log msg ()
-makeEffectF [''Log]
+data Log msg :: Effect where
+    Log :: msg -> Log msg f ()
+makeEffectF ''Log

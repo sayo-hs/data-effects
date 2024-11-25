@@ -13,8 +13,8 @@ Portability :  portable
 -}
 module Data.Effect.Accum where
 
-data Accum w a where
-    Add :: w -> Accum f ()
-    Look :: Accum w w
+data Accum w :: Effect where
+    Add :: w -> Accum w f ()
+    Look :: Accum w f w
 
-makeEffectF [''Accum]
+makeEffectF ''Accum

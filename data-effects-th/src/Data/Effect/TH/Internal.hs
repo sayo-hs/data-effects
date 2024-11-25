@@ -17,18 +17,55 @@ Portability :  portable
 -}
 module Data.Effect.TH.Internal where
 
+import Control.Arrow ((>>>))
+import Control.Effect (Perform, perform)
+import Control.Effect.Key (PerformBy, performBy)
 import Control.Lens (Traversal', makeLenses, (%~), (.~), _head)
-import Control.Monad (forM, forM_, replicateM, unless, when)
-import Data.List (foldl')
+import Control.Monad (forM, forM_, replicateM, when)
+import Control.Monad.Reader (ReaderT, ask)
+import Control.Monad.Writer.CPS (WriterT, execWriterT, lift, tell)
+import Data.Char (toLower)
+import Data.Default (Default, def)
+import Data.Effect (EffectOrder (FirstOrder, HigherOrder), FirstOrder, OrderOf)
+import Data.Effect.Tag (Tagged (Tagged))
+import Data.Either.Extra (mapLeft, maybeToEither)
+import Data.Either.Validation (Validation, eitherToValidation, validationToEither)
+import Data.Function ((&))
+import Data.Functor (($>), (<&>))
+import Data.List (foldl', uncons)
+import Data.List.Extra (unsnoc)
+import Data.Maybe (fromJust, isJust)
+import Data.Text qualified as T
+import Language.Haskell.TH (
+    BangType,
+    Body (NormalB),
+    Clause (Clause),
+    Con (ForallC, GadtC, InfixC, NormalC, RecC, RecGadtC),
+    Dec (DataD, FunD, NewtypeD, PragmaD),
+    DocLoc (ArgDoc, DeclDoc),
+    Exp (AppE, AppTypeE, ConE, SigE, VarE),
+    Info (TyConI),
+    Inline (Inline),
+    Pat (VarP),
+    Phases (AllPhases),
+    Pragma (InlineP),
+    RuleMatch (FunLike),
+    Specificity (SpecifiedSpec),
+    TyVarBndr (..),
+    TyVarBndrSpec,
+    Type (WildCardT),
+    getDoc,
+    mkName,
+    pprint,
+    putDoc,
+ )
+import Language.Haskell.TH qualified as TH
 import Language.Haskell.TH.Syntax (
-    Con,
     Cxt,
     Dec (SigD),
-    Info,
     Name,
     Q,
     Quote (newName),
-    TyVarBndr,
     Type (
         AppKindT,
         AppT,
@@ -48,100 +85,33 @@ import Language.Haskell.TH.Syntax (
     reify,
  )
 
-import Control.Arrow ((>>>))
-import Control.Effect (SendFOE, SendHOE, sendFOE, sendHOE)
-import Control.Effect.Key (SendFOEBy, SendHOEBy, sendFOEBy, sendHOEBy)
-import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
-import Data.Char (toLower)
-import Data.Default (Default, def)
-import Data.Effect (LiftFOE (LiftFOE))
-import Data.Effect.Tag (Tag (Tag), TagH (TagH))
-import Data.Either.Extra (mapLeft, maybeToEither)
-import Data.Either.Validation (Validation, eitherToValidation, validationToEither)
-import Data.Function ((&))
-import Data.Functor (($>), (<&>))
-import Data.List.Extra (unsnoc)
-import Data.Maybe (fromJust, isJust)
-import Data.Text qualified as T
-import Language.Haskell.TH (
-    BangType,
-    Body (NormalB),
-    Clause (Clause),
-    Con (ForallC, GadtC, InfixC, NormalC, RecC, RecGadtC),
-    Dec (DataD, FunD, NewtypeD, PatSynD, PragmaD, TySynD),
-    DocLoc (ArgDoc, DeclDoc),
-    Exp (AppE, AppTypeE, ConE, SigE, VarE),
-    Info (TyConI),
-    Inline (Inline),
-    Pat (ConP, VarP),
-    PatSynArgs (PrefixPatSyn),
-    PatSynDir (ImplBidir),
-    Phases (AllPhases),
-    Pragma (CompleteP, InlineP),
-    RuleMatch (FunLike),
-    Specificity (SpecifiedSpec),
-    TyVarBndr (..),
-    TyVarBndrSpec,
-    Type (TupleT, WildCardT),
-    getDoc,
-    mkName,
-    patSynSigD,
-    pprint,
-    putDoc,
-    reportWarning,
- )
-import Language.Haskell.TH qualified as TH
-import Language.Haskell.TH.Datatype.TyVarBndr (pattern BndrReq)
-
-data EffClsInfo = EffClsInfo
-    { ecName :: Name
-    , ecParamVars :: [TyVarBndr ()]
-    , ecCarrier :: Maybe (TyVarBndr ())
-    , ecEffs :: [EffConInfo]
+data EffectInfo = EffectInfo
+    { eName :: Name
+    , eParamVars :: [TyVarBndr ()]
+    , eCarrier :: TyVarBndr ()
+    , eOps :: [OpInfo]
     }
 
-data EffConInfo = EffConInfo
-    { effName :: Name
-    , effParamTypes :: [TH.Type]
-    , effDataType :: TH.Type
-    , effResultType :: TH.Type
-    , effTyVars :: [TyVarBndrSpec]
-    , effCarrier :: Maybe (TyVarBndr ())
-    , effCxt :: Cxt
+data OpInfo = OpInfo
+    { opName :: Name
+    , opParamTypes :: [TH.Type]
+    , opDataType :: TH.Type
+    , opResultType :: TH.Type
+    , opTyVars :: [TyVarBndrSpec]
+    , opCarrier :: TyVarBndr ()
+    , opCxt :: Cxt
+    , opOrder :: EffectOrder
     }
 
--- | An order of effect.
-data EffectOrder = FirstOrder | HigherOrder
-    deriving (Show, Eq, Ord)
+newtype EffectConf = EffectConf {opConf :: Name -> OpConf}
 
-orderOf :: EffClsInfo -> EffectOrder
-orderOf =
-    ecCarrier >>> \case
-        Just _ -> HigherOrder
-        Nothing -> FirstOrder
+alterOpConf :: (OpConf -> OpConf) -> EffectConf -> EffectConf
+alterOpConf f conf = conf{opConf = f . opConf conf}
 
-newtype MakeEffectConf = MakeEffectConf {unMakeEffectConf :: EffClsInfo -> Q EffectClassConf}
-
-alterEffectClassConf :: (EffectClassConf -> EffectClassConf) -> MakeEffectConf -> MakeEffectConf
-alterEffectClassConf f (MakeEffectConf conf) = MakeEffectConf (fmap f . conf)
-{-# INLINE alterEffectClassConf #-}
-
-alterEffectConf :: (EffectConf -> EffectConf) -> MakeEffectConf -> MakeEffectConf
-alterEffectConf f = alterEffectClassConf \conf ->
-    conf{_confByEffect = f . _confByEffect conf}
-
-data EffectClassConf = EffectClassConf
-    { _confByEffect :: Name -> EffectConf
-    , _doesDeriveHFunctor :: Bool
-    , _doesGenerateLiftFOETypeSynonym :: Bool
-    , _doesGenerateLiftFOEPatternSynonyms :: Bool
-    }
-
-data EffectConf = EffectConf
+data OpConf = OpConf
     { _normalSenderGenConf :: Maybe SenderFunctionConf
     , _taggedSenderGenConf :: Maybe SenderFunctionConf
     , _keyedSenderGenConf :: Maybe SenderFunctionConf
-    , _warnFirstOrderInHOE :: Bool
     }
 
 data SenderFunctionConf = SenderFunctionConf
@@ -151,225 +121,165 @@ data SenderFunctionConf = SenderFunctionConf
     , _senderFnArgDoc :: Int -> Maybe String -> Q (Maybe String)
     }
 
-senderFnConfs :: Traversal' EffectConf SenderFunctionConf
-senderFnConfs f EffectConf{..} = do
+senderFnConfs :: Traversal' OpConf SenderFunctionConf
+senderFnConfs f OpConf{..} = do
     normal <- traverse f _normalSenderGenConf
     tagged <- traverse f _taggedSenderGenConf
     keyed <- traverse f _keyedSenderGenConf
     pure
-        EffectConf
+        OpConf
             { _normalSenderGenConf = normal
             , _taggedSenderGenConf = tagged
             , _keyedSenderGenConf = keyed
-            , _warnFirstOrderInHOE
             }
 
-makeLenses ''EffectClassConf
-makeLenses ''EffectConf
+makeLenses ''OpConf
 makeLenses ''SenderFunctionConf
 
-deriveHFunctor :: MakeEffectConf -> MakeEffectConf
-deriveHFunctor = alterEffectClassConf $ doesDeriveHFunctor .~ True
-{-# INLINE deriveHFunctor #-}
-
-noDeriveHFunctor :: MakeEffectConf -> MakeEffectConf
-noDeriveHFunctor = alterEffectClassConf $ doesDeriveHFunctor .~ False
-{-# INLINE noDeriveHFunctor #-}
-
-generateLiftFOETypeSynonym :: MakeEffectConf -> MakeEffectConf
-generateLiftFOETypeSynonym = alterEffectClassConf $ doesGenerateLiftFOETypeSynonym .~ True
-{-# INLINE generateLiftFOETypeSynonym #-}
-
-noGenerateLiftFOETypeSynonym :: MakeEffectConf -> MakeEffectConf
-noGenerateLiftFOETypeSynonym = alterEffectClassConf $ doesGenerateLiftFOETypeSynonym .~ False
-{-# INLINE noGenerateLiftFOETypeSynonym #-}
-
-generateLiftFOEPatternSynonyms :: MakeEffectConf -> MakeEffectConf
-generateLiftFOEPatternSynonyms = alterEffectClassConf $ doesGenerateLiftFOEPatternSynonyms .~ True
-{-# INLINE generateLiftFOEPatternSynonyms #-}
-
-noGenerateLiftFOEPatternSynonyms :: MakeEffectConf -> MakeEffectConf
-noGenerateLiftFOEPatternSynonyms =
-    alterEffectClassConf $ doesGenerateLiftFOEPatternSynonyms .~ False
-{-# INLINE noGenerateLiftFOEPatternSynonyms #-}
-
-noGenerateNormalSenderFunction :: MakeEffectConf -> MakeEffectConf
-noGenerateNormalSenderFunction = alterEffectConf $ normalSenderGenConf .~ Nothing
+noGenerateNormalSenderFunction :: EffectConf -> EffectConf
+noGenerateNormalSenderFunction = alterOpConf $ normalSenderGenConf .~ Nothing
 {-# INLINE noGenerateNormalSenderFunction #-}
 
-noGenerateTaggedSenderFunction :: MakeEffectConf -> MakeEffectConf
-noGenerateTaggedSenderFunction = alterEffectConf $ taggedSenderGenConf .~ Nothing
+noGenerateTaggedSenderFunction :: EffectConf -> EffectConf
+noGenerateTaggedSenderFunction = alterOpConf $ taggedSenderGenConf .~ Nothing
 {-# INLINE noGenerateTaggedSenderFunction #-}
 
-noGenerateKeyedSenderFunction :: MakeEffectConf -> MakeEffectConf
-noGenerateKeyedSenderFunction = alterEffectConf $ keyedSenderGenConf .~ Nothing
+noGenerateKeyedSenderFunction :: EffectConf -> EffectConf
+noGenerateKeyedSenderFunction = alterOpConf $ keyedSenderGenConf .~ Nothing
 {-# INLINE noGenerateKeyedSenderFunction #-}
 
-suppressFirstOrderInHigherOrderEffectWarning :: MakeEffectConf -> MakeEffectConf
-suppressFirstOrderInHigherOrderEffectWarning = alterEffectConf $ warnFirstOrderInHOE .~ False
-{-# INLINE suppressFirstOrderInHigherOrderEffectWarning #-}
-
-noGenerateSenderFunctionSignature :: MakeEffectConf -> MakeEffectConf
+noGenerateSenderFunctionSignature :: EffectConf -> EffectConf
 noGenerateSenderFunctionSignature =
-    alterEffectConf $ senderFnConfs %~ doesGenerateSenderFnSignature .~ False
+    alterOpConf $ senderFnConfs %~ doesGenerateSenderFnSignature .~ False
 {-# INLINE noGenerateSenderFunctionSignature #-}
 
-instance Default MakeEffectConf where
-    def = MakeEffectConf $ const $ pure def
-    {-# INLINE def #-}
-
-instance Default EffectClassConf where
+instance Default EffectConf where
     def =
-        EffectClassConf
-            { _confByEffect = \effConName ->
+        EffectConf
+            { opConf = \effConName ->
                 let normalSenderFnConf =
                         SenderFunctionConf
                             { _senderFnName =
                                 let effConName' = nameBase effConName
-                                 in if head effConName' == ':'
-                                        then tail effConName'
+                                    (opNameInitial, opNameTail) = fromJust $ uncons effConName'
+                                 in if opNameInitial == ':'
+                                        then opNameTail
                                         else effConName' & _head %~ toLower
                             , _doesGenerateSenderFnSignature = True
                             , _senderFnDoc = pure
                             , _senderFnArgDoc = const pure
                             }
-                 in EffectConf
+                 in OpConf
                         { _normalSenderGenConf = Just normalSenderFnConf
                         , _taggedSenderGenConf =
-                            Just $ normalSenderFnConf & senderFnName %~ (++ "'")
-                        , _keyedSenderGenConf =
                             Just $ normalSenderFnConf & senderFnName %~ (++ "''")
-                        , _warnFirstOrderInHOE = True
+                        , _keyedSenderGenConf =
+                            Just $ normalSenderFnConf & senderFnName %~ (++ "'")
                         }
-            , _doesDeriveHFunctor = True
-            , _doesGenerateLiftFOETypeSynonym = True
-            , _doesGenerateLiftFOEPatternSynonyms = True
             }
 
-genSenders :: EffectClassConf -> EffClsInfo -> Q [Dec]
-genSenders EffectClassConf{..} ec@EffClsInfo{..} = do
-    let order = orderOf ec
+type EffectGenerator =
+    ReaderT (EffectConf, Name, Info, DataInfo, EffectInfo) (WriterT [Dec] Q) ()
 
-    execWriterT $ forM ecEffs \con@EffConInfo{..} -> do
-        let EffectConf{..} = _confByEffect effName
+genEffect, genFOE, genHOE :: EffectGenerator
+genEffect = do
+    (conf, _, _, _, eInfo) <- ask
+    genSenders conf eInfo & lift & lift >>= tell
+genFOE = do
+    genEffect
+    (_, _, _, _, EffectInfo{..}) <- ask
+    let eData = foldl AppT (ConT eName) (map (VarT . tyVarName) eParamVars)
+    [d|type instance OrderOf $(pure eData) = 'FirstOrder|] & lift & lift >>= tell
+    [d|instance FirstOrder $(pure eData)|] & lift & lift >>= tell
+genHOE = do
+    genEffect
+    (_, _, _, _, EffectInfo{..}) <- ask
+    let eData = foldl AppT (ConT eName) (map (VarT . tyVarName) eParamVars)
+    [d|type instance OrderOf $(pure eData) = HigherOrder|] & lift & lift >>= tell
 
-        forM_ _normalSenderGenConf \conf -> genNormalSender order conf con
-        forM_ _taggedSenderGenConf \conf -> genTaggedSender order conf con
-        forM_ _keyedSenderGenConf \conf -> genKeyedSender order conf con
+genSenders :: EffectConf -> EffectInfo -> Q [Dec]
+genSenders EffectConf{..} EffectInfo{..} = do
+    execWriterT $ forM eOps \con@OpInfo{..} -> do
+        let OpConf{..} = opConf opName
 
-        -- Check for First Order in Higher Order effect warning
-        when (_warnFirstOrderInHOE && order == HigherOrder) do
-            let isHigherOrderEffect = any (tyVarName (fromJust effCarrier) `occurs`) effParamTypes
-
-            unless isHigherOrderEffect do
-                lift $
-                    reportWarning $
-                        "The first-order operation ‘"
-                            <> nameBase effName
-                            <> "’ has been found within the higher-order effect data type ‘"
-                            <> nameBase ecName
-                            <> "’.\nConsider separating the first-order operation into an first-order effect data type."
+        forM_ _normalSenderGenConf (genNormalSender con)
+        forM_ _taggedSenderGenConf (genTaggedSender con)
+        forM_ _keyedSenderGenConf (genKeyedSender con)
 
 genNormalSender
-    :: EffectOrder
+    :: OpInfo
     -> SenderFunctionConf
-    -> EffConInfo
     -> WriterT [Dec] Q ()
-genNormalSender order = genSender order send sendCxt id
-  where
-    (send, sendCxt) = case order of
-        FirstOrder ->
-            ( (VarE 'sendFOE `AppE`)
-            , \effDataType carrier -> ConT ''SendFOE `AppT` effDataType `AppT` carrier
-            )
-        HigherOrder ->
-            ( (VarE 'sendHOE `AppE`)
-            , \effDataType carrier -> ConT ''SendHOE `AppT` effDataType `AppT` carrier
-            )
+genNormalSender =
+    genSender
+        (VarE 'perform `AppE`)
+        (\opDataType carrier -> ConT ''Perform `AppT` opDataType `AppT` carrier)
+        id
 
 genTaggedSender
-    :: EffectOrder
+    :: OpInfo
     -> SenderFunctionConf
-    -> EffConInfo
     -> WriterT [Dec] Q ()
-genTaggedSender order conf eff = do
+genTaggedSender conf eff = do
     nTag <- newName "tag" & lift
     let tag = VarT nTag
 
-        (send, sendCxt) = case order of
-            FirstOrder ->
-                ( (VarE 'sendFOE `AppE`) . (ConE 'Tag `AppTypeE` WildCardT `AppTypeE` tag `AppE`)
-                , \effDataType carrier ->
-                    ConT ''SendFOE `AppT` (ConT ''Tag `AppT` effDataType `AppT` tag) `AppT` carrier
-                )
-            HigherOrder ->
-                ( (VarE 'sendHOE `AppE`) . (ConE 'TagH `AppTypeE` WildCardT `AppTypeE` tag `AppE`)
-                , \effDataType carrier ->
-                    ConT ''SendHOE `AppT` (ConT ''TagH `AppT` effDataType `AppT` tag) `AppT` carrier
-                )
-
-    genSender order send sendCxt (PlainTV nTag SpecifiedSpec :) conf eff
+    genSender
+        ((VarE 'perform `AppE`) . (ConE 'Tagged `AppTypeE` WildCardT `AppTypeE` tag `AppE`))
+        ( \opDataType carrier ->
+            ConT ''Perform `AppT` (ConT ''Tagged `AppT` opDataType `AppT` tag) `AppT` carrier
+        )
+        (PlainTV nTag SpecifiedSpec :)
+        conf
+        eff
 
 genKeyedSender
-    :: EffectOrder
+    :: OpInfo
     -> SenderFunctionConf
-    -> EffConInfo
     -> WriterT [Dec] Q ()
-genKeyedSender order conf eff = do
+genKeyedSender eff conf = do
     nKey <- newName "key" & lift
     let key = VarT nKey
 
-        (send, sendCxt) = case order of
-            FirstOrder ->
-                ( (VarE 'sendFOEBy `AppTypeE` key `AppE`)
-                , \effDataType carrier ->
-                    ConT ''SendFOEBy `AppT` key `AppT` effDataType `AppT` carrier
-                )
-            HigherOrder ->
-                ( (VarE 'sendHOEBy `AppTypeE` key `AppE`)
-                , \effDataType carrier ->
-                    ConT ''SendHOEBy `AppT` key `AppT` effDataType `AppT` carrier
-                )
-
-    genSender order send sendCxt (PlainTV nKey SpecifiedSpec :) conf eff
+    genSender
+        (VarE 'performBy `AppTypeE` key `AppE`)
+        ( \opDataType carrier ->
+            ConT ''PerformBy `AppT` key `AppT` opDataType `AppT` carrier
+        )
+        (PlainTV nKey SpecifiedSpec :)
+        eff
+        conf
 
 genSender
-    :: EffectOrder
-    -> (Exp -> Exp)
+    :: (Exp -> Exp)
     -> (TH.Type -> TH.Type -> TH.Type)
     -> ([TyVarBndrSpec] -> [TyVarBndrSpec])
+    -> OpInfo
     -> SenderFunctionConf
-    -> EffConInfo
     -> WriterT [Dec] Q ()
-genSender order send sendCxt alterFnSigTVs conf@SenderFunctionConf{..} con@EffConInfo{..} = do
-    genSenderArmor sendCxt alterFnSigTVs conf con \f -> do
-        args <- replicateM (length effParamTypes) (newName "x")
+genSender send sendCxt alterFnSigTVs con@OpInfo{..} conf@SenderFunctionConf{..} = do
+    genSenderArmor sendCxt alterFnSigTVs con conf \f -> do
+        args <- replicateM (length opParamTypes) (newName "x")
 
         let body =
                 send
-                    ( foldl' AppE (ConE effName) (map VarE args)
+                    ( foldl' AppE (ConE opName) (map VarE args)
                         & if _doesGenerateSenderFnSignature
-                            then (`SigE` ((effDataType & appCarrier) `AppT` effResultType))
+                            then (`SigE` ((opDataType `AppT` f) `AppT` opResultType))
                             else id
                     )
-
-            appCarrier = case order of
-                FirstOrder -> id
-                HigherOrder -> (`AppT` f)
 
         pure $ Clause (map VarP args) (NormalB body) []
 
 genSenderArmor
     :: (TH.Type -> TH.Type -> TH.Type)
     -> ([TyVarBndrSpec] -> [TyVarBndrSpec])
+    -> OpInfo
     -> SenderFunctionConf
-    -> EffConInfo
     -> (Type -> Q Clause)
     -> WriterT [Dec] Q ()
-genSenderArmor sendCxt alterFnSigTVs SenderFunctionConf{..} EffConInfo{..} clause = do
-    carrier <- maybe ((`PlainTV` ()) <$> newName "f") pure effCarrier & lift
-
-    let f = tyVarType carrier
+genSenderArmor sendCxt alterFnSigTVs OpInfo{..} SenderFunctionConf{..} clause = do
+    let f = tyVarType opCarrier
 
         fnName = mkName _senderFnName
 
@@ -377,9 +287,9 @@ genSenderArmor sendCxt alterFnSigTVs SenderFunctionConf{..} EffConInfo{..} claus
             SigD
                 fnName
                 ( ForallT
-                    (effTyVars ++ [carrier $> SpecifiedSpec] & alterFnSigTVs)
-                    (sendCxt effDataType f : effCxt)
-                    (arrowChain effParamTypes (f `AppT` effResultType))
+                    (opTyVars ++ [opCarrier $> SpecifiedSpec] & alterFnSigTVs)
+                    (sendCxt opDataType f : opCxt)
+                    (arrowChain opParamTypes (f `AppT` opResultType))
                 )
 
         funInline = PragmaD (InlineP fnName Inline FunLike AllPhases)
@@ -388,12 +298,12 @@ genSenderArmor sendCxt alterFnSigTVs SenderFunctionConf{..} EffConInfo{..} claus
 
     -- Put documents
     lift do
-        effDoc <- getDoc $ DeclDoc effName
+        effDoc <- getDoc $ DeclDoc opName
         _senderFnDoc effDoc >>= mapM_ \doc -> do
             addModFinalizer $ putDoc (DeclDoc fnName) doc
 
-        forM [0 .. length effParamTypes - 1] \i -> do
-            argDoc <- getDoc $ ArgDoc effName i
+        forM [0 .. length opParamTypes - 1] \i -> do
+            argDoc <- getDoc $ ArgDoc opName i
             _senderFnArgDoc i argDoc >>= mapM_ \doc -> do
                 addModFinalizer $ putDoc (ArgDoc fnName i) doc
 
@@ -420,8 +330,8 @@ data ConInfo = ConInfo
     , conCxt :: Cxt
     }
 
-reifyEffCls :: EffectOrder -> Name -> Q (Info, DataInfo, EffClsInfo)
-reifyEffCls order name = do
+reifyEffect :: Name -> Q (Info, DataInfo, EffectInfo)
+reifyEffect name = do
     info <- reify name
 
     dataInfo <-
@@ -429,29 +339,23 @@ reifyEffCls order name = do
             & maybe (fail $ "Not datatype: ‘" <> pprint name <> "’") pure
 
     effClsInfo <-
-        analyzeEffCls order dataInfo
+        analyzeEffect dataInfo
             & either (fail . T.unpack) pure
 
     pure (info, dataInfo, effClsInfo)
 
-analyzeEffCls :: EffectOrder -> DataInfo -> Either T.Text EffClsInfo
-analyzeEffCls order DataInfo{..} = do
+analyzeEffect :: DataInfo -> Either T.Text EffectInfo
+analyzeEffect DataInfo{..} = do
     (initTyVars, resultType) <- unsnoc dataTyVars & maybeToEither "No result type variable."
+    (paramVars, carrier) <- unsnoc initTyVars & maybeToEither "No carrier type variable."
 
-    (paramVars, mCarrier) <-
-        case order of
-            FirstOrder -> pure (initTyVars, Nothing)
-            HigherOrder -> do
-                (pvs, carrier) <- unsnoc initTyVars & maybeToEither "No carrier type variable."
-                pure (pvs, Just carrier)
-
-    let analyzeEffCon :: ConInfo -> Validation [T.Text] EffConInfo
-        analyzeEffCon ConInfo{..} = eitherToValidation do
-            (effDataType, effCarrier, effResultType) <-
+    let analyzeOp :: ConInfo -> Validation [T.Text] OpInfo
+        analyzeOp ConInfo{..} = eitherToValidation do
+            (opDataType, opCarrier, opResultType) <-
                 maybe
                     ( pure
                         ( foldl' AppT (VarT dataName) (map tyVarType paramVars)
-                        , mCarrier
+                        , carrier
                         , tyVarType resultType
                         )
                     )
@@ -459,123 +363,58 @@ analyzeEffCls order DataInfo{..} = do
                     conGadtReturnType
 
             let removeCarrierTV :: [TyVarBndr a] -> [TyVarBndr a]
-                removeCarrierTV = case order of
-                    FirstOrder -> id
-                    HigherOrder -> filter ((tyVarName <$> effCarrier /=) . Just . tyVarName)
+                removeCarrierTV = filter ((tyVarName opCarrier /=) . tyVarName)
 
-                effTyVars =
+                opTyVars =
                     if isJust conGadtReturnType
                         then removeCarrierTV conTyVars
                         else map (SpecifiedSpec <$) (removeCarrierTV paramVars) ++ conTyVars
 
+                opParamTypes = map snd conArgs
+
             Right
-                EffConInfo
-                    { effName = conName
-                    , effParamTypes = map snd conArgs
-                    , effDataType = effDataType
-                    , effResultType = effResultType
-                    , effTyVars = effTyVars
-                    , effCarrier = effCarrier
-                    , effCxt = conCxt
+                OpInfo
+                    { opName = conName
+                    , opParamTypes = opParamTypes
+                    , opDataType = opDataType
+                    , opResultType = opResultType
+                    , opTyVars = opTyVars
+                    , opCarrier = opCarrier
+                    , opCxt = conCxt
+                    , opOrder =
+                        if any (tyVarName opCarrier `occurs`) opParamTypes
+                            then HigherOrder
+                            else FirstOrder
                     }
           where
             decomposeGadtReturnType
-                :: TH.Type -> Either [T.Text] (TH.Type, Maybe (TyVarBndr ()), TH.Type)
+                :: TH.Type -> Either [T.Text] (TH.Type, TyVarBndr (), TH.Type)
             decomposeGadtReturnType =
-                unkindType >>> case order of
-                    FirstOrder ->
-                        \case
-                            ins `AppT` x -> Right (ins, Nothing, x)
-                            t ->
-                                Left
-                                    [ "Unexpected form of GADT return type for the first-order operation ‘"
-                                        <> T.pack (nameBase conName)
-                                        <> "’: "
-                                        <> T.pack (pprint t)
-                                    ]
-                    HigherOrder -> \case
-                        sig `AppT` SigT (VarT f) kf `AppT` x ->
-                            Right (sig, Just (KindedTV f () kf), x)
-                        sig `AppT` VarT f `AppT` x ->
-                            Right (sig, Just (PlainTV f ()), x)
-                        t ->
-                            Left
-                                [ "Unexpected form of GADT return type for the higher-order operation ‘"
-                                    <> T.pack (nameBase conName)
-                                    <> "’: "
-                                    <> T.pack (pprint t)
-                                ]
+                unkindType >>> \case
+                    e `AppT` SigT (VarT f) kf `AppT` x ->
+                        Right (e, KindedTV f () kf, x)
+                    e `AppT` VarT f `AppT` x ->
+                        Right (e, PlainTV f (), x)
+                    t ->
+                        Left
+                            [ "Unexpected form of GADT return type for the higher-order operation ‘"
+                                <> T.pack (nameBase conName)
+                                <> "’: "
+                                <> T.pack (pprint t)
+                            ]
 
     effCons <-
-        traverse analyzeEffCon dataCons
+        traverse analyzeOp dataCons
             & validationToEither
             & mapLeft T.unlines
 
     pure
-        EffClsInfo
-            { ecName = dataName
-            , ecParamVars = paramVars
-            , ecCarrier = mCarrier
-            , ecEffs = effCons
+        EffectInfo
+            { eName = dataName
+            , eParamVars = paramVars
+            , eCarrier = carrier
+            , eOps = effCons
             }
-
--- ** Generating Synonyms about LiftFOE
-
-{- |
-Generate the pattern synonyms for operation constructors:
-
-    @pattern LBaz ... = LiftFOE (Baz ...)@
--}
-genLiftFOEPatternSynonyms :: EffClsInfo -> Q [Dec]
-genLiftFOEPatternSynonyms EffClsInfo{..} = do
-    patSyns <-
-        forM ecEffs \EffConInfo{..} -> do
-            let newConName = mkName $ 'L' : nameBase effName
-            args <- replicateM (length effParamTypes) (newName "x")
-
-            f <- VarT <$> newName "f"
-            a <- VarT <$> newName "a"
-
-            (newConName,)
-                <$> sequence
-                    [ patSynSigD
-                        newConName
-                        -- For some reason, if I don't write constraints in this form, the type is
-                        -- not inferred properly (why?).
-                        [t|
-                            ()
-                            => ( $(pure a) ~ $(pure effResultType)
-                               , $(pure $ foldl AppT (TupleT (length effCxt)) effCxt)
-                               )
-                            => $( pure $
-                                    arrowChain
-                                        effParamTypes
-                                        ((ConT ''LiftFOE `AppT` effDataType) `AppT` f `AppT` a)
-                                )
-                            |]
-                    , pure $
-                        PatSynD
-                            newConName
-                            (PrefixPatSyn args)
-                            ImplBidir
-                            (ConP 'LiftFOE [] [ConP effName [] (VarP <$> args)])
-                    ]
-
-    pure $ concatMap snd patSyns ++ [PragmaD $ CompleteP (fst <$> patSyns) Nothing]
-
-{- |
-Generate the type synonym for an first-order effect datatype:
-
-    @type (LFoobar ...) = LiftFOE (Foobar ...)@
--}
-genLiftFOETypeSynonym :: EffClsInfo -> Dec
-genLiftFOETypeSynonym EffClsInfo{..} = do
-    TySynD
-        (mkName $ 'L' : nameBase ecName)
-        (pvs <&> (`PlainTV` BndrReq))
-        (ConT ''LiftFOE `AppT` foldl AppT (ConT ecName) (map VarT pvs))
-  where
-    pvs = tyVarName <$> ecParamVars
 
 -- * Utility functions
 

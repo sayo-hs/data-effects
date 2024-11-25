@@ -16,12 +16,12 @@ can modify the value within a local scope using the `local` operation.
 module Data.Effect.Reader where
 
 -- | An effect that holds a value of type @r@ in the context (environment).
-data Ask r (a :: Type) where
+data Ask r :: Effect where
     -- | Obtain a value from the environment.
-    Ask :: Ask r r
+    Ask :: Ask r f r
 
 -- | An effect that locally modifies the value held in the environment.
-data Local r f (a :: Type) where
+data Local r :: Effect where
     -- | Locally modifies the value held in the environment.
     Local
         :: (r -> r)
@@ -30,8 +30,9 @@ data Local r f (a :: Type) where
         -- ^ The local scope where the modification is applied.
         -> Local r f a
 
-makeEffect [''Ask] [''Local]
+makeEffectF ''Ask
+makeEffectH ''Local
 
 -- | Obtains a value from the environment and returns it transformed by the given function.
-asks :: (Ask r <: f, Functor f) => (r -> a) -> f a
+asks :: (Ask r <! f, Functor f) => (r -> a) -> f a
 asks f = f <$> ask

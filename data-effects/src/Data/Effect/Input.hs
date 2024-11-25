@@ -18,12 +18,12 @@ Realizes input of values from the external world.
 module Data.Effect.Input where
 
 -- | A general effect representing input of values from the external world.
-data Input i (a :: Type) where
+data Input i :: Effect where
     -- | Retrieve a value input from the external world.
-    Input :: Input i i
+    Input :: Input i f i
 
-makeEffectF [''Input]
+makeEffectF ''Input
 
 -- | Returns the value obtained by transforming the input value using the given function.
-inputs :: (Input i <: f, Functor f) => (i -> a) -> f a
+inputs :: (Input i <! f, Functor f) => (i -> a) -> f a
 inputs f = f <$> input

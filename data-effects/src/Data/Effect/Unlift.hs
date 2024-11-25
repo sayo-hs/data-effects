@@ -13,12 +13,12 @@ Realizes [@unliftio@](https://hackage.haskell.org/package/unliftio) in the form 
 -}
 module Data.Effect.Unlift where
 
-import Data.Effect.Tag (type (##))
+import Data.Effect.Tag (type (#))
 
 data UnliftBase b f (a :: Type) where
     WithRunInBase :: ((forall x. f x -> b x) -> b a) -> UnliftBase b f a
 
-makeEffectH [''UnliftBase]
+makeEffectH ''UnliftBase
 
 type UnliftIO = UnliftBase IO
 
@@ -26,14 +26,14 @@ pattern WithRunInIO :: (f ~> IO -> IO a) -> UnliftIO f a
 pattern WithRunInIO f = WithRunInBase f
 {-# COMPLETE WithRunInIO #-}
 
-withRunInIO :: (UnliftIO <<: f) => (f ~> IO -> IO a) -> f a
+withRunInIO :: (UnliftIO <! f) => (f ~> IO -> IO a) -> f a
 withRunInIO = withRunInBase
 {-# INLINE withRunInIO #-}
 
-withRunInIO' :: forall tag f a. (UnliftIO ## tag <<: f) => (f ~> IO -> IO a) -> f a
-withRunInIO' = withRunInBase' @tag
+withRunInIO' :: forall key f a. (PerformBy key UnliftIO f) => (f ~> IO -> IO a) -> f a
+withRunInIO' = withRunInBase' @key
 {-# INLINE withRunInIO' #-}
 
-withRunInIO'' :: forall key f a. (SendHOEBy key UnliftIO f) => (f ~> IO -> IO a) -> f a
-withRunInIO'' = withRunInBase'' @key
+withRunInIO'' :: forall tag f a. (UnliftIO # tag <! f) => (f ~> IO -> IO a) -> f a
+withRunInIO'' = withRunInBase'' @tag
 {-# INLINE withRunInIO'' #-}

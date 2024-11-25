@@ -15,25 +15,25 @@ in the @effectful@ package.
 module Data.Effect.Provider where
 
 import Data.Effect.HFunctor (HFunctor, hfmap)
-import Data.Effect.Key (type (##>))
+import Data.Effect.Key (type (#>))
 import Data.Functor.Const (Const (Const))
 import Data.Functor.Identity (Identity, runIdentity)
 
 -- | An effect to introduce a new local scope that provides effect context @b@.
-data Provider' ctx i b (f :: Type -> Type) (a :: Type) where
+data Provider' ctx i b :: Effect where
     -- | Introduces a new local scope that provides an effect context @b p@ parameterized by type @i p@ and with results wrapped in @ctx p@.
     Provide
         :: i p
         -> ((forall x. f x -> b p x) -> b p a)
         -> Provider' ctx i b f (ctx p a)
 
-makeEffectH [''Provider']
+makeEffectH ''Provider'
 
 -- | A type-level key to uniquely resolve the effect context carrier @b@ from @ctx@ and @i@.
 data ProviderKey ctx i
 
 -- | An effect to introduce a new local scope that provides effect context @b@.
-type Provider ctx i b = ProviderKey ctx i ##> Provider' ctx i b
+type Provider ctx i b = ProviderKey ctx i #> Provider' ctx i b
 
 {- |
 An effect to introduce a new local scope that provides effect context @b@.
@@ -55,7 +55,7 @@ A version of `..!` where the result is not wrapped in a specific container.
 -}
 (.!)
     :: forall i f a b
-     . ( SendHOEBy
+     . ( PerformBy
             (ProviderKey (Const1 Identity :: () -> Type -> Type) (Const i :: () -> Type))
             (Provider' (Const1 Identity) (Const i) (Const1 b))
             f
@@ -66,7 +66,7 @@ A version of `..!` where the result is not wrapped in a specific container.
     -> f a
 i .! f =
     runIdentity . getConst1
-        <$> provide'' @(ProviderKey (Const1 Identity :: () -> _ -> _) (Const i :: () -> _))
+        <$> provide' @(ProviderKey (Const1 Identity :: () -> _ -> _) (Const i :: () -> _))
             (Const i)
             \run -> Const1 $ f $ getConst1 . run
 {-# INLINE (.!) #-}
@@ -76,9 +76,9 @@ infix 2 ..!
 -- | A operator to introduce a new local scope that provides effect context @b p@.
 (..!)
     :: forall ctx i p f a b
-     . (SendHOEBy (ProviderKey ctx i) (Provider' ctx i b) f)
+     . (PerformBy (ProviderKey ctx i) (Provider' ctx i b) f)
     => i p
     -> ((f ~> b p) -> b p a)
     -> f (ctx p a)
-i ..! f = provide'' @(ProviderKey ctx i) i f
+i ..! f = provide' @(ProviderKey ctx i) i f
 {-# INLINE (..!) #-}

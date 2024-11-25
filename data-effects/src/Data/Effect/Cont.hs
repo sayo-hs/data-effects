@@ -6,7 +6,7 @@
 
 module Data.Effect.Cont where
 
-data CallCC m a where
+data CallCC :: Effect where
     CallCC :: (forall r. (a -> m r) -> m a) -> CallCC m a
 
-makeEffect' (def & noDeriveHFunctor) noExtTemplate [] [''CallCC]
+makeEffectH_ ''CallCC

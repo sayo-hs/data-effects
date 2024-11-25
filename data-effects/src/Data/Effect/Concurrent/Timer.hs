@@ -20,21 +20,21 @@ import Data.Functor ((<&>))
 import Data.Time (DiffTime)
 
 -- | An effect for time-related operations.
-data Timer a where
+data Timer :: Effect where
     -- | Retrieves the current relative time from an arbitrary fixed reference point.
     --   The reference point does not change within the context of that scope.
-    Clock :: Timer DiffTime
+    Clock :: Timer f DiffTime
     -- | Temporarily suspends computation for the specified duration.
-    Sleep :: DiffTime -> Timer ()
+    Sleep :: DiffTime -> Timer f ()
 
-makeEffectF [''Timer]
+makeEffectF ''Timer
 
 {- |
 Creates a scope where elapsed time can be obtained.
 An action to retrieve the elapsed time, re-zeroed at the start of the scope, is passed to the scope.
 -}
 withElapsedTime
-    :: (Timer <: m, Monad m)
+    :: (Timer <! m, Monad m)
     => (m DiffTime -> m a)
     -- ^ A scope where the elapsed time can be obtained.
     -- An action to retrieve the elapsed time is passed as an argument.
@@ -44,7 +44,7 @@ withElapsedTime f = do
     f $ clock <&> (`subtract` start)
 
 -- | Returns the time taken for a computation along with the result as a pair.
-measureTime :: (Timer <: m, Monad m) => m a -> m (DiffTime, a)
+measureTime :: (Timer <! m, Monad m) => m a -> m (DiffTime, a)
 measureTime m = withElapsedTime \elapsedTime -> do
     r <- m
     elapsedTime <&> (,r)
@@ -53,7 +53,7 @@ measureTime m = withElapsedTime \elapsedTime -> do
 Temporarily suspends computation until the relative time from the fixed reference point in the current scope's context, as given by the argument.
 If the specified resume time has already passed, returns the elapsed time (positive value) in `Just`.
 -}
-sleepUntil :: (Timer <: m, Monad m) => DiffTime -> m (Maybe DiffTime)
+sleepUntil :: (Timer <! m, Monad m) => DiffTime -> m (Maybe DiffTime)
 sleepUntil t = do
     now <- clock
     when (t > now) do
@@ -65,7 +65,7 @@ Repeats a computation indefinitely. Controls so that each loop occurs at a speci
 If the computation time exceeds and the requested interval cannot be realized, the excess delay occurs, which accumulates and is not canceled.
 -}
 runCyclic
-    :: (Timer <: m, Monad m)
+    :: (Timer <! m, Monad m)
     => m DiffTime
     -- ^ An action called at the start of each loop to determine the time interval until the next loop.
     --   For example, @pure 1@ would control the loop to have a 1-second interval.
@@ -85,7 +85,7 @@ Controls to repeat a specified computation at fixed time intervals. A specialize
 If the computation time exceeds and the requested interval cannot be realized, the excess delay occurs, which accumulates and is not canceled.
 -}
 runPeriodic
-    :: (Timer <: m, Monad m)
+    :: (Timer <! m, Monad m)
     => DiffTime
     -- ^ Loop interval
     -> m ()
@@ -98,7 +98,7 @@ runPeriodic interval = runCyclic (pure interval)
 Calls `yield` of a coroutine at fixed intervals.
 If the computation time exceeds and the requested interval cannot be realized, the excess delay occurs, which accumulates and is not canceled.
 -}
-periodicTimer :: forall m a. (Timer <: m, Yield () () <: m, Monad m) => DiffTime -> m a
+periodicTimer :: forall m a. (Timer <! m, Yield () () <! m, Monad m) => DiffTime -> m a
 periodicTimer interval = runPeriodic interval $ yield ()
 {-# INLINE periodicTimer #-}
 
@@ -107,13 +107,13 @@ Calls `yield` of a coroutine at specific intervals.
 Controls so that the time returned by `yield` becomes the time interval until the next loop.
 If the computation time exceeds and the requested interval cannot be realized, the excess delay occurs, which accumulates and is not canceled.
 -}
-cyclicTimer :: forall m a. (Timer <: m, Yield () DiffTime <: m, Monad m) => m a
+cyclicTimer :: forall m a. (Timer <! m, Yield () DiffTime <! m, Monad m) => m a
 cyclicTimer = runCyclic (yield ()) (pure ())
 {-# INLINE cyclicTimer #-}
 
 -- | An effect that realizes control of wait times such that the specified time becomes the interval until the next @wait@ when @wait@ is executed repeatedly.
-data CyclicTimer a where
+data CyclicTimer :: Effect where
     -- | Controls the wait time so that when @wait@ is executed repeatedly, the specified time becomes the interval until the next @wait@.
-    Wait :: DiffTime -> CyclicTimer ()
+    Wait :: DiffTime -> CyclicTimer f ()
 
-makeEffectF [''CyclicTimer]
+makeEffectF ''CyclicTimer

@@ -27,30 +27,30 @@ import Data.Functor (void)
 An effect capable of providing [bracket]
 (https://hackage.haskell.org/package/base-4.16.4.0/docs/Control-Exception.html#v:bracket) semantics.
 -}
-data Resource f a where
+data Resource :: Effect where
     -- | Allocate a resource, use it, and clean it up afterwards.
     Bracket :: f a -> (a -> f ()) -> (a -> f b) -> Resource f b
     -- | Allocate a resource, use it, and clean it up afterwards if an error occurred.
     BracketOnExcept :: f a -> (a -> f ()) -> (a -> f b) -> Resource f b
 
-makeEffectH [''Resource]
+makeEffectH ''Resource
 
-bracket_ :: (Resource <<: f, Functor f) => f a -> f b -> f c -> f c
+bracket_ :: (Resource <! f, Functor f) => f a -> f b -> f c -> f c
 bracket_ acquire release thing =
     bracket acquire (const $ void release) (const thing)
 
-bracketOnExcept_ :: (Resource <<: f, Functor f) => f a -> f b -> f c -> f c
+bracketOnExcept_ :: (Resource <! f, Functor f) => f a -> f b -> f c -> f c
 bracketOnExcept_ acquire onExc thing =
     bracketOnExcept acquire (const $ void onExc) (const thing)
 
-finally :: (Resource <<: f, Applicative f) => f a -> f () -> f a
+finally :: (Resource <! f, Applicative f) => f a -> f () -> f a
 finally thing release = bracket (pure ()) (const release) (const thing)
 
-finally_ :: (Resource <<: f, Applicative f) => f a -> f b -> f a
+finally_ :: (Resource <! f, Applicative f) => f a -> f b -> f a
 finally_ thing release = finally thing (void release)
 
-onException :: (Resource <<: f, Applicative f) => f a -> f () -> f a
+onException :: (Resource <! f, Applicative f) => f a -> f () -> f a
 onException thing onExc = bracketOnExcept (pure ()) (const onExc) (const thing)
 
-onException_ :: (Resource <<: f, Applicative f) => f a -> f b -> f a
+onException_ :: (Resource <! f, Applicative f) => f a -> f b -> f a
 onException_ thing onExc = onException thing (void onExc)
