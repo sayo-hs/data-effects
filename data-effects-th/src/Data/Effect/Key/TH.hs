@@ -17,17 +17,17 @@ import Data.Char (toLower)
 import Data.Effect.Key (type (#>))
 import Data.Effect.TH (
     EffectConf (..),
-    PerformerFunctionConf (
-        PerformerFunctionConf,
-        _doesGeneratePerformerFnSignature,
-        _performerFnArgDoc,
-        _performerFnDoc,
-        _performerFnName
+    PerformerConf (
+        PerformerConf,
+        _doesGeneratePerformerSignature,
+        _performerArgDoc,
+        _performerDoc,
+        _performerName
     ),
     effectMakers,
     genHOEwithHFunctor,
-    normalPerformerGenConf,
-    performerFnName,
+    normalPerformerConf,
+    performerName,
     (&),
  )
 import Data.Effect.TH.Internal (
@@ -35,9 +35,9 @@ import Data.Effect.TH.Internal (
     EffectInfo (..),
     OpConf (
         OpConf,
-        _keyedPerformerGenConf,
-        _normalPerformerGenConf,
-        _taggedPerformerGenConf
+        _keyedPerformerConf,
+        _normalPerformerConf,
+        _taggedPerformerConf
     ),
     OpInfo (
         OpInfo,
@@ -90,13 +90,13 @@ makeKeyedEffectH_' :: EffectConf -> Name -> Q [Dec]
 
 genKeyedEffect :: EffectGenerator -> EffectGenerator
 genKeyedEffect gen = do
-    local (_1 %~ changeNormalPerformerFnNameFormat) gen
+    local (_1 %~ changeNormalPerformerNameFormat) gen
     genEffectKey
 
-changeNormalPerformerFnNameFormat :: EffectConf -> EffectConf
-changeNormalPerformerFnNameFormat =
-    alterOpConf $ normalPerformerGenConf . _Just . performerFnName %~ (++ "'_")
-{-# INLINE changeNormalPerformerFnNameFormat #-}
+changeNormalPerformerNameFormat :: EffectConf -> EffectConf
+changeNormalPerformerNameFormat =
+    alterOpConf $ normalPerformerConf . _Just . performerName %~ (++ "'_")
+{-# INLINE changeNormalPerformerNameFormat #-}
 
 genEffectKey :: EffectGenerator
 genEffectKey = do
@@ -130,12 +130,12 @@ genEffectKey = do
 
     forM_ eOps \op@OpInfo{..} -> do
         let OpConf{..} = opConf opName
-        forM_ _keyedPerformerGenConf \conf@PerformerFunctionConf{..} -> do
+        forM_ _keyedPerformerConf \conf@PerformerConf{..} -> do
             let sendCxt effDataType carrier =
                     ConT ''PerformBy `AppT` key `AppT` effDataType `AppT` carrier
 
-            lift $ genPerformerArmor sendCxt id op conf{_performerFnName = nameBase opName & _head %~ toLower} \_f ->
-                pure $ Clause [] (NormalB $ VarE (mkName _performerFnName) `AppTypeE` key) []
+            lift $ genPerformerArmor sendCxt id op conf{_performerName = nameBase opName & _head %~ toLower} \_f ->
+                pure $ Clause [] (NormalB $ VarE (mkName _performerName) `AppTypeE` key) []
 
 removeLastApostrophe :: String -> Maybe String
 removeLastApostrophe = stripSuffix "'"

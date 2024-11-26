@@ -109,72 +109,72 @@ alterOpConf :: (OpConf -> OpConf) -> EffectConf -> EffectConf
 alterOpConf f conf = conf{opConf = f . opConf conf}
 
 data OpConf = OpConf
-    { _normalPerformerGenConf :: Maybe PerformerFunctionConf
-    , _keyedPerformerGenConf :: Maybe PerformerFunctionConf
-    , _taggedPerformerGenConf :: Maybe PerformerFunctionConf
+    { _normalPerformerConf :: Maybe PerformerConf
+    , _keyedPerformerConf :: Maybe PerformerConf
+    , _taggedPerformerConf :: Maybe PerformerConf
     }
 
-data PerformerFunctionConf = PerformerFunctionConf
-    { _performerFnName :: String
-    , _doesGeneratePerformerFnSignature :: Bool
-    , _performerFnDoc :: Maybe String -> Q (Maybe String)
-    , _performerFnArgDoc :: Int -> Maybe String -> Q (Maybe String)
+data PerformerConf = PerformerConf
+    { _performerName :: String
+    , _doesGeneratePerformerSignature :: Bool
+    , _performerDoc :: Maybe String -> Q (Maybe String)
+    , _performerArgDoc :: Int -> Maybe String -> Q (Maybe String)
     }
 
-performerFnConfs :: Traversal' OpConf PerformerFunctionConf
-performerFnConfs f OpConf{..} = do
-    normal <- traverse f _normalPerformerGenConf
-    keyed <- traverse f _keyedPerformerGenConf
-    tagged <- traverse f _taggedPerformerGenConf
+performerConfs :: Traversal' OpConf PerformerConf
+performerConfs f OpConf{..} = do
+    normal <- traverse f _normalPerformerConf
+    keyed <- traverse f _keyedPerformerConf
+    tagged <- traverse f _taggedPerformerConf
     pure
         OpConf
-            { _normalPerformerGenConf = normal
-            , _keyedPerformerGenConf = keyed
-            , _taggedPerformerGenConf = tagged
+            { _normalPerformerConf = normal
+            , _keyedPerformerConf = keyed
+            , _taggedPerformerConf = tagged
             }
 
 makeLenses ''OpConf
-makeLenses ''PerformerFunctionConf
+makeLenses ''PerformerConf
 
-noGenerateNormalPerformerFunction :: EffectConf -> EffectConf
-noGenerateNormalPerformerFunction = alterOpConf $ normalPerformerGenConf .~ Nothing
-{-# INLINE noGenerateNormalPerformerFunction #-}
+noGenerateNormalPerformer :: EffectConf -> EffectConf
+noGenerateNormalPerformer = alterOpConf $ normalPerformerConf .~ Nothing
+{-# INLINE noGenerateNormalPerformer #-}
 
-noGenerateKeyedPerformerFunction :: EffectConf -> EffectConf
-noGenerateKeyedPerformerFunction = alterOpConf $ keyedPerformerGenConf .~ Nothing
-{-# INLINE noGenerateKeyedPerformerFunction #-}
+noGenerateKeyedPerformer :: EffectConf -> EffectConf
+noGenerateKeyedPerformer = alterOpConf $ keyedPerformerConf .~ Nothing
+{-# INLINE noGenerateKeyedPerformer #-}
 
-noGenerateTaggedPerformerFunction :: EffectConf -> EffectConf
-noGenerateTaggedPerformerFunction = alterOpConf $ taggedPerformerGenConf .~ Nothing
-{-# INLINE noGenerateTaggedPerformerFunction #-}
+noGenerateTaggedPerformer :: EffectConf -> EffectConf
+noGenerateTaggedPerformer = alterOpConf $ taggedPerformerConf .~ Nothing
+{-# INLINE noGenerateTaggedPerformer #-}
 
-noGeneratePerformerFunctionSignature :: EffectConf -> EffectConf
-noGeneratePerformerFunctionSignature =
-    alterOpConf $ performerFnConfs %~ doesGeneratePerformerFnSignature .~ False
-{-# INLINE noGeneratePerformerFunctionSignature #-}
+noGeneratePerformerSignature :: EffectConf -> EffectConf
+noGeneratePerformerSignature =
+    alterOpConf $ performerConfs %~ doesGeneratePerformerSignature .~ False
+{-# INLINE noGeneratePerformerSignature #-}
 
 instance Default EffectConf where
     def =
         EffectConf
-            { opConf = \effConName ->
-                let normalPerformerFnConf =
-                        PerformerFunctionConf
-                            { _performerFnName =
-                                let effConName' = nameBase effConName
+            { opConf = \opName ->
+                let conf =
+                        PerformerConf
+                            { _performerName =
+                                let effConName' = nameBase opName
                                     (opNameInitial, opNameTail) = fromJust $ uncons effConName'
                                  in if opNameInitial == ':'
                                         then opNameTail
                                         else effConName' & _head %~ toLower
-                            , _doesGeneratePerformerFnSignature = True
-                            , _performerFnDoc = pure
-                            , _performerFnArgDoc = const pure
+                            , _doesGeneratePerformerSignature = True
+                            , _performerDoc = pure
+                            , _performerArgDoc = const pure
                             }
                  in OpConf
-                        { _normalPerformerGenConf = Just normalPerformerFnConf
-                        , _keyedPerformerGenConf =
-                            Just $ normalPerformerFnConf & performerFnName %~ (++ "'")
-                        , _taggedPerformerGenConf =
-                            Just $ normalPerformerFnConf & performerFnName %~ (++ "''")
+                        { _normalPerformerConf = Just conf
+                        , _keyedPerformerConf =
+                            Just $ conf & performerName %~ (++ "'")
+                        , _taggedPerformerConf =
+                            Just $ conf & performerName %~ (++ "''")
                         }
             }
 
@@ -202,13 +202,13 @@ genPerformers EffectConf{..} EffectInfo{..} = do
     execWriterT $ forM eOps \con@OpInfo{..} -> do
         let OpConf{..} = opConf opName
 
-        forM_ _normalPerformerGenConf (genNormalPerformer con)
-        forM_ _keyedPerformerGenConf (genKeyedPerformer con)
-        forM_ _taggedPerformerGenConf (genTaggedPerformer con)
+        forM_ _normalPerformerConf (genNormalPerformer con)
+        forM_ _keyedPerformerConf (genKeyedPerformer con)
+        forM_ _taggedPerformerConf (genTaggedPerformer con)
 
 genNormalPerformer
     :: OpInfo
-    -> PerformerFunctionConf
+    -> PerformerConf
     -> WriterT [Dec] Q ()
 genNormalPerformer =
     genPerformer
@@ -218,7 +218,7 @@ genNormalPerformer =
 
 genKeyedPerformer
     :: OpInfo
-    -> PerformerFunctionConf
+    -> PerformerConf
     -> WriterT [Dec] Q ()
 genKeyedPerformer eff conf = do
     nKey <- newName "key" & lift
@@ -235,7 +235,7 @@ genKeyedPerformer eff conf = do
 
 genTaggedPerformer
     :: OpInfo
-    -> PerformerFunctionConf
+    -> PerformerConf
     -> WriterT [Dec] Q ()
 genTaggedPerformer conf eff = do
     nTag <- newName "tag" & lift
@@ -255,16 +255,16 @@ genPerformer
     -> (TH.Type -> TH.Type -> TH.Type)
     -> ([TyVarBndrSpec] -> [TyVarBndrSpec])
     -> OpInfo
-    -> PerformerFunctionConf
+    -> PerformerConf
     -> WriterT [Dec] Q ()
-genPerformer send sendCxt alterFnSigTVs con@OpInfo{..} conf@PerformerFunctionConf{..} = do
+genPerformer send sendCxt alterFnSigTVs con@OpInfo{..} conf@PerformerConf{..} = do
     genPerformerArmor sendCxt alterFnSigTVs con conf \f -> do
         args <- replicateM (length opParamTypes) (newName "x")
 
         let body =
                 send
                     ( foldl' AppE (ConE opName) (map VarE args)
-                        & if _doesGeneratePerformerFnSignature
+                        & if _doesGeneratePerformerSignature
                             then (`SigE` ((opDataType `AppT` f) `AppT` opResultType))
                             else id
                     )
@@ -275,13 +275,13 @@ genPerformerArmor
     :: (TH.Type -> TH.Type -> TH.Type)
     -> ([TyVarBndrSpec] -> [TyVarBndrSpec])
     -> OpInfo
-    -> PerformerFunctionConf
+    -> PerformerConf
     -> (Type -> Q Clause)
     -> WriterT [Dec] Q ()
-genPerformerArmor sendCxt alterFnSigTVs OpInfo{..} PerformerFunctionConf{..} clause = do
+genPerformerArmor sendCxt alterFnSigTVs OpInfo{..} PerformerConf{..} clause = do
     let f = tyVarType opCarrier
 
-        fnName = mkName _performerFnName
+        fnName = mkName _performerName
 
         funSig =
             SigD
@@ -299,16 +299,16 @@ genPerformerArmor sendCxt alterFnSigTVs OpInfo{..} PerformerFunctionConf{..} cla
     -- Put documents
     lift do
         effDoc <- getDoc $ DeclDoc opName
-        _performerFnDoc effDoc >>= mapM_ \doc -> do
+        _performerDoc effDoc >>= mapM_ \doc -> do
             addModFinalizer $ putDoc (DeclDoc fnName) doc
 
         forM [0 .. length opParamTypes - 1] \i -> do
             argDoc <- getDoc $ ArgDoc opName i
-            _performerFnArgDoc i argDoc >>= mapM_ \doc -> do
+            _performerArgDoc i argDoc >>= mapM_ \doc -> do
                 addModFinalizer $ putDoc (ArgDoc fnName i) doc
 
     -- Append declerations
-    when _doesGeneratePerformerFnSignature $ tell [funSig]
+    when _doesGeneratePerformerSignature $ tell [funSig]
     tell [funDef, funInline]
 
 arrowChain :: (Foldable t) => t TH.Type -> TH.Type -> TH.Type
