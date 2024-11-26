@@ -10,9 +10,9 @@ module Control.Effect where
 import Data.Effect (Effect)
 import Data.Kind (Type)
 
--- | A type class that represents the ability to perform an effect @e@ on carrier @f@.
+-- | A type class that represents the ability to perform an effect @e@ on carrier the @f@.
 class Perform (e :: Effect) f where
-    -- | Send an effect @e@ to carrier @f@.
+    -- | Perform an effect @e@ on the carrier @f@.
     perform :: e f a -> f a
 
 type (<!) = Perform
