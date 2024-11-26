@@ -110,8 +110,8 @@ alterOpConf f conf = conf{opConf = f . opConf conf}
 
 data OpConf = OpConf
     { _normalSenderGenConf :: Maybe SenderFunctionConf
-    , _taggedSenderGenConf :: Maybe SenderFunctionConf
     , _keyedSenderGenConf :: Maybe SenderFunctionConf
+    , _taggedSenderGenConf :: Maybe SenderFunctionConf
     }
 
 data SenderFunctionConf = SenderFunctionConf
@@ -124,13 +124,13 @@ data SenderFunctionConf = SenderFunctionConf
 senderFnConfs :: Traversal' OpConf SenderFunctionConf
 senderFnConfs f OpConf{..} = do
     normal <- traverse f _normalSenderGenConf
-    tagged <- traverse f _taggedSenderGenConf
     keyed <- traverse f _keyedSenderGenConf
+    tagged <- traverse f _taggedSenderGenConf
     pure
         OpConf
             { _normalSenderGenConf = normal
-            , _taggedSenderGenConf = tagged
             , _keyedSenderGenConf = keyed
+            , _taggedSenderGenConf = tagged
             }
 
 makeLenses ''OpConf
@@ -140,13 +140,13 @@ noGenerateNormalSenderFunction :: EffectConf -> EffectConf
 noGenerateNormalSenderFunction = alterOpConf $ normalSenderGenConf .~ Nothing
 {-# INLINE noGenerateNormalSenderFunction #-}
 
-noGenerateTaggedSenderFunction :: EffectConf -> EffectConf
-noGenerateTaggedSenderFunction = alterOpConf $ taggedSenderGenConf .~ Nothing
-{-# INLINE noGenerateTaggedSenderFunction #-}
-
 noGenerateKeyedSenderFunction :: EffectConf -> EffectConf
 noGenerateKeyedSenderFunction = alterOpConf $ keyedSenderGenConf .~ Nothing
 {-# INLINE noGenerateKeyedSenderFunction #-}
+
+noGenerateTaggedSenderFunction :: EffectConf -> EffectConf
+noGenerateTaggedSenderFunction = alterOpConf $ taggedSenderGenConf .~ Nothing
+{-# INLINE noGenerateTaggedSenderFunction #-}
 
 noGenerateSenderFunctionSignature :: EffectConf -> EffectConf
 noGenerateSenderFunctionSignature =
@@ -171,10 +171,10 @@ instance Default EffectConf where
                             }
                  in OpConf
                         { _normalSenderGenConf = Just normalSenderFnConf
-                        , _taggedSenderGenConf =
-                            Just $ normalSenderFnConf & senderFnName %~ (++ "''")
                         , _keyedSenderGenConf =
                             Just $ normalSenderFnConf & senderFnName %~ (++ "'")
+                        , _taggedSenderGenConf =
+                            Just $ normalSenderFnConf & senderFnName %~ (++ "''")
                         }
             }
 
@@ -203,8 +203,8 @@ genSenders EffectConf{..} EffectInfo{..} = do
         let OpConf{..} = opConf opName
 
         forM_ _normalSenderGenConf (genNormalSender con)
-        forM_ _taggedSenderGenConf (genTaggedSender con)
         forM_ _keyedSenderGenConf (genKeyedSender con)
+        forM_ _taggedSenderGenConf (genTaggedSender con)
 
 genNormalSender
     :: OpInfo
@@ -215,23 +215,6 @@ genNormalSender =
         (VarE 'perform `AppE`)
         (\opDataType carrier -> ConT ''Perform `AppT` opDataType `AppT` carrier)
         id
-
-genTaggedSender
-    :: OpInfo
-    -> SenderFunctionConf
-    -> WriterT [Dec] Q ()
-genTaggedSender conf eff = do
-    nTag <- newName "tag" & lift
-    let tag = VarT nTag
-
-    genSender
-        ((VarE 'perform `AppE`) . (ConE 'Tagged `AppTypeE` WildCardT `AppTypeE` tag `AppE`))
-        ( \opDataType carrier ->
-            ConT ''Perform `AppT` (ConT ''Tagged `AppT` opDataType `AppT` tag) `AppT` carrier
-        )
-        (PlainTV nTag SpecifiedSpec :)
-        conf
-        eff
 
 genKeyedSender
     :: OpInfo
@@ -249,6 +232,23 @@ genKeyedSender eff conf = do
         (PlainTV nKey SpecifiedSpec :)
         eff
         conf
+
+genTaggedSender
+    :: OpInfo
+    -> SenderFunctionConf
+    -> WriterT [Dec] Q ()
+genTaggedSender conf eff = do
+    nTag <- newName "tag" & lift
+    let tag = VarT nTag
+
+    genSender
+        ((VarE 'perform `AppE`) . (ConE 'Tagged `AppTypeE` WildCardT `AppTypeE` tag `AppE`))
+        ( \opDataType carrier ->
+            ConT ''Perform `AppT` (ConT ''Tagged `AppT` opDataType `AppT` tag) `AppT` carrier
+        )
+        (PlainTV nTag SpecifiedSpec :)
+        conf
+        eff
 
 genSender
     :: (Exp -> Exp)
