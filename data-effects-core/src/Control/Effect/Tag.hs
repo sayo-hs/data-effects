@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -27,7 +26,7 @@ import Control.Monad.State (MonadState)
 import Control.Monad.Writer (MonadWriter)
 import Data.Coerce (coerce)
 import Data.Effect.HFunctor (HFunctor, hfmap)
-import Data.Effect.Tag (pattern Tag, type (#))
+import Data.Effect.Tag (Tagged (Tag), type (#))
 import Data.Kind (Type)
 
 -- | A wrapper data type to represent performing an effect on the carrier @f@ with the specified tag.

@@ -1,5 +1,4 @@
 -- SPDX-License-Identifier: MPL-2.0
-{-# LANGUAGE PatternSynonyms #-}
 
 {- |
 Copyright   :  (c) 2023-2024 Sayo Koyoneda
@@ -12,20 +11,14 @@ import Data.Comp.Multi.HFunctor (HFunctor)
 import Data.Effect (Effect, FirstOrder, OrderOf)
 
 -- | Tagged effect.
-newtype Tagged (e :: Effect) tag f a = Tagged {unTagged :: e f a}
+newtype Tagged tag (e :: Effect) f a = Tag {unTagged :: e f a}
     deriving stock (Functor, Foldable, Traversable)
     deriving newtype (HFunctor)
 
-type instance OrderOf (Tagged e tag) = OrderOf e
-instance (FirstOrder e) => FirstOrder (Tagged e tag)
+type instance OrderOf (Tagged tag e) = OrderOf e
+instance (FirstOrder e) => FirstOrder (Tagged tag e)
 
 -- | Tagged effect.
-type (#) = Tagged
+type e # tag = Tagged tag e
 
 infixl 8 #
-
--- | Tagged effect.
-pattern Tag :: forall tag e f a. e f a -> Tagged e tag f a
-pattern Tag e = Tagged e
-
-{-# COMPLETE Tag #-}

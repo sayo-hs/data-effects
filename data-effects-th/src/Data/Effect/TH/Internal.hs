@@ -27,7 +27,7 @@ import Control.Monad.Writer.CPS (WriterT, execWriterT, lift, tell)
 import Data.Char (toLower)
 import Data.Default (Default, def)
 import Data.Effect (EffectOrder (FirstOrder, HigherOrder), FirstOrder, OrderOf)
-import Data.Effect.Tag (Tagged (Tagged))
+import Data.Effect.Tag (Tagged (Tag))
 import Data.Either.Extra (mapLeft, maybeToEither)
 import Data.Either.Validation (Validation, eitherToValidation, validationToEither)
 import Data.Function ((&))
@@ -53,7 +53,7 @@ import Language.Haskell.TH (
     Specificity (SpecifiedSpec),
     TyVarBndr (..),
     TyVarBndrSpec,
-    Type (WildCardT),
+    Type,
     getDoc,
     mkName,
     pprint,
@@ -242,9 +242,9 @@ genTaggedPerformer conf eff = do
     let tag = VarT nTag
 
     genPerformer
-        ((VarE 'perform `AppE`) . (ConE 'Tagged `AppTypeE` WildCardT `AppTypeE` tag `AppE`))
+        ((VarE 'perform `AppE`) . (ConE 'Tag `AppTypeE` tag `AppE`))
         ( \opDataType carrier ->
-            ConT ''Perform `AppT` (ConT ''Tagged `AppT` opDataType `AppT` tag) `AppT` carrier
+            ConT ''Perform `AppT` (ConT ''Tagged `AppT` tag `AppT` opDataType) `AppT` carrier
         )
         (PlainTV nTag SpecifiedSpec :)
         conf
