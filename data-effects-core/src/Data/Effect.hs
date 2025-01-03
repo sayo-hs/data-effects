@@ -22,6 +22,12 @@ data EffectOrder = FirstOrder | HigherOrder
 
 type family OrderOf (e :: Effect) :: EffectOrder
 
+type family OrderCase (e :: EffectOrder) a b where
+    OrderCase 'FirstOrder a b = a
+    OrderCase 'HigherOrder a b = b
+
+type family LabelOf (e :: Effect)
+
 class
     ( OrderOf e ~ 'FirstOrder
     , forall f g a. Coercible (e f a) (e g a)
@@ -33,3 +39,10 @@ data Nop :: Effect
     deriving anyclass (FirstOrder)
 
 type instance OrderOf Nop = 'FirstOrder
+
+newtype Lift e f a = Lift {getLift :: e a}
+    deriving anyclass (FirstOrder)
+
+type instance OrderOf (Lift e) = 'FirstOrder
+
+newtype Unlift e a = Unlift {getUnlift :: forall f. e f a}

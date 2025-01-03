@@ -8,7 +8,8 @@ Maintainer  :  ymdfield@outlook.jp
 module Data.Effect.Key where
 
 import Data.Comp.Multi.HFunctor (HFunctor)
-import Data.Effect (Effect, FirstOrder, OrderOf)
+import Data.Effect (Effect, FirstOrder, LabelOf, OrderOf)
+import Data.Kind (Type)
 
 -- | Keyed effect.
 newtype Keyed key (e :: Effect) f a = Key {unKeyed :: e f a}
@@ -17,6 +18,9 @@ newtype Keyed key (e :: Effect) f a = Key {unKeyed :: e f a}
 
 type instance OrderOf (Keyed key e) = OrderOf e
 instance (FirstOrder e) => FirstOrder (Keyed key e)
+
+type instance LabelOf (Keyed key e) = KeyedLabel key (LabelOf e)
+data KeyedLabel key (label :: Type)
 
 -- | Keyed effect.
 type (#>) = Keyed

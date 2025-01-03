@@ -40,11 +40,13 @@ source-repository head
 library
     exposed-modules:
         Data.Effect
+        Data.Effect.OpenUnion
         Data.Effect.Tag
         Data.Effect.Key
         Data.Effect.HFunctor
         Data.Effect.HFunctor.HCont
         Control.Effect
+        Control.Effect.Interpret
         Control.Effect.Tag
         Control.Effect.Key
 
@@ -57,6 +59,8 @@ library
         base                          >= 4.16.4 && < 4.21,
         compdata                      >= 0.13.1 && < 0.14,
         mtl                           >= 2.2.2 && < 2.4,
+        kan-extensions,
+        free,
 
     hs-source-dirs:   src
     ghc-options:      -Wall

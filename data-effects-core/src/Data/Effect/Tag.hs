@@ -8,7 +8,8 @@ Maintainer  :  ymdfield@outlook.jp
 module Data.Effect.Tag where
 
 import Data.Comp.Multi.HFunctor (HFunctor)
-import Data.Effect (Effect, FirstOrder, OrderOf)
+import Data.Effect (Effect, FirstOrder, LabelOf, OrderOf)
+import Data.Kind (Type)
 
 -- | Tagged effect.
 newtype Tagged tag (e :: Effect) f a = Tag {unTagged :: e f a}
@@ -17,6 +18,9 @@ newtype Tagged tag (e :: Effect) f a = Tag {unTagged :: e f a}
 
 type instance OrderOf (Tagged tag e) = OrderOf e
 instance (FirstOrder e) => FirstOrder (Tagged tag e)
+
+type instance LabelOf (Tagged tag e) = TaggedLabel tag (LabelOf e)
+data TaggedLabel tag (label :: Type)
 
 -- | Tagged effect.
 type e # tag = Tagged tag e
