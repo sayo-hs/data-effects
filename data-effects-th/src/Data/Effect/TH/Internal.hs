@@ -320,15 +320,15 @@ genPerformerArmor performCxt alterFnSigTVs OpInfo{..} PerformerConf{..} clause =
     funDef <- FunD fnName <$> sequence [clause carrier & lift]
 
     -- Put documents
-    lift do
+    lift $ addModFinalizer do
         effDoc <- getDoc $ DeclDoc opName
         _performerDoc effDoc >>= mapM_ \doc -> do
-            addModFinalizer $ putDoc (DeclDoc fnName) doc
+            putDoc (DeclDoc fnName) doc
 
-        forM [0 .. length opParamTypes - 1] \i -> do
+        forM_ [0 .. length opParamTypes - 1] \i -> do
             argDoc <- getDoc $ ArgDoc opName i
             _performerArgDoc i argDoc >>= mapM_ \doc -> do
-                addModFinalizer $ putDoc (ArgDoc fnName i) doc
+                putDoc (ArgDoc fnName i) doc
 
     -- Append declerations
     when _doesGeneratePerformerSignature $ tell [funSig]
