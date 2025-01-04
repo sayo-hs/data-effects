@@ -105,7 +105,7 @@ type Index e es = Find e es es
 
 type family Find e (es :: [Effect]) w where
     Find e (e ': es) w = 0
-    Find e (e' ': es) w = 1 + Find e es w
+    Find e (e' ': es) w = Find e es w + 1
     Find e '[] w = TypeError ('Text "No " :<>: 'ShowType e :<>: 'Text " in " :<>: 'ShowType w)
 
 elemIndex :: forall i e es. (Member i e es) => Word

@@ -74,7 +74,9 @@ library
         Data.Effect.HFunctor,
         Data.Effect.HFunctor.HCont,
         Data.Effect.HFunctor.TH,
+        Data.Effect.OpenUnion,
         Control.Effect,
+        Control.Effect.Interpret,
         Control.Effect.Tag,
         Control.Effect.Key,
 
