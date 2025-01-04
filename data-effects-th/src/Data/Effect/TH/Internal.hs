@@ -25,7 +25,7 @@ import Control.Monad.Reader (ReaderT, ask)
 import Control.Monad.Writer.CPS (WriterT, execWriterT, lift, tell)
 import Data.Char (toLower)
 import Data.Default (Default, def)
-import Data.Effect (EffectOrder (FirstOrder, HigherOrder), FirstOrder, OrderOf)
+import Data.Effect (EffectOrder (FirstOrder, HigherOrder), FirstOrder, LabelOf, OrderOf)
 import Data.Effect.OpenUnion (Has, In, (:>))
 import Data.Effect.Tag (Tagged (Tag))
 import Data.Either.Extra (mapLeft, maybeToEither)
@@ -54,6 +54,7 @@ import Language.Haskell.TH (
     TyVarBndr (..),
     TyVarBndrSpec,
     Type,
+    conT,
     getDoc,
     mkName,
     pprint,
@@ -104,7 +105,10 @@ data OpInfo = OpInfo
     , opOrder :: EffectOrder
     }
 
-newtype EffectConf = EffectConf {opConf :: Name -> OpConf}
+data EffectConf = EffectConf
+    { opConf :: Name -> OpConf
+    , doesGenerateLabel :: Bool
+    }
 
 alterOpConf :: (OpConf -> OpConf) -> EffectConf -> EffectConf
 alterOpConf f conf = conf{opConf = f . opConf conf}
@@ -157,6 +161,10 @@ noGeneratePerformerSignature =
     alterOpConf $ performerConfs %~ doesGeneratePerformerSignature .~ False
 {-# INLINE noGeneratePerformerSignature #-}
 
+noGenerateLabel :: EffectConf -> EffectConf
+noGenerateLabel conf = conf{doesGenerateLabel = False}
+{-# INLINE noGenerateLabel #-}
+
 instance Default EffectConf where
     def =
         EffectConf
@@ -182,6 +190,7 @@ instance Default EffectConf where
                         , _senderConf =
                             Just $ conf & performerName %~ (++ "'_")
                         }
+            , doesGenerateLabel = True
             }
 
 type EffectGenerator =
@@ -191,6 +200,7 @@ genEffect, genFOE, genHOE :: EffectGenerator
 genEffect = do
     (conf, _, _, _, eInfo) <- ask
     genPerformers conf eInfo & lift & lift >>= tell
+    genLabel conf eInfo & lift & lift >>= tell
 genFOE = do
     genEffect
     (_, _, _, _, EffectInfo{..}) <- ask
@@ -212,6 +222,15 @@ genPerformers EffectConf{..} EffectInfo{..} = do
         forM_ _keyedPerformerConf (genKeyedPerformer con)
         forM_ _taggedPerformerConf (genTaggedPerformer con)
         forM_ _senderConf (genSender con)
+
+genLabel :: EffectConf -> EffectInfo -> Q [Dec]
+genLabel EffectConf{..} EffectInfo{..} =
+    execWriterT $ when doesGenerateLabel do
+        let labelData = mkName $ nameBase eName ++ "Label"
+            eData = foldl AppT (ConT eName) (map (VarT . tyVarName) eParamVars)
+
+        [DataD [] labelData [] Nothing [] []] & tell
+        [d|type instance LabelOf $(pure eData) = $(conT labelData)|] & lift >>= tell
 
 genNormalPerformer
     :: OpInfo
