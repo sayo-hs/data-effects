@@ -42,7 +42,6 @@ library
         Data.Effect
         Data.Effect.OpenUnion
         Data.Effect.Tag
-        Data.Effect.Key
         Data.Effect.HFunctor
         Data.Effect.HFunctor.HCont
         Control.Effect

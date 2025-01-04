@@ -7,20 +7,18 @@
 module Prelude (
     module Prelude,
     module Control.Effect,
-    module Control.Effect.Key,
+    module Data.Effect.OpenUnion,
     module Data.Effect,
     module Data.Effect.TH,
     module Data.Effect.HFunctor.TH,
-    module Data.Effect.Key.TH,
     Type,
     Infinite ((:<)),
 ) where
 
-import Control.Effect (type (<!), type (~>))
-import Control.Effect.Key (PerformBy)
+import Control.Effect (Eff, Free, type (~>))
 import Data.Effect (Effect)
 import Data.Effect.HFunctor.TH
-import Data.Effect.Key.TH
+import Data.Effect.OpenUnion (Has, In, type (:>))
 import Data.Effect.TH
 import Data.Kind (Type)
 import Data.List.Infinite (Infinite ((:<)))

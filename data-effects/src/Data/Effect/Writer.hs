@@ -48,7 +48,10 @@ pass m = do
     pure a
 @
 -}
-pass :: (Tell w <! m, WriterH w <! m, Monad m) => m (w -> w, a) -> m a
+pass
+    :: (Tell w :> es, WriterH w :> es, Monad (Eff ff es), Free c ff)
+    => Eff ff es (w -> w, a)
+    -> Eff ff es a
 pass m = do
     (w, (f, a)) <- listen m
     tell $ f w

@@ -23,9 +23,9 @@ data State s :: Effect where
 makeEffectF ''State
 
 -- | Retrieves the current state value from the context and returns the value transformed based on the given function.
-gets :: (State s <! f, Functor f) => (s -> a) -> f a
+gets :: (State s :> es, Functor (Eff ff es), Free c ff) => (s -> a) -> Eff ff es a
 gets f = f <$> get
 
 -- | Modifies the current state value in the context based on the given function.
-modify :: (State s <! m, Monad m) => (s -> s) -> m ()
+modify :: (State s :> es, Monad (Eff ff es), Free c ff) => (s -> s) -> Eff ff es ()
 modify f = put . f =<< get

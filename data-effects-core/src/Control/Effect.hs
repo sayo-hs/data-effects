@@ -19,6 +19,8 @@ import Control.Applicative (Alternative)
 import Control.Applicative.Free qualified as Tree
 import Control.Applicative.Free.Fast qualified as Fast
 import Control.Applicative.Free.Final qualified as Final
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Effect (Emb (Emb))
 import Data.Effect.HFunctor (hfmap)
 import Data.Effect.OpenUnion (Has, In, Index, KeyIndex, LabelIndex, Union, inj, type (:>))
 import Data.Functor.Coyoneda (Coyoneda (Coyoneda), hoistCoyoneda, liftCoyoneda, lowerCoyoneda)
@@ -29,6 +31,10 @@ newtype Eff ff es a = Eff {unEff :: ff (Union es (Eff ff es)) a}
 deriving instance (Functor (ff (Union es (Eff ff es)))) => Functor (Eff ff es)
 deriving instance (Applicative (ff (Union es (Eff ff es)))) => Applicative (Eff ff es)
 deriving instance (Monad (ff (Union es (Eff ff es)))) => Monad (Eff ff es)
+
+instance (Emb IO `In` es, Monad (Eff ff es), Free c ff) => MonadIO (Eff ff es) where
+    liftIO = emb
+    {-# INLINE liftIO #-}
 
 convertEff
     :: forall ff gg es a c c'
@@ -69,6 +75,10 @@ perform' = Eff . liftFree . inj @(KeyIndex key es)
 send :: forall e es ff a c. (e `In` es, Free c ff) => e (Eff ff es) a -> Eff ff es a
 send = Eff . liftFree . inj @(Index e es)
 {-# INLINE send #-}
+
+emb :: forall f es ff a c. (Emb f `In` es, Free c ff) => f a -> Eff ff es a
+emb = send . Emb
+{-# INLINE emb #-}
 
 instance Free Functor Coyoneda where
     liftFree = liftCoyoneda

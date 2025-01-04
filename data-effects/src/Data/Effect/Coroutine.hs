@@ -30,7 +30,7 @@ data Yield a b :: Effect where
 makeEffectF ''Yield
 
 -- | A version of `yield` where the value returned from the caller of the computation with coroutines is unit.
-yield_ :: (Yield a () <! f) => a -> f ()
+yield_ :: (Yield a () :> es, Free c ff) => a -> Eff ff es ()
 yield_ = yield
 {-# INLINE yield_ #-}
 

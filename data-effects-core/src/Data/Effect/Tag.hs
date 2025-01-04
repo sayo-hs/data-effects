@@ -25,4 +25,4 @@ data TaggedLabel tag (label :: Type)
 -- | Tagged effect.
 type e # tag = Tagged tag e
 
-infixl 8 #
+infixl 7 #

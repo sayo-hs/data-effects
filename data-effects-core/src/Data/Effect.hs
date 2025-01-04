@@ -11,6 +11,7 @@ Maintainer  :  ymdfield@outlook.jp
 module Data.Effect where
 
 import Data.Coerce (Coercible)
+import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Kind (Type)
 
 -- | The kind for effects.
@@ -40,9 +41,12 @@ data Nop :: Effect
 
 type instance OrderOf Nop = 'FirstOrder
 
-newtype Lift e f a = Lift {getLift :: e a}
+newtype Emb e f a = Emb {getEmb :: e a}
     deriving anyclass (FirstOrder)
 
-type instance OrderOf (Lift e) = 'FirstOrder
+type instance OrderOf (Emb e) = 'FirstOrder
+instance HFunctor (Emb e) where
+    hfmap _ (Emb e) = Emb e
+    {-# INLINE hfmap #-}
 
-newtype Unlift e a = Unlift {getUnlift :: forall f. e f a}
+newtype Unemb e a = Unemb {getUnemb :: forall f. e f a}

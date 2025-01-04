@@ -13,7 +13,7 @@ module Data.Effect.OpenUnion where
 import Data.Data (Proxy (Proxy))
 import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, LabelOf, OrderCase, OrderOf)
 import Data.Effect.HFunctor (HFunctor, hfmap)
-import Data.Effect.Key (type (#>))
+import Data.Effect.Tag (type (#))
 import Data.Kind (Type)
 import GHC.TypeLits (ErrorMessage (ShowType, Text, (:<>:)), KnownNat, TypeError, natVal, type (+), type (-))
 import Unsafe.Coerce (unsafeCoerce)
@@ -97,7 +97,7 @@ type KeyIndex key es = FindByKey key es es
 
 -- fixme: add uniqueness check
 type family FindByKey key es w where
-    FindByKey key (key #> e ': es) w = 0
+    FindByKey key (e # key ': es) w = 0
     FindByKey key (e ': es) w = FindByKey key es w + 1
     FindByKey key '[] w = TypeError ('Text "No the key" :<>: 'ShowType key :<>: 'Text " in " :<>: 'ShowType w)
 
@@ -120,9 +120,9 @@ type KnownOrder e = Elem e (OrderOf e)
 
 class (order ~ OrderOf e) => Elem e order where
     inject :: (Member i e es) => Proxy i -> e f a -> Union es f a
-    project :: (Member i e es, HFunctor e) => Proxy i -> Union es f a -> Maybe (e f a)
-    (!+) :: (HFunctor e) => (e f a -> r) -> (Union es f a -> r) -> Union (e ': es) f a -> r
-    extract :: (HFunctor e) => Union '[e] f a -> e f a
+    project :: (Member i e es) => Proxy i -> Union es f a -> Maybe (e f a)
+    (!+) :: (e f a -> r) -> (Union es f a -> r) -> Union (e ': es) f a -> r
+    extract :: Union '[e] f a -> e f a
 
     infixr 5 !+
 
@@ -146,7 +146,7 @@ instance (FirstOrder e) => Elem e 'FirstOrder where
 
     project
         :: forall i es f a
-         . (Member i e es, HFunctor e)
+         . (Member i e es)
         => Proxy i
         -> Union es f a
         -> Maybe (e f a)
@@ -167,11 +167,11 @@ instance (FirstOrder e) => Elem e 'FirstOrder where
     {-# INLINE (!+) #-}
     {-# INLINE extract #-}
 
-instance (OrderOf e ~ 'HigherOrder) => Elem e 'HigherOrder where
+instance (OrderOf e ~ 'HigherOrder, HFunctor e) => Elem e 'HigherOrder where
     inject :: forall i es f a. (Member i e es) => Proxy i -> e f a -> Union es f a
     inject _ e = UnsafeUnion (elemIndex @i @e @es) e HigherOrder id
 
-    project :: forall i es f a. (Member i e es, HFunctor e) => Proxy i -> Union es f a -> Maybe (e f a)
+    project :: forall i es f a. (Member i e es) => Proxy i -> Union es f a -> Maybe (e f a)
     project _ (UnsafeUnion n e _ koi) =
         if n == elemIndex @i @e @es
             then Just $ hfmap koi (unsafeCoerce e)

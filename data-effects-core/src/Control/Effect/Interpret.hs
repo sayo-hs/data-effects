@@ -7,13 +7,14 @@ Maintainer  :  ymdfield@outlook.jp
 -}
 module Control.Effect.Interpret where
 
-import Control.Effect (Eff (..), Free (liftFree, runFree), type (~>))
+import Control.Effect (Eff (..), Free (liftFree, runFree), hoist, retract, type (~>))
+import Data.Effect (Emb, getEmb)
 import Data.Effect.HFunctor (HFunctor, hfmap)
-import Data.Effect.OpenUnion (KnownOrder, (!+))
+import Data.Effect.OpenUnion (KnownOrder, extract, (!+))
 
 interpret
     :: forall e es ff a c
-     . (Free c ff, KnownOrder e, HFunctor e)
+     . (Free c ff, KnownOrder e)
     => (e (Eff ff es) ~> Eff ff es)
     -> Eff ff (e ': es) a
     -> Eff ff es a
@@ -22,3 +23,7 @@ interpret i = loop
     loop :: Eff ff (e ': es) ~> Eff ff es
     loop = Eff . runFree ((unEff . i !+ liftFree) . hfmap loop) . unEff
 {-# INLINE interpret #-}
+
+runEff :: (Free c ff, c f) => Eff ff '[Emb f] a -> f a
+runEff = runFree (getEmb . extract) . unEff
+{-# INLINE runEff #-}

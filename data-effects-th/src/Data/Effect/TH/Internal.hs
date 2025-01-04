@@ -18,8 +18,7 @@ Portability :  portable
 module Data.Effect.TH.Internal where
 
 import Control.Arrow ((>>>))
-import Control.Effect (Perform, perform)
-import Control.Effect.Key (PerformBy, performBy)
+import Control.Effect (Eff, Free, perform, perform')
 import Control.Lens (Traversal', makeLenses, (%~), (.~), _head)
 import Control.Monad (forM, forM_, replicateM, when)
 import Control.Monad.Reader (ReaderT, ask)
@@ -27,6 +26,7 @@ import Control.Monad.Writer.CPS (WriterT, execWriterT, lift, tell)
 import Data.Char (toLower)
 import Data.Default (Default, def)
 import Data.Effect (EffectOrder (FirstOrder, HigherOrder), FirstOrder, OrderOf)
+import Data.Effect.OpenUnion (Has, (:>))
 import Data.Effect.Tag (Tagged (Tag))
 import Data.Either.Extra (mapLeft, maybeToEither)
 import Data.Either.Validation (Validation, eitherToValidation, validationToEither)
@@ -58,6 +58,7 @@ import Language.Haskell.TH (
     mkName,
     pprint,
     putDoc,
+    varT,
  )
 import Language.Haskell.TH qualified as TH
 import Language.Haskell.TH.Syntax (
@@ -213,7 +214,7 @@ genNormalPerformer
 genNormalPerformer =
     genPerformer
         (VarE 'perform `AppE`)
-        (\opDataType carrier -> ConT ''Perform `AppT` opDataType `AppT` carrier)
+        (\opDataType es -> InfixT opDataType ''(:>) es)
         id
 
 genKeyedPerformer
@@ -225,9 +226,9 @@ genKeyedPerformer eff conf = do
     let key = VarT nKey
 
     genPerformer
-        (VarE 'performBy `AppTypeE` key `AppE`)
-        ( \opDataType carrier ->
-            ConT ''PerformBy `AppT` key `AppT` opDataType `AppT` carrier
+        (VarE 'perform' `AppTypeE` key `AppE`)
+        ( \opDataType es ->
+            ConT ''Has `AppT` key `AppT` opDataType `AppT` es
         )
         (PlainTV nKey SpecifiedSpec :)
         eff
@@ -243,8 +244,8 @@ genTaggedPerformer conf eff = do
 
     genPerformer
         ((VarE 'perform `AppE`) . (ConE 'Tag `AppTypeE` tag `AppE`))
-        ( \opDataType carrier ->
-            ConT ''Perform `AppT` (ConT ''Tagged `AppT` tag `AppT` opDataType) `AppT` carrier
+        ( \opDataType es ->
+            InfixT (ConT ''Tagged `AppT` tag `AppT` opDataType) ''(:>) es
         )
         (PlainTV nTag SpecifiedSpec :)
         conf
@@ -279,22 +280,28 @@ genPerformerArmor
     -> (Type -> Q Clause)
     -> WriterT [Dec] Q ()
 genPerformerArmor sendCxt alterFnSigTVs OpInfo{..} PerformerConf{..} clause = do
-    let f = tyVarType opCarrier
+    let carrier = tyVarType opCarrier
 
-        fnName = mkName _performerName
+    free <- newName "ff" & lift
+    es <- newName "es" & lift
+    c <- newName "c" & lift
+    freeCxt <- [t|Free $(varT c) $(varT free)|] & lift
+    carrierCxt <- [t|$(pure carrier) ~ Eff $(varT free) $(varT es)|] & lift
+
+    let fnName = mkName _performerName
 
         funSig =
             SigD
                 fnName
                 ( ForallT
-                    (opTyVars ++ [opCarrier $> SpecifiedSpec] & alterFnSigTVs)
-                    (sendCxt opDataType f : opCxt)
-                    (arrowChain opParamTypes (f `AppT` opResultType))
+                    (opTyVars ++ (opCarrier $> SpecifiedSpec) : map (\n -> PlainTV n () $> SpecifiedSpec) [es, free, c] & alterFnSigTVs)
+                    (freeCxt : carrierCxt : sendCxt opDataType (VarT es) : opCxt)
+                    (arrowChain opParamTypes (carrier `AppT` opResultType))
                 )
 
         funInline = PragmaD (InlineP fnName Inline FunLike AllPhases)
 
-    funDef <- FunD fnName <$> sequence [clause f & lift]
+    funDef <- FunD fnName <$> sequence [clause carrier & lift]
 
     -- Put documents
     lift do

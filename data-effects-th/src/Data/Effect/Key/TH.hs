@@ -7,14 +7,12 @@
 
 module Data.Effect.Key.TH where
 
-import Control.Effect.Key (PerformBy)
 import Control.Lens ((%~), (<&>), _1, _Just, _head)
 import Control.Monad (forM_)
 import Control.Monad.Reader (ask, local)
 import Control.Monad.Trans (lift)
 import Control.Monad.Writer.CPS (tell)
 import Data.Char (toLower)
-import Data.Effect.Key (type (#>))
 import Data.Effect.TH (
     EffectConf (..),
     PerformerConf (
@@ -73,6 +71,7 @@ import Language.Haskell.TH (
  )
 import Language.Haskell.TH.Datatype.TyVarBndr (pattern BndrReq)
 
+{-
 makeKeyedEffectF :: Name -> Q [Dec]
 makeKeyedEffectsF :: [Name] -> Q [Dec]
 makeKeyedEffectF' :: EffectConf -> Name -> Q [Dec]
@@ -139,3 +138,4 @@ genEffectKey = do
 
 removeLastApostrophe :: String -> Maybe String
 removeLastApostrophe = stripSuffix "'"
+-}

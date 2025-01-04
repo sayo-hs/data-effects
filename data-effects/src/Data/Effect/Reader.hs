@@ -34,5 +34,5 @@ makeEffectF ''Ask
 makeEffectH ''Local
 
 -- | Obtains a value from the environment and returns it transformed by the given function.
-asks :: (Ask r <! f, Functor f) => (r -> a) -> f a
+asks :: (Ask r :> es, Functor (Eff ff es), Free c ff) => (r -> a) -> Eff ff es a
 asks f = f <$> ask

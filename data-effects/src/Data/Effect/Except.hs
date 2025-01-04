@@ -32,12 +32,12 @@ makeEffectF ''Throw
 makeEffectH ''Catch
 
 -- | Throws the given `Either` value as an exception if it is `Left`.
-liftEither :: (Throw e <! f, Applicative f) => Either e a -> f a
+liftEither :: (Throw e :> es, Applicative (Eff ff es), Free c ff) => Either e a -> Eff ff es a
 liftEither = either throw pure
 {-# INLINE liftEither #-}
 
 -- | Throws the result of the given action as an exception if it is `Left`.
-joinEither :: (Throw e <! m, Monad m) => m (Either e a) -> m a
+joinEither :: (Throw e :> es, Monad (Eff ff es), Free c ff) => Eff ff es (Either e a) -> Eff ff es a
 joinEither = (>>= either throw pure)
 {-# INLINE joinEither #-}
 
@@ -53,23 +53,23 @@ exc = (>>= either id pure)
 
 -- | If an exception occurs, executes the given exception handler, but the exception is not stopped there and is rethrown.
 withExcept
-    :: (Catch e <! f, Throw e <! f, Applicative f)
-    => f a
+    :: (Catch e :> es, Throw e :> es, Applicative (Eff ff es), Free c ff)
+    => Eff ff es a
     -- ^ Scope to which the exception handler applies
-    -> (e -> f ())
+    -> (e -> Eff ff es ())
     -- ^ Exception handler
-    -> f a
+    -> Eff ff es a
 withExcept thing after = thing `catch` \e -> after e *> throw e
 {-# INLINE withExcept #-}
 
 -- | If an exception occurs, executes the specified action, but the exception is not stopped there and is rethrown.
 onExcept
-    :: forall e f a
-     . (Catch e <! f, Throw e <! f, Applicative f)
-    => f a
+    :: forall e es ff a c
+     . (Catch e :> es, Throw e :> es, Applicative (Eff ff es), Free c ff)
+    => Eff ff es a
     -- ^ Scope in which to detect exceptions
-    -> f ()
+    -> Eff ff es ()
     -- ^ Action to execute in case of an exception
-    -> f a
+    -> Eff ff es a
 onExcept thing after = thing `withExcept` \(_ :: e) -> after
 {-# INLINE onExcept #-}
