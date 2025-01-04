@@ -38,13 +38,16 @@ makeEffectH ''Local
 -- | Obtains a value from the environment and returns it transformed by the given function.
 asks :: (Ask r :> es, Functor (Eff ff es), Free c ff) => (r -> a) -> Eff ff es a
 asks f = f <$> ask
+{-# INLINE asks #-}
 
 -- | Obtains a value from the environment and returns it transformed by the given function.
 asks'_ :: (Ask r `In` es, Functor (Eff ff es), Free c ff) => (r -> a) -> Eff ff es a
 asks'_ f = f <$> ask'_
+{-# INLINE asks'_ #-}
 
 runAsk :: (Free c ff, Applicative (Eff ff es)) => r -> Eff ff (Ask r ': es) a -> Eff ff es a
 runAsk r = interpret \Ask -> pure r
+{-# INLINE runAsk #-}
 
 runLocal
     :: forall r es ff a c
@@ -54,6 +57,7 @@ runLocal
 runLocal =
     interpret \(Local f a) ->
         interpose @(Ask r) (\Ask -> asks'_ f) a
+{-# INLINE runLocal #-}
 
 runReader
     :: (Free c ff, forall f. (c (ff f)) => Applicative (ff f))
@@ -61,3 +65,4 @@ runReader
     -> Eff ff (Local r ': Ask r ': es) a
     -> Eff ff es a
 runReader r = runAsk r . runLocal
+{-# INLINE runReader #-}
