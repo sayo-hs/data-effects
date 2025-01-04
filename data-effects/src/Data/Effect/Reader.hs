@@ -1,11 +1,11 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE UndecidableInstances #-}
 
--- This Source Code Form is subject to the terms of the Mozilla Public
--- License, v. 2.0. If a copy of the MPL was not distributed with this
--- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- SPDX-License-Identifier: MPL-2.0
 
 {- |
-Copyright   :  (c) 2023 Sayo Koyoneda
+Copyright   :  (c) 2023-2025 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 
@@ -14,6 +14,8 @@ Environmental values are immutable and do not change across procedures, but you
 can modify the value within a local scope using the `local` operation.
 -}
 module Data.Effect.Reader where
+
+import Control.Effect.Interpret (interpose, interpret)
 
 -- | An effect that holds a value of type @r@ in the context (environment).
 data Ask r :: Effect where
@@ -36,3 +38,26 @@ makeEffectH ''Local
 -- | Obtains a value from the environment and returns it transformed by the given function.
 asks :: (Ask r :> es, Functor (Eff ff es), Free c ff) => (r -> a) -> Eff ff es a
 asks f = f <$> ask
+
+-- | Obtains a value from the environment and returns it transformed by the given function.
+asks'_ :: (Ask r `In` es, Functor (Eff ff es), Free c ff) => (r -> a) -> Eff ff es a
+asks'_ f = f <$> ask'_
+
+runAsk :: (Free c ff, Applicative (Eff ff es)) => r -> Eff ff (Ask r ': es) a -> Eff ff es a
+runAsk r = interpret \Ask -> pure r
+
+runLocal
+    :: forall r es ff a c
+     . (Free c ff, Applicative (Eff ff es), Ask r `In` es)
+    => Eff ff (Local r ': es) a
+    -> Eff ff es a
+runLocal =
+    interpret \(Local f a) ->
+        interpose @(Ask r) (\Ask -> asks'_ f) a
+
+runReader
+    :: (Free c ff, forall f. (c (ff f)) => Applicative (ff f))
+    => r
+    -> Eff ff (Local r ': Ask r ': es) a
+    -> Eff ff es a
+runReader r = runAsk r . runLocal

@@ -18,7 +18,7 @@ Portability :  portable
 module Data.Effect.TH.Internal where
 
 import Control.Arrow ((>>>))
-import Control.Effect (Eff, Free, perform, perform')
+import Control.Effect (Eff, Free, perform, perform', send)
 import Control.Lens (Traversal', makeLenses, (%~), (.~), _head)
 import Control.Monad (forM, forM_, replicateM, when)
 import Control.Monad.Reader (ReaderT, ask)
@@ -26,7 +26,7 @@ import Control.Monad.Writer.CPS (WriterT, execWriterT, lift, tell)
 import Data.Char (toLower)
 import Data.Default (Default, def)
 import Data.Effect (EffectOrder (FirstOrder, HigherOrder), FirstOrder, OrderOf)
-import Data.Effect.OpenUnion (Has, (:>))
+import Data.Effect.OpenUnion (Has, In, (:>))
 import Data.Effect.Tag (Tagged (Tag))
 import Data.Either.Extra (mapLeft, maybeToEither)
 import Data.Either.Validation (Validation, eitherToValidation, validationToEither)
@@ -113,6 +113,7 @@ data OpConf = OpConf
     { _normalPerformerConf :: Maybe PerformerConf
     , _keyedPerformerConf :: Maybe PerformerConf
     , _taggedPerformerConf :: Maybe PerformerConf
+    , _senderConf :: Maybe PerformerConf
     }
 
 data PerformerConf = PerformerConf
@@ -127,11 +128,13 @@ performerConfs f OpConf{..} = do
     normal <- traverse f _normalPerformerConf
     keyed <- traverse f _keyedPerformerConf
     tagged <- traverse f _taggedPerformerConf
+    sender <- traverse f _senderConf
     pure
         OpConf
             { _normalPerformerConf = normal
             , _keyedPerformerConf = keyed
             , _taggedPerformerConf = tagged
+            , _senderConf = sender
             }
 
 makeLenses ''OpConf
@@ -176,6 +179,8 @@ instance Default EffectConf where
                             Just $ conf & performerName %~ (++ "'")
                         , _taggedPerformerConf =
                             Just $ conf & performerName %~ (++ "''")
+                        , _senderConf =
+                            Just $ conf & performerName %~ (++ "'_")
                         }
             }
 
@@ -206,6 +211,7 @@ genPerformers EffectConf{..} EffectInfo{..} = do
         forM_ _normalPerformerConf (genNormalPerformer con)
         forM_ _keyedPerformerConf (genKeyedPerformer con)
         forM_ _taggedPerformerConf (genTaggedPerformer con)
+        forM_ _senderConf (genSender con)
 
 genNormalPerformer
     :: OpInfo
@@ -251,6 +257,16 @@ genTaggedPerformer conf eff = do
         conf
         eff
 
+genSender
+    :: OpInfo
+    -> PerformerConf
+    -> WriterT [Dec] Q ()
+genSender =
+    genPerformer
+        (VarE 'send `AppE`)
+        (\opDataType es -> InfixT opDataType ''In es)
+        id
+
 genPerformer
     :: (Exp -> Exp)
     -> (TH.Type -> TH.Type -> TH.Type)
@@ -258,12 +274,12 @@ genPerformer
     -> OpInfo
     -> PerformerConf
     -> WriterT [Dec] Q ()
-genPerformer send sendCxt alterFnSigTVs con@OpInfo{..} conf@PerformerConf{..} = do
-    genPerformerArmor sendCxt alterFnSigTVs con conf \f -> do
+genPerformer performer performCxt alterFnSigTVs con@OpInfo{..} conf@PerformerConf{..} = do
+    genPerformerArmor performCxt alterFnSigTVs con conf \f -> do
         args <- replicateM (length opParamTypes) (newName "x")
 
         let body =
-                send
+                performer
                     ( foldl' AppE (ConE opName) (map VarE args)
                         & if _doesGeneratePerformerSignature
                             then (`SigE` ((opDataType `AppT` f) `AppT` opResultType))
@@ -279,7 +295,7 @@ genPerformerArmor
     -> PerformerConf
     -> (Type -> Q Clause)
     -> WriterT [Dec] Q ()
-genPerformerArmor sendCxt alterFnSigTVs OpInfo{..} PerformerConf{..} clause = do
+genPerformerArmor performCxt alterFnSigTVs OpInfo{..} PerformerConf{..} clause = do
     let carrier = tyVarType opCarrier
 
     free <- newName "ff" & lift
@@ -295,7 +311,7 @@ genPerformerArmor sendCxt alterFnSigTVs OpInfo{..} PerformerConf{..} clause = do
                 fnName
                 ( ForallT
                     (opTyVars ++ (opCarrier $> SpecifiedSpec) : map (\n -> PlainTV n () $> SpecifiedSpec) [es, free, c] & alterFnSigTVs)
-                    (freeCxt : carrierCxt : sendCxt opDataType (VarT es) : opCxt)
+                    (freeCxt : carrierCxt : performCxt opDataType (VarT es) : opCxt)
                     (arrowChain opParamTypes (carrier `AppT` opResultType))
                 )
 

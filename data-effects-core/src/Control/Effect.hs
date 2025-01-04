@@ -1,8 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE QuantifiedConstraints #-}
-{-# HLINT ignore "Eta reduce" #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 -- SPDX-License-Identifier: MPL-2.0
 
@@ -80,11 +78,15 @@ emb :: forall f es ff a c. (Emb f `In` es, Free c ff) => f a -> Eff ff es a
 emb = send . Emb
 {-# INLINE emb #-}
 
+sendAny :: (Free c ff) => Union es (Eff ff es) a -> Eff ff es a
+sendAny = Eff . liftFree
+{-# INLINE sendAny #-}
+
 instance Free Functor Coyoneda where
     liftFree = liftCoyoneda
     runFree f (Coyoneda g x) = g <$> f x
     retract = lowerCoyoneda
-    hoist phi = hoistCoyoneda phi
+    hoist = hoistCoyoneda
 
     {-# INLINE liftFree #-}
     {-# INLINE runFree #-}
@@ -93,9 +95,9 @@ instance Free Functor Coyoneda where
 
 instance Free Applicative Tree.Ap where
     liftFree = Tree.liftAp
-    runFree f = Tree.runAp f
+    runFree = Tree.runAp
     retract = Tree.retractAp
-    hoist phi = Tree.hoistAp phi
+    hoist = Tree.hoistAp
 
     {-# INLINE liftFree #-}
     {-# INLINE runFree #-}
@@ -104,9 +106,9 @@ instance Free Applicative Tree.Ap where
 
 instance Free Applicative Fast.Ap where
     liftFree = Fast.liftAp
-    runFree f = Fast.runAp f
+    runFree = Fast.runAp
     retract = Fast.retractAp
-    hoist phi = Fast.hoistAp phi
+    hoist = Fast.hoistAp
 
     {-# INLINE liftFree #-}
     {-# INLINE runFree #-}
@@ -115,9 +117,9 @@ instance Free Applicative Fast.Ap where
 
 instance Free Applicative Final.Ap where
     liftFree = Final.liftAp
-    runFree f = Final.runAp f
+    runFree = Final.runAp
     retract = Final.retractAp
-    hoist phi = Final.hoistAp phi
+    hoist = Final.hoistAp
 
     {-# INLINE liftFree #-}
     {-# INLINE runFree #-}
@@ -126,8 +128,8 @@ instance Free Applicative Final.Ap where
 
 instance Free Alternative Tree.Alt where
     liftFree = Tree.liftAlt
-    runFree f = Tree.runAlt f
-    hoist phi = Tree.hoistAlt phi
+    runFree = Tree.runAlt
+    hoist = Tree.hoistAlt
 
     {-# INLINE liftFree #-}
     {-# INLINE runFree #-}
@@ -135,8 +137,8 @@ instance Free Alternative Tree.Alt where
 
 instance Free Alternative Final.Alt where
     liftFree = Final.liftAlt
-    runFree f = Final.runAlt f
-    hoist phi = Final.hoistAlt phi
+    runFree = Final.runAlt
+    hoist = Final.hoistAlt
 
     {-# INLINE liftFree #-}
     {-# INLINE runFree #-}
@@ -146,3 +148,8 @@ instance Free Alternative Final.Alt where
 type f ~> g = forall (x :: Type). f x -> g x
 
 infixr 2 ~>
+
+-- | A natural transformation style higher-order interpreter.
+type e ~~> f = e f ~> f
+
+infix 2 ~~>

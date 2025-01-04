@@ -1,4 +1,5 @@
 -- SPDX-License-Identifier: MPL-2.0
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 {- |
 Copyright   :  (c) 2025 Sayo Koyoneda
@@ -7,23 +8,102 @@ Maintainer  :  ymdfield@outlook.jp
 -}
 module Control.Effect.Interpret where
 
-import Control.Effect (Eff (..), Free (liftFree, runFree), hoist, retract, type (~>))
+import Control.Effect (
+    Eff (..),
+    Free (liftFree, runFree),
+    hoist,
+    sendAny,
+    type (~>),
+    type (~~>),
+ )
 import Data.Effect (Emb, getEmb)
-import Data.Effect.HFunctor (HFunctor, hfmap)
-import Data.Effect.OpenUnion (KnownOrder, extract, (!+))
-
-interpret
-    :: forall e es ff a c
-     . (Free c ff, KnownOrder e)
-    => (e (Eff ff es) ~> Eff ff es)
-    -> Eff ff (e ': es) a
-    -> Eff ff es a
-interpret i = loop
-  where
-    loop :: Eff ff (e ': es) ~> Eff ff es
-    loop = Eff . runFree ((unEff . i !+ liftFree) . hfmap loop) . unEff
-{-# INLINE interpret #-}
+import Data.Effect.HFunctor (hfmap)
+import Data.Effect.OpenUnion (At, In, Index, KnownOrder, Union, extract, nil, prj, (!+))
+import Data.Functor.Identity (Identity, runIdentity)
 
 runEff :: (Free c ff, c f) => Eff ff '[Emb f] a -> f a
 runEff = runFree (getEmb . extract) . unEff
 {-# INLINE runEff #-}
+
+runPure :: (Free c ff, c Identity) => Eff ff '[] a -> a
+runPure = runIdentity . runFree nil . unEff
+{-# INLINE runPure #-}
+
+interpret
+    :: forall e es ff a c
+     . (Free c ff, KnownOrder e)
+    => (e ~~> Eff ff es)
+    -> Eff ff (e ': es) a
+    -> Eff ff es a
+interpret i = interpretAll $ i !+ sendAny
+{-# INLINE interpret #-}
+
+interpose
+    :: forall e es ff a c
+     . (Free c ff, e `In` es)
+    => (e ~~> Eff ff es)
+    -> Eff ff es a
+    -> Eff ff es a
+interpose = interposeAt @(Index e es)
+{-# INLINE interpose #-}
+
+interposeAt
+    :: forall i e es ff a c
+     . (Free c ff, At i e es)
+    => (e ~~> Eff ff es)
+    -> Eff ff es a
+    -> Eff ff es a
+interposeAt f =
+    interpretAll \u ->
+        case prj @i u of
+            Just e -> f e
+            Nothing -> sendAny u
+{-# INLINE interposeAt #-}
+
+preinterpose
+    :: forall e es ff a c
+     . (Free c ff, e `In` es)
+    => (e ~~> Eff ff es)
+    -> Eff ff es a
+    -> Eff ff es a
+preinterpose = preinterposeAt @(Index e es)
+{-# INLINE preinterpose #-}
+
+preinterposeAt
+    :: forall i e es ff a c
+     . (Free c ff, At i e es)
+    => (e ~~> Eff ff es)
+    -> Eff ff es a
+    -> Eff ff es a
+preinterposeAt f = loop
+  where
+    loop :: Eff ff es ~> Eff ff es
+    loop (Eff a) = Eff $ (`runFree` a) \u ->
+        hoist (hfmap loop) $ case prj @i u of
+            Just e -> unEff $ f e
+            Nothing -> liftFree u
+{-# INLINE preinterposeAt #-}
+
+interpretAll
+    :: forall es es' ff a c
+     . (Free c ff)
+    => (Union es ~~> Eff ff es')
+    -> Eff ff es a
+    -> Eff ff es' a
+interpretAll i = loop
+  where
+    loop :: Eff ff es ~> Eff ff es'
+    loop = Eff . runFree (unEff . i . hfmap loop) . unEff
+{-# INLINE interpretAll #-}
+
+iterEff
+    :: forall es f ff a c
+     . (Free c ff, c f)
+    => (Union es ~~> f)
+    -> Eff ff es a
+    -> f a
+iterEff i = loop
+  where
+    loop :: Eff ff es ~> f
+    loop = runFree (i . hfmap loop) . unEff
+{-# INLINE iterEff #-}

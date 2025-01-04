@@ -116,6 +116,8 @@ wordVal :: forall n. (KnownNat n) => Word
 wordVal = fromIntegral $ natVal @n Proxy
 {-# INLINE wordVal #-}
 
+type At i e es = (Member i e es, KnownOrder e)
+
 type KnownOrder e = Elem e (OrderOf e)
 
 class (order ~ OrderOf e) => Elem e order where
@@ -132,7 +134,7 @@ inj :: forall i e es f a. (KnownOrder e, Member i e es) => e f a -> Union es f a
 inj = inject $ Proxy @i
 {-# INLINE inj #-}
 
-prj :: forall i e es f a. (KnownOrder e, Member i e es, HFunctor e) => Union es f a -> Maybe (e f a)
+prj :: forall i e es f a. (KnownOrder e, Member i e es) => Union es f a -> Maybe (e f a)
 prj = project $ Proxy @i
 {-# INLINE prj #-}
 
@@ -189,26 +191,26 @@ instance (OrderOf e ~ 'HigherOrder, HFunctor e) => Elem e 'HigherOrder where
     {-# INLINE (!+) #-}
     {-# INLINE extract #-}
 
-projectAnyOE :: forall i e es f a. (Member i e es, HFunctor e) => Union es f a -> Maybe (e f a)
-projectAnyOE (UnsafeUnion n e order koi) =
+projectAnyOrder :: forall i e es f a. (Member i e es, HFunctor e) => Union es f a -> Maybe (e f a)
+projectAnyOrder (UnsafeUnion n e order koi) =
     if n == elemIndex @i @e @es
         then Just $ hfmapDynUnsafeCoerce order koi e
         else Nothing
 
-infixr 5 `caseAnyOE`
+infixr 5 `caseAnyOrder`
 
-caseAnyOE :: (HFunctor e) => (e f a -> r) -> (Union es f a -> r) -> Union (e ': es) f a -> r
-(f `caseAnyOE` g) (UnsafeUnion n e order koi) =
+caseAnyOrder :: (HFunctor e) => (e f a -> r) -> (Union es f a -> r) -> Union (e ': es) f a -> r
+(f `caseAnyOrder` g) (UnsafeUnion n e order koi) =
     if n == 0
         then f $ hfmapDynUnsafeCoerce order koi e
         else g $ UnsafeUnion (n - 1) e order koi
 
-extractAnyOE :: (HFunctor e) => Union es f a -> e f a
-extractAnyOE (UnsafeUnion _ e order koi) = hfmapDynUnsafeCoerce order koi e
+extractAnyOrder :: (HFunctor e) => Union es f a -> e f a
+extractAnyOrder (UnsafeUnion _ e order koi) = hfmapDynUnsafeCoerce order koi e
 
-{-# INLINE projectAnyOE #-}
-{-# INLINE caseAnyOE #-}
-{-# INLINE extractAnyOE #-}
+{-# INLINE projectAnyOrder #-}
+{-# INLINE caseAnyOrder #-}
+{-# INLINE extractAnyOrder #-}
 
 hfmapDynUnsafeCoerce :: (HFunctor e') => EffectOrder -> (forall x. f x -> g x) -> e f a -> e' g a
 hfmapDynUnsafeCoerce order phi e = case order of
