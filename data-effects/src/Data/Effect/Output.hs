@@ -1,11 +1,9 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
--- This Source Code Form is subject to the terms of the Mozilla Public
--- License, v. 2.0. If a copy of the MPL was not distributed with this
--- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- SPDX-License-Identifier: MPL-2.0
 
 {- |
-Copyright   :  (c) 2023 Sayo Koyoneda
+Copyright   :  (c) 2023-2025 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 
@@ -23,3 +21,22 @@ data Output o :: Effect where
     Output :: o -> Output o f ()
 
 makeEffectF ''Output
+
+-- | Interprets the t'Output' effect using the given output handler.
+runOutputEff
+    :: forall o es ff a c
+     . (Free c ff)
+    => (o -> Eff ff es ())
+    -> Eff ff (Output o ': es) a
+    -> Eff ff es a
+runOutputEff f = interpret \(Output o) -> f o
+{-# INLINE runOutputEff #-}
+
+-- | Interprets the t'Output' effect by ignoring the outputs.
+ignoreOutput
+    :: forall o es ff a c
+     . (Applicative (Eff ff es), Free c ff)
+    => Eff ff (Output o ': es) a
+    -> Eff ff es a
+ignoreOutput = runOutputEff $ const $ pure ()
+{-# INLINE ignoreOutput #-}

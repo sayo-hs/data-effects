@@ -7,6 +7,7 @@
 module Prelude (
     module Prelude,
     module Control.Effect,
+    module Control.Effect.Interpret,
     module Data.Effect.OpenUnion,
     module Data.Effect,
     module Data.Effect.TH,
@@ -15,7 +16,8 @@ module Prelude (
     Infinite ((:<)),
 ) where
 
-import Control.Effect (Eff, Free, type (~>))
+import Control.Effect (Eff, Free, type (~>), type (~~>))
+import Control.Effect.Interpret (interpose, interpret)
 import Data.Effect (Effect)
 import Data.Effect.HFunctor.TH
 import Data.Effect.OpenUnion (Has, In, type (:>))

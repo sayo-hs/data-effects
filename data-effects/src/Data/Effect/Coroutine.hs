@@ -1,12 +1,10 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
--- This Source Code Form is subject to the terms of the Mozilla Public
--- License, v. 2.0. If a copy of the MPL was not distributed with this
--- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- SPDX-License-Identifier: MPL-2.0
 
 {- |
 Copyright   : (c) 2016 Allele Dev; 2017 Ixperta Solutions s.r.o.; 2017 Alexis King
-              (c) 2023-2024 Sayo Koyoneda
+              (c) 2023-2025 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 
@@ -17,6 +15,8 @@ in the @freer-simple@ package (The continuation part @(b -> c)@ has been removed
 module Data.Effect.Coroutine where
 
 import Control.Monad ((>=>))
+import Data.Effect.Input (Input (Input))
+import Data.Effect.Output (Output (Output))
 
 {- |
 An effect for coroutines.
@@ -28,11 +28,6 @@ data Yield a b :: Effect where
     Yield :: a -> Yield a b f b
 
 makeEffectF ''Yield
-
--- | A version of `yield` where the value returned from the caller of the computation with coroutines is unit.
-yield_ :: (Yield a () :> es, Free c ff) => a -> Eff ff es ()
-yield_ = yield
-{-# INLINE yield_ #-}
 
 {- |
 The execution result when handling a computation that includes the t`Yield` effect. A computation that may include suspension.
@@ -55,9 +50,12 @@ continueStatus
     -> Status m a b x
     -- ^ Computation status to extend
     -> m (Status m a b r)
-continueStatus kk = \case
-    Done x -> kk x
-    Continue a k -> pure . Continue a $ k >=> continueStatus kk
+continueStatus kk = loop
+  where
+    loop = \case
+        Done x -> kk x
+        Continue a k -> pure . Continue a $ k >=> continueStatus kk
+{-# INLINE continueStatus #-}
 
 -- | Repeats the computation until the final result is obtained by continuing the computation using the specified handler each time it suspends.
 loopStatus
@@ -67,6 +65,19 @@ loopStatus
     -> Status m a b r
     -- ^ A computation that may include suspension.
     -> m r
-loopStatus f = \case
-    Done r -> pure r
-    Continue a k -> f a >>= k >>= loopStatus f
+loopStatus f = loop
+  where
+    loop = \case
+        Done r -> pure r
+        Continue a k -> f a >>= k >>= loopStatus f
+{-# INLINE loopStatus #-}
+
+-- | Converts the t'Input' effect into the [coroutine]("Data.Effect.Coroutine")'s t'Yield' effect.
+inputToYield :: Input i f a -> Yield () i f a
+inputToYield Input = Yield ()
+{-# INLINE inputToYield #-}
+
+-- | Converts the t'Output' effect into the [coroutine]("Data.Effect.Coroutine")'s t'Yield' effect.
+outputToYield :: Output o f a -> Yield o () f a
+outputToYield (Output o) = Yield o
+{-# INLINE outputToYield #-}

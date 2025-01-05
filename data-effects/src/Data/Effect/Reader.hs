@@ -15,8 +15,6 @@ can modify the value within a local scope using the `local` operation.
 -}
 module Data.Effect.Reader where
 
-import Control.Effect.Interpret (interpose, interpret)
-
 -- | An effect that holds a value of type @r@ in the context (environment).
 data Ask r :: Effect where
     -- | Obtain a value from the environment.
@@ -36,29 +34,15 @@ makeEffectF ''Ask
 makeEffectH ''Local
 
 -- | Obtains a value from the environment and returns it transformed by the given function.
-asks :: (Ask r :> es, Functor (Eff ff es), Free c ff) => (r -> a) -> Eff ff es a
+asks
+    :: forall r es ff a c
+     . (Ask r :> es, Functor (Eff ff es), Free c ff)
+    => (r -> a)
+    -> Eff ff es a
 asks f = f <$> ask
 {-# INLINE asks #-}
 
--- | Obtains a value from the environment and returns it transformed by the given function.
-asks'_ :: (Ask r `In` es, Functor (Eff ff es), Free c ff) => (r -> a) -> Eff ff es a
-asks'_ f = f <$> ask'_
-{-# INLINE asks'_ #-}
-
-runAsk :: (Free c ff, Applicative (Eff ff es)) => r -> Eff ff (Ask r ': es) a -> Eff ff es a
-runAsk r = interpret \Ask -> pure r
-{-# INLINE runAsk #-}
-
-runLocal
-    :: forall r es ff a c
-     . (Free c ff, Applicative (Eff ff es), Ask r `In` es)
-    => Eff ff (Local r ': es) a
-    -> Eff ff es a
-runLocal =
-    interpret \(Local f a) ->
-        interpose @(Ask r) (\Ask -> asks'_ f) a
-{-# INLINE runLocal #-}
-
+-- | Interpret the t'Ask'/t'Local' effects.
 runReader
     :: (Free c ff, forall f. (c (ff f)) => Applicative (ff f))
     => r
@@ -66,3 +50,30 @@ runReader
     -> Eff ff es a
 runReader r = runAsk r . runLocal
 {-# INLINE runReader #-}
+
+-- | Interpret the t'Ask' effect.
+runAsk
+    :: forall r es ff a c
+     . (Free c ff, Applicative (Eff ff es))
+    => r
+    -> Eff ff (Ask r ': es) a
+    -> Eff ff es a
+runAsk r = interpret \Ask -> pure r
+{-# INLINE runAsk #-}
+
+-- | Interpret the t'Local' effect.
+runLocal
+    :: forall r es ff a c
+     . (Free c ff, Applicative (Eff ff es), Ask r :> es)
+    => Eff ff (Local r ': es) a
+    -> Eff ff es a
+runLocal = interpret handleLocal
+{-# INLINE runLocal #-}
+
+-- | A handler for the t'Local' effect.
+handleLocal
+    :: forall r es ff c
+     . (Free c ff, Applicative (Eff ff es), Ask r :> es)
+    => Local r ~~> Eff ff es
+handleLocal (Local f a) = a & interpose @(Ask r) \Ask -> f <$> ask
+{-# INLINE handleLocal #-}

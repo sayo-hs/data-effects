@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 
 -- SPDX-License-Identifier: MPL-2.0
 
@@ -10,12 +11,13 @@ Maintainer  :  ymdfield@outlook.jp
 -}
 module Data.Effect.OpenUnion where
 
+import Data.Coerce (coerce)
 import Data.Data (Proxy (Proxy))
 import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, LabelOf, OrderCase, OrderOf)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.Tag (type (#))
 import Data.Kind (Type)
-import GHC.TypeLits (ErrorMessage (ShowType, Text, (:<>:)), KnownNat, TypeError, natVal, type (+), type (-))
+import GHC.TypeLits (ErrorMessage (ShowType, Text, (:$$:), (:<>:)), KnownNat, Symbol, TypeError, natVal, type (+), type (-))
 import Unsafe.Coerce (unsafeCoerce)
 
 data Union (es :: [Effect]) (f :: Type -> Type) (a :: Type) where
@@ -42,118 +44,169 @@ coerceFOEs :: (FOEs es) => Union es f a -> Union es g a
 coerceFOEs = unsafeCoerce
 {-# INLINE coerceFOEs #-}
 
-type family RemoveHOEs (es :: [Effect]) where
-    RemoveHOEs '[] = '[]
-    RemoveHOEs (e ': es) =
-        OrderCase (OrderOf e) (e ': RemoveHOEs es) (RemoveHOEs es)
+newtype Membership (e :: Effect) (es :: [Effect]) = UnsafeMembership {unMembership :: Word}
+    deriving stock (Eq, Show)
 
-type KnownOrders es = WeakenH es 0 (OrderOfHead es)
+here :: Membership e (e ': es)
+here = UnsafeMembership 0
+{-# INLINE here #-}
 
-type family OrderOfHead es where
-    OrderOfHead (e ': es) = OrderOf e
+weaken :: Membership e es -> Membership e (e' ': es)
+weaken (UnsafeMembership n) = UnsafeMembership $ n + 1
+{-# INLINE weaken #-}
 
-class (FOEs (RemoveHOEs es), orderOfHead ~ OrderOfHead es) => WeakenH es i orderOfHead where
-    weakenH :: Word -> Word
+mapUnion
+    :: forall es es' f a
+     . (forall e. Membership e es -> Membership e es')
+    -> Union es f a
+    -> Union es' f a
+mapUnion f (UnsafeUnion n e order koi) =
+    UnsafeUnion (unMembership $ f $ UnsafeMembership n) e order koi
+{-# INLINE mapUnion #-}
 
-instance (OrderOfHead '[] ~ orderOfHead) => WeakenH '[] i orderOfHead where
-    weakenH = id
-    {-# INLINE weakenH #-}
+membershipAt :: forall i es. (KnownNat i) => Membership (At i es) es
+membershipAt = UnsafeMembership $ wordVal @i
+{-# INLINE membershipAt #-}
 
-instance (FirstOrder e, WeakenH es (i + 1) _orderOfHead) => WeakenH (e ': es) i 'FirstOrder where
-    weakenH = weakenH @es @(i + 1)
-    {-# INLINE weakenH #-}
-
-instance
-    (OrderOf e ~ 'HigherOrder, WeakenH es (i + 1) _orderOfHead, FOEs (RemoveHOEs es), KnownNat i)
-    => WeakenH (e ': es) i 'HigherOrder
-    where
-    weakenH n = if n < wordVal @i then n else weakenH @es @(i + 1) n + 1
-    {-# INLINE weakenH #-}
-
-raiseH :: forall es f a. (KnownOrders es) => Union (RemoveHOEs es) f a -> Union es f a
-raiseH = unsafeTransformUnion $ weakenH @es @0
-{-# INLINE raiseH #-}
-
-type e :> es = (Member (LabelIndex e es) e es, KnownOrder e)
-type Has key e es = (Member (KeyIndex key es) e es, KnownOrder e)
-type e `In` es = (Member (Index e es) e es, KnownOrder e)
-
-type family ElemAt i es :: Effect where
-    ElemAt 0 (e ': es) = e
-    ElemAt i (e ': es) = ElemAt (i - 1) es
-    ElemAt i '[] = TypeError ('Text "Effect index out of range")
-
-type LabelIndex e es = FindByLabel (LabelOf e) es es
-
-type family FindByLabel label es w where
-    FindByLabel label (e ': es) w = CmpLabel (LabelOf e) label 0 (FindByLabel label es w + 1)
-    FindByLabel label '[] w = TypeError ('Text "No the label" :<>: 'ShowType label :<>: 'Text " in " :<>: 'ShowType w)
-
-type family CmpLabel (label :: Type) label' eq neq where
-    CmpLabel l l eq neq = eq
-    CmpLabel l l' eq neq = neq
-
-type KeyIndex key es = FindByKey key es es
-
--- fixme: add uniqueness check
-type family FindByKey key es w where
-    FindByKey key (e # key ': es) w = 0
-    FindByKey key (e ': es) w = FindByKey key es w + 1
-    FindByKey key '[] w = TypeError ('Text "No the key" :<>: 'ShowType key :<>: 'Text " in " :<>: 'ShowType w)
-
-type Index e es = Find e es es
-
-type family Find e (es :: [Effect]) w where
-    Find e (e ': es) w = 0
-    Find e (e' ': es) w = Find e es w + 1
-    Find e '[] w = TypeError ('Text "No " :<>: 'ShowType e :<>: 'Text " in " :<>: 'ShowType w)
-
-elemIndex :: forall i e es. (Member i e es) => Word
-elemIndex = wordVal @i
-{-# INLINE elemIndex #-}
+type family At i es where
+    At 0 '[] = TypeError ('Text "Effect index out of range")
+    At 0 (e ': es) = e
+    At n (e ': es) = At (n - 1) es
 
 wordVal :: forall n. (KnownNat n) => Word
 wordVal = fromIntegral $ natVal @n Proxy
 {-# INLINE wordVal #-}
 
-type At i e es = (Member i e es, KnownOrder e)
+data LabelResolver
+data KeyResolver
+data IdentityResolver
+
+data KeyDiscriminator key
+data NoKeyDiscriminator
+
+data IdentityDiscriminator (e :: Effect)
+
+type family Discriminator resolver (e :: Effect)
+type instance Discriminator LabelResolver e = LabelOf e
+type instance Discriminator KeyResolver e = DiscriminatorForKey e
+type instance Discriminator IdentityResolver e = IdentityDiscriminator e
+
+type family DiscriminatorForKey e where
+    DiscriminatorForKey (e # key) = KeyDiscriminator key
+    DiscriminatorForKey e = NoKeyDiscriminator
+
+type family ResolverName resolver :: Symbol
+type instance ResolverName LabelResolver = "label"
+type instance ResolverName KeyResolver = "key"
+type instance ResolverName IdentityResolver = "identity"
+
+type e :> es = MemberBy LabelResolver (Discriminator LabelResolver e) e es
+type Has key e es = MemberBy KeyResolver (KeyDiscriminator key) (e # key) es
+type e `In` es = MemberBy IdentityResolver (IdentityDiscriminator e) e es
+type KnownIndex i es = (KnownNat i, KnownOrder (At i es))
+
+type MemberBy resolver dscr e es =
+    ( FindBy resolver dscr (Discriminator resolver (HeadOf es)) e es
+    , ErrorIfNotFound resolver dscr (Discriminator resolver (HeadOf es)) e es es
+    , KnownOrder e
+    )
+
+class
+    (dscr ~ Discriminator resolver e, dscr' ~ Discriminator resolver (HeadOf r)) =>
+    FindBy resolver dscr dscr' e r
+    where
+    findBy :: Membership e r
+
+instance
+    (dscr ~ Discriminator resolver e, dscr ~ Discriminator resolver e', e ~ e')
+    => FindBy resolver dscr dscr e (e' ': r)
+    where
+    findBy = here
+    {-# INLINE findBy #-}
+
+instance
+    {-# OVERLAPPABLE #-}
+    ( dscr ~ Discriminator resolver e
+    , dscr' ~ Discriminator resolver e'
+    , FindBy resolver dscr (Discriminator resolver (HeadOf r)) e r
+    )
+    => FindBy resolver dscr dscr' e (e' ': r)
+    where
+    findBy = weaken $ findBy @resolver @dscr @(Discriminator resolver (HeadOf r)) @e @r
+    {-# INLINE findBy #-}
+
+membership
+    :: forall resolver dscr e es
+     . (FindBy resolver dscr (Discriminator resolver (HeadOf es)) e es)
+    => Membership e es
+membership = findBy @resolver @dscr @(Discriminator resolver (HeadOf es)) @e @es
+{-# INLINE membership #-}
+
+class
+    (dscr ~ Discriminator resolver e, dscr' ~ Discriminator resolver (HeadOf r)) =>
+    ErrorIfNotFound resolver dscr dscr' (e :: Effect) (r :: [Effect]) (w :: [Effect])
+
+instance
+    ( TypeError
+        ( 'Text "The effect ‘"
+            ':<>: 'ShowType e
+            ':<>: 'Text "’ does not exist within the effect list"
+            ':$$: 'Text "  ‘" ':<>: 'ShowType w ':<>: 'Text "’"
+            ':$$: 'Text "Resolver: " ':<>: 'Text (ResolverName resolver)
+            ':$$: 'Text "Discriminator: " ':<>: 'ShowType dscr
+        )
+    , dscr ~ Discriminator resolver e
+    , dscr' ~ Discriminator resolver (HeadOf '[])
+    )
+    => ErrorIfNotFound resolver dscr dscr' e '[] w
+
+instance
+    (dscr ~ Discriminator resolver e, dscr ~ Discriminator resolver e', e ~ e')
+    => ErrorIfNotFound resolver dscr dscr e (e' ': r) w
+
+instance
+    {-# OVERLAPPABLE #-}
+    ( dscr ~ Discriminator resolver e
+    , dscr' ~ Discriminator resolver e'
+    , ErrorIfNotFound resolver dscr (Discriminator resolver (HeadOf r)) e r w
+    )
+    => ErrorIfNotFound resolver dscr dscr' e (e' ': r) w
+
+instance
+    {-# INCOHERENT #-}
+    ( dscr ~ Discriminator resolver e
+    , dscr' ~ Discriminator resolver (HeadOf r)
+    )
+    => ErrorIfNotFound resolver dscr dscr' e r w
+
+type family HeadOf es where
+    HeadOf (e ': es) = e
 
 type KnownOrder e = Elem e (OrderOf e)
 
 class (order ~ OrderOf e) => Elem e order where
-    inject :: (Member i e es) => Proxy i -> e f a -> Union es f a
-    project :: (Member i e es) => Proxy i -> Union es f a -> Maybe (e f a)
+    inject :: Membership e es -> e f a -> Union es f a
+    project :: Membership e es -> Union es f a -> Maybe (e f a)
     (!+) :: (e f a -> r) -> (Union es f a -> r) -> Union (e ': es) f a -> r
     extract :: Union '[e] f a -> e f a
 
     infixr 5 !+
-
-type Member i e es = (KnownNat i, ElemAt i es ~ e)
-
-inj :: forall i e es f a. (KnownOrder e, Member i e es) => e f a -> Union es f a
-inj = inject $ Proxy @i
-{-# INLINE inj #-}
-
-prj :: forall i e es f a. (KnownOrder e, Member i e es) => Union es f a -> Maybe (e f a)
-prj = project $ Proxy @i
-{-# INLINE prj #-}
 
 decomp :: (KnownOrder e, HFunctor e) => Union (e ': es) f a -> Either (e f a) (Union es f a)
 decomp = Left !+ Right
 {-# INLINE decomp #-}
 
 instance (FirstOrder e) => Elem e 'FirstOrder where
-    inject :: forall i es f a. (Member i e es) => Proxy i -> e f a -> Union es f a
-    inject _ e = UnsafeUnion (elemIndex @i @e @es) e FirstOrder undefined
+    inject :: forall es f a. Membership e es -> e f a -> Union es f a
+    inject i e = UnsafeUnion (unMembership i) e FirstOrder undefined
 
     project
-        :: forall i es f a
-         . (Member i e es)
-        => Proxy i
+        :: forall es f a
+         . Membership e es
         -> Union es f a
         -> Maybe (e f a)
-    project _ (UnsafeUnion n e _ _) =
-        if n == elemIndex @i @e @es
+    project i (UnsafeUnion n e _ _) =
+        if n == unMembership i
             then Just $ unsafeCoerce e
             else Nothing
 
@@ -170,12 +223,12 @@ instance (FirstOrder e) => Elem e 'FirstOrder where
     {-# INLINE extract #-}
 
 instance (OrderOf e ~ 'HigherOrder, HFunctor e) => Elem e 'HigherOrder where
-    inject :: forall i es f a. (Member i e es) => Proxy i -> e f a -> Union es f a
-    inject _ e = UnsafeUnion (elemIndex @i @e @es) e HigherOrder id
+    inject :: forall es f a. Membership e es -> e f a -> Union es f a
+    inject i e = UnsafeUnion (unMembership i) e HigherOrder id
 
-    project :: forall i es f a. (Member i e es) => Proxy i -> Union es f a -> Maybe (e f a)
-    project _ (UnsafeUnion n e _ koi) =
-        if n == elemIndex @i @e @es
+    project :: forall es f a. Membership e es -> Union es f a -> Maybe (e f a)
+    project i (UnsafeUnion n e _ koi) =
+        if n == unMembership i
             then Just $ hfmap koi (unsafeCoerce e)
             else Nothing
 
@@ -191,9 +244,9 @@ instance (OrderOf e ~ 'HigherOrder, HFunctor e) => Elem e 'HigherOrder where
     {-# INLINE (!+) #-}
     {-# INLINE extract #-}
 
-projectAnyOrder :: forall i e es f a. (Member i e es, HFunctor e) => Union es f a -> Maybe (e f a)
-projectAnyOrder (UnsafeUnion n e order koi) =
-    if n == elemIndex @i @e @es
+projectAnyOrder :: forall e es f a. (HFunctor e) => Membership e es -> Union es f a -> Maybe (e f a)
+projectAnyOrder i (UnsafeUnion n e order koi) =
+    if n == unMembership i
         then Just $ hfmapDynUnsafeCoerce order koi e
         else Nothing
 
@@ -221,9 +274,9 @@ hfmapDynUnsafeCoerce order phi e = case order of
 nil :: Union '[] f a -> r
 nil _ = error "Effect system internal error: nil - An empty effect union, which should not be possible to create, has been created."
 
-unsafeTransformUnion :: forall es es' f a. (Word -> Word) -> Union es f a -> Union es' f a
-unsafeTransformUnion f (UnsafeUnion n e order koi) = UnsafeUnion (f n) e order koi
-{-# INLINE unsafeTransformUnion #-}
+weakens :: forall es es' e. (Weaken es es') => Membership e es -> Membership e es'
+weakens (UnsafeMembership n) = UnsafeMembership $ n + prefixLen @es @es'
+{-# INLINE weakens #-}
 
 class Weaken (es :: [Effect]) (es' :: [Effect]) where
     prefixLen :: Word
@@ -235,10 +288,6 @@ instance {-# INCOHERENT #-} Weaken es es where
 instance (Weaken es es') => Weaken es (e ': es') where
     prefixLen = prefixLen @es @es' + 1
     {-# INLINE prefixLen #-}
-
-weaken :: forall es es' f a. (Weaken es es') => Union es f a -> Union es' f a
-weaken = unsafeTransformUnion (+ prefixLen @es @es')
-{-# INLINE weaken #-}
 
 class WeakenUnder (es :: [Effect]) (es' :: [Effect]) where
     prefixLenUnder :: Word
@@ -258,9 +307,42 @@ instance (WeakenUnder es es') => WeakenUnder (e ': es) (e ': es') where
     {-# INLINE prefixLenUnder #-}
     {-# INLINE offset #-}
 
-weakenUnder :: forall es es' f a. (WeakenUnder es es') => Union es f a -> Union es' f a
-weakenUnder = unsafeTransformUnion \n ->
-    if n < offset @es @es'
-        then n
-        else n + prefixLenUnder @es @es'
-{-# INLINE weakenUnder #-}
+weakensUnder :: forall es es' e. (WeakenUnder es es') => Membership e es -> Membership e es'
+weakensUnder (UnsafeMembership n) =
+    UnsafeMembership
+        if n < offset @es @es'
+            then n
+            else n + prefixLenUnder @es @es'
+{-# INLINE weakensUnder #-}
+
+type family RemoveHOEs (es :: [Effect]) where
+    RemoveHOEs '[] = '[]
+    RemoveHOEs (e ': es) =
+        OrderCase (OrderOf e) (e ': RemoveHOEs es) (RemoveHOEs es)
+
+type KnownOrders es = WeakenH es 0 (OrderOfHead es)
+
+type family OrderOfHead es where
+    OrderOfHead (e ': es) = OrderOf e
+
+class (FOEs (RemoveHOEs es), orderOfHead ~ OrderOfHead es) => WeakenH es i orderOfHead where
+    weakensH :: Membership e (RemoveHOEs es) -> Membership e es
+
+instance (OrderOfHead '[] ~ orderOfHead) => WeakenH '[] i orderOfHead where
+    weakensH = id
+    {-# INLINE weakensH #-}
+
+instance (FirstOrder e, WeakenH es (i + 1) _orderOfHead) => WeakenH (e ': es) i 'FirstOrder where
+    weakensH = coerce $ weakensH @es @(i + 1)
+    {-# INLINE weakensH #-}
+
+instance
+    (OrderOf e ~ 'HigherOrder, WeakenH es (i + 1) _orderOfHead, FOEs (RemoveHOEs es), KnownNat i)
+    => WeakenH (e ': es) i 'HigherOrder
+    where
+    weakensH (UnsafeMembership n) =
+        UnsafeMembership $
+            if n < wordVal @i
+                then n
+                else unMembership (weakensH @es @(i + 1) $ UnsafeMembership n) + 1
+    {-# INLINE weakensH #-}

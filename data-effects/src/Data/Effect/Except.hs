@@ -1,17 +1,20 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
--- This Source Code Form is subject to the terms of the Mozilla Public
--- License, v. 2.0. If a copy of the MPL was not distributed with this
--- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- SPDX-License-Identifier: MPL-2.0
 
 {- |
-Copyright   :  (c) 2023 Sayo Koyoneda
+Copyright   :  (c) 2023-2025 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 
 An effect to escape from the normal control structure with an exception value in the middle of a context.
 -}
 module Data.Effect.Except where
+
+import Data.Effect (Emb)
+import Data.Effect.Unlift (UnliftIO)
+import UnliftIO (Exception, throwIO)
+import UnliftIO qualified as IO
 
 -- | An effect to escape from the normal control structure with an exception value of type @e@ in the middle of a context.
 data Throw e :: Effect where
@@ -73,3 +76,21 @@ onExcept
     -> Eff ff es a
 onExcept thing after = thing `withExcept` \(_ :: e) -> after
 {-# INLINE onExcept #-}
+
+-- | Interpret the t'Throw' effect based on an IO-fused semantics using IO-level exceptions.
+runThrowIO
+    :: forall e es ff a c
+     . (Emb IO `In` es, Exception e, Monad (Eff ff es), Free c ff)
+    => Eff ff (Throw e ': es) a
+    -> Eff ff es a
+runThrowIO = interpret \(Throw e) -> throwIO e
+{-# INLINE runThrowIO #-}
+
+-- | Interpret the t'Catch' effect based on an IO-fused semantics using IO-level exceptions.
+runCatchIO
+    :: forall e es ff a c
+     . (UnliftIO :> es, Emb IO `In` es, Exception e, Monad (Eff ff es), Free c ff)
+    => Eff ff (Catch e ': es) a
+    -> Eff ff es a
+runCatchIO = interpret \(Catch action hdl) -> IO.catch action hdl
+{-# INLINE runCatchIO #-}

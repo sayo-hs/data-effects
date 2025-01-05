@@ -20,7 +20,24 @@ import Control.Applicative.Free.Final qualified as Final
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Effect (Emb (Emb))
 import Data.Effect.HFunctor (hfmap)
-import Data.Effect.OpenUnion (Has, In, Index, KeyIndex, LabelIndex, Union, inj, type (:>))
+import Data.Effect.OpenUnion (
+    At,
+    Has,
+    IdentityResolver,
+    In,
+    KeyDiscriminator,
+    KeyResolver,
+    KnownIndex,
+    KnownOrder,
+    LabelResolver,
+    Membership,
+    Union,
+    inject,
+    membership,
+    membershipAt,
+    type (:>),
+ )
+import Data.Effect.Tag (Tagged (Tag))
 import Data.Functor.Coyoneda (Coyoneda (Coyoneda), hoistCoyoneda, liftCoyoneda, lowerCoyoneda)
 import Data.Kind (Type)
 
@@ -63,24 +80,37 @@ class (forall f. c (ff f)) => Free c (ff :: (Type -> Type) -> Type -> Type) | ff
     {-# INLINE hoist #-}
 
 perform :: forall e es ff a c. (e :> es, Free c ff) => e (Eff ff es) a -> Eff ff es a
-perform = Eff . liftFree . inj @(LabelIndex e es)
+perform = sendFor $ membership @LabelResolver
 {-# INLINE perform #-}
 
 perform' :: forall key e es ff a c. (Has key e es, Free c ff) => e (Eff ff es) a -> Eff ff es a
-perform' = Eff . liftFree . inj @(KeyIndex key es)
+perform' = sendFor (membership @KeyResolver @(KeyDiscriminator key)) . Tag
 {-# INLINE perform' #-}
 
 send :: forall e es ff a c. (e `In` es, Free c ff) => e (Eff ff es) a -> Eff ff es a
-send = Eff . liftFree . inj @(Index e es)
+send = sendFor $ membership @IdentityResolver
 {-# INLINE send #-}
+
+sendAt :: forall i es ff a c. (KnownIndex i es, Free c ff) => At i es (Eff ff es) a -> Eff ff es a
+sendAt = sendFor $ membershipAt @i
+{-# INLINE sendAt #-}
+
+sendFor
+    :: forall e es ff a c
+     . (KnownOrder e, Free c ff)
+    => Membership e es
+    -> e (Eff ff es) a
+    -> Eff ff es a
+sendFor i = sendUnion . inject i
+{-# INLINE sendFor #-}
 
 emb :: forall f es ff a c. (Emb f `In` es, Free c ff) => f a -> Eff ff es a
 emb = send . Emb
 {-# INLINE emb #-}
 
-sendAny :: (Free c ff) => Union es (Eff ff es) a -> Eff ff es a
-sendAny = Eff . liftFree
-{-# INLINE sendAny #-}
+sendUnion :: (Free c ff) => Union es (Eff ff es) a -> Eff ff es a
+sendUnion = Eff . liftFree
+{-# INLINE sendUnion #-}
 
 instance Free Functor Coyoneda where
     liftFree = liftCoyoneda

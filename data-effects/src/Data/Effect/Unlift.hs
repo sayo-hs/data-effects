@@ -1,11 +1,10 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE UndecidableInstances #-}
 
--- This Source Code Form is subject to the terms of the Mozilla Public
--- License, v. 2.0. If a copy of the MPL was not distributed with this
--- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- SPDX-License-Identifier: MPL-2.0
 
 {- |
-Copyright   :  (c) 2023-2024 Sayo Koyoneda
+Copyright   :  (c) 2023-2025 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 
@@ -13,7 +12,10 @@ Realizes [@unliftio@](https://hackage.haskell.org/package/unliftio) in the form 
 -}
 module Data.Effect.Unlift where
 
-import Data.Effect.Tag (type (#))
+import Control.Effect (sendAt)
+import Control.Effect.Interpret (runEff)
+import Data.Effect (Emb (Emb))
+import UnliftIO qualified as IO
 
 data UnliftBase b f (a :: Type) where
     WithRunInBase :: ((forall x. f x -> b x) -> b a) -> UnliftBase b f a
@@ -26,14 +28,27 @@ pattern WithRunInIO :: (f ~> IO -> IO a) -> UnliftIO f a
 pattern WithRunInIO f = WithRunInBase f
 {-# COMPLETE WithRunInIO #-}
 
-withRunInIO :: (UnliftIO <! f) => (f ~> IO -> IO a) -> f a
+withRunInIO
+    :: forall es ff a c
+     . (UnliftIO :> es, Free c ff)
+    => (Eff ff es ~> IO -> IO a)
+    -> Eff ff es a
 withRunInIO = withRunInBase
 {-# INLINE withRunInIO #-}
 
-withRunInIO' :: forall key f a. (PerformBy key UnliftIO f) => (f ~> IO -> IO a) -> f a
-withRunInIO' = withRunInBase' @key
-{-# INLINE withRunInIO' #-}
+runUnliftBase :: forall b ff a c. (c b, Free c ff) => Eff ff '[UnliftBase b, Emb b] a -> b a
+runUnliftBase =
+    runEff . interpret \(WithRunInBase f) ->
+        sendAt @0 $ Emb $ f runEff
+{-# INLINE runUnliftBase #-}
 
-withRunInIO'' :: forall tag f a. (UnliftIO # tag <! f) => (f ~> IO -> IO a) -> f a
-withRunInIO'' = withRunInBase'' @tag
-{-# INLINE withRunInIO'' #-}
+runUnliftIO :: (IO.MonadUnliftIO m, Free c ff, c m) => Eff ff '[UnliftIO, Emb m] a -> m a
+runUnliftIO =
+    runEff . interpret \(WithRunInBase f) ->
+        sendAt @0 $ Emb $ IO.withRunInIO \run -> f $ run . runEff
+{-# INLINE runUnliftIO #-}
+
+-- fixme: orphan
+instance (UnliftIO :> es, Emb IO `In` es, Monad (Eff ff es), Free c ff) => IO.MonadUnliftIO (Eff ff es) where
+    withRunInIO = withRunInIO
+    {-# INLINE withRunInIO #-}

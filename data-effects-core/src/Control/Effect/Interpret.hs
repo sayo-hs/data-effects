@@ -12,13 +12,24 @@ import Control.Effect (
     Eff (..),
     Free (liftFree, runFree),
     hoist,
-    sendAny,
+    sendUnion,
     type (~>),
     type (~~>),
  )
 import Data.Effect (Emb, getEmb)
 import Data.Effect.HFunctor (hfmap)
-import Data.Effect.OpenUnion (At, In, Index, KnownOrder, Union, extract, nil, prj, (!+))
+import Data.Effect.OpenUnion (
+    KnownOrder,
+    LabelResolver,
+    Membership,
+    Union,
+    extract,
+    membership,
+    nil,
+    project,
+    (!+),
+    (:>),
+ )
 import Data.Functor.Identity (Identity, runIdentity)
 
 runEff :: (Free c ff, c f) => Eff ff '[Emb f] a -> f a
@@ -35,54 +46,56 @@ interpret
     => (e ~~> Eff ff es)
     -> Eff ff (e ': es) a
     -> Eff ff es a
-interpret i = interpretAll $ i !+ sendAny
+interpret i = interpretAll $ i !+ sendUnion
 {-# INLINE interpret #-}
 
 interpose
     :: forall e es ff a c
-     . (Free c ff, e `In` es)
+     . (Free c ff, e :> es)
     => (e ~~> Eff ff es)
     -> Eff ff es a
     -> Eff ff es a
-interpose = interposeAt @(Index e es)
+interpose = interposeFor $ membership @LabelResolver
 {-# INLINE interpose #-}
 
-interposeAt
-    :: forall i e es ff a c
-     . (Free c ff, At i e es)
-    => (e ~~> Eff ff es)
+interposeFor
+    :: forall e es ff a c
+     . (Free c ff, KnownOrder e)
+    => Membership e es
+    -> (e ~~> Eff ff es)
     -> Eff ff es a
     -> Eff ff es a
-interposeAt f =
+interposeFor i f =
     interpretAll \u ->
-        case prj @i u of
+        case project i u of
             Just e -> f e
-            Nothing -> sendAny u
-{-# INLINE interposeAt #-}
+            Nothing -> sendUnion u
+{-# INLINE interposeFor #-}
 
 preinterpose
     :: forall e es ff a c
-     . (Free c ff, e `In` es)
+     . (Free c ff, e :> es)
     => (e ~~> Eff ff es)
     -> Eff ff es a
     -> Eff ff es a
-preinterpose = preinterposeAt @(Index e es)
+preinterpose = preinterposeFor $ membership @LabelResolver
 {-# INLINE preinterpose #-}
 
-preinterposeAt
-    :: forall i e es ff a c
-     . (Free c ff, At i e es)
-    => (e ~~> Eff ff es)
+preinterposeFor
+    :: forall e es ff a c
+     . (Free c ff, KnownOrder e)
+    => Membership e es
+    -> (e ~~> Eff ff es)
     -> Eff ff es a
     -> Eff ff es a
-preinterposeAt f = loop
+preinterposeFor i f = loop
   where
     loop :: Eff ff es ~> Eff ff es
     loop (Eff a) = Eff $ (`runFree` a) \u ->
-        hoist (hfmap loop) $ case prj @i u of
+        hoist (hfmap loop) $ case project i u of
             Just e -> unEff $ f e
             Nothing -> liftFree u
-{-# INLINE preinterposeAt #-}
+{-# INLINE preinterposeFor #-}
 
 interpretAll
     :: forall es es' ff a c

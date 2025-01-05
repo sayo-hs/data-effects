@@ -1,11 +1,9 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
--- This Source Code Form is subject to the terms of the Mozilla Public
--- License, v. 2.0. If a copy of the MPL was not distributed with this
--- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- SPDX-License-Identifier: MPL-2.0
 
 {- |
-Copyright   :  (c) 2023 Sayo Koyoneda
+Copyright   :  (c) 2023-2025 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 
@@ -56,3 +54,14 @@ pass m = do
     (w, (f, a)) <- listen m
     tell $ f w
     pure a
+{-# INLINE pass #-}
+
+-- | 'censor' with pre-applying semantics.
+censorPre
+    :: forall w es ff a c
+     . (Tell w :> es, Monoid w, Free c ff)
+    => (w -> w)
+    -> Eff ff es a
+    -> Eff ff es a
+censorPre f = interpose @(Tell w) \(Tell w) -> tell $ f w
+{-# INLINE censorPre #-}
