@@ -19,17 +19,21 @@ import Control.Effect (
 import Data.Effect (Emb, getEmb)
 import Data.Effect.HFunctor (hfmap)
 import Data.Effect.OpenUnion (
+    Has,
+    In,
     KnownOrder,
-    LabelResolver,
     Membership,
     Union,
     extract,
-    membership,
+    identityMembership,
+    keyMembership,
+    labelMembership,
     nil,
     project,
     (!+),
     (:>),
  )
+import Data.Effect.Tag (unTag)
 import Data.Functor.Identity (Identity, runIdentity)
 
 runEff :: (Free c ff, c f) => Eff ff '[Emb f] a -> f a
@@ -55,8 +59,26 @@ interpose
     => (e ~~> Eff ff es)
     -> Eff ff es a
     -> Eff ff es a
-interpose = interposeFor $ membership @LabelResolver
+interpose = interposeFor labelMembership
 {-# INLINE interpose #-}
+
+interposeOn
+    :: forall key e es ff a c
+     . (Free c ff, Has key e es)
+    => (e ~~> Eff ff es)
+    -> Eff ff es a
+    -> Eff ff es a
+interposeOn f = interposeFor (keyMembership @key) (f . unTag)
+{-# INLINE interposeOn #-}
+
+interposeIn
+    :: forall e es ff a c
+     . (Free c ff, e `In` es)
+    => (e ~~> Eff ff es)
+    -> Eff ff es a
+    -> Eff ff es a
+interposeIn = interposeFor identityMembership
+{-# INLINE interposeIn #-}
 
 interposeFor
     :: forall e es ff a c
@@ -78,7 +100,7 @@ preinterpose
     => (e ~~> Eff ff es)
     -> Eff ff es a
     -> Eff ff es a
-preinterpose = preinterposeFor $ membership @LabelResolver
+preinterpose = preinterposeFor labelMembership
 {-# INLINE preinterpose #-}
 
 preinterposeFor

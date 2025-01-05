@@ -179,7 +179,7 @@ type f ~> g = forall (x :: Type). f x -> g x
 
 infixr 2 ~>
 
--- | A natural transformation style higher-order interpreter.
+-- | A stateless higher-order handler.
 type e ~~> f = e f ~> f
 
 infix 2 ~~>

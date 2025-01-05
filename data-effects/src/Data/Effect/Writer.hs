@@ -59,9 +59,9 @@ pass m = do
 -- | 'censor' with pre-applying semantics.
 censorPre
     :: forall w es ff a c
-     . (Tell w :> es, Monoid w, Free c ff)
+     . (Tell w `In` es, Monoid w, Free c ff)
     => (w -> w)
     -> Eff ff es a
     -> Eff ff es a
-censorPre f = interpose @(Tell w) \(Tell w) -> tell $ f w
+censorPre f = interposeIn @(Tell w) \(Tell w) -> tell'_ $ f w
 {-# INLINE censorPre #-}

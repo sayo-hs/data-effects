@@ -88,12 +88,12 @@ data IdentityDiscriminator (e :: Effect)
 
 type family Discriminator resolver (e :: Effect)
 type instance Discriminator LabelResolver e = LabelOf e
-type instance Discriminator KeyResolver e = DiscriminatorForKey e
+type instance Discriminator KeyResolver e = KeyOf e
 type instance Discriminator IdentityResolver e = IdentityDiscriminator e
 
-type family DiscriminatorForKey e where
-    DiscriminatorForKey (e # key) = KeyDiscriminator key
-    DiscriminatorForKey e = NoKeyDiscriminator
+type family KeyOf e where
+    KeyOf (e # key) = KeyDiscriminator key
+    KeyOf e = NoKeyDiscriminator
 
 type family ResolverName resolver :: Symbol
 type instance ResolverName LabelResolver = "label"
@@ -141,6 +141,27 @@ membership
     => Membership e es
 membership = findBy @resolver @dscr @(Discriminator resolver (HeadOf es)) @e @es
 {-# INLINE membership #-}
+
+labelMembership
+    :: forall e es
+     . (FindBy LabelResolver (LabelOf e) (LabelOf (HeadOf es)) e es)
+    => Membership e es
+labelMembership = membership @LabelResolver
+{-# INLINE labelMembership #-}
+
+keyMembership
+    :: forall key e es
+     . (FindBy KeyResolver (KeyDiscriminator key) (KeyOf (HeadOf es)) (e # key) es)
+    => Membership (e # key) es
+keyMembership = membership @KeyResolver
+{-# INLINE keyMembership #-}
+
+identityMembership
+    :: forall e es
+     . (FindBy IdentityResolver (IdentityDiscriminator e) (IdentityDiscriminator (HeadOf es)) e es)
+    => Membership e es
+identityMembership = membership @IdentityResolver
+{-# INLINE identityMembership #-}
 
 class
     (dscr ~ Discriminator resolver e, dscr' ~ Discriminator resolver (HeadOf r)) =>

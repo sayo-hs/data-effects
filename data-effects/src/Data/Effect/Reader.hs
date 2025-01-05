@@ -64,7 +64,7 @@ runAsk r = interpret \Ask -> pure r
 -- | Interpret the t'Local' effect.
 runLocal
     :: forall r es ff a c
-     . (Free c ff, Applicative (Eff ff es), Ask r :> es)
+     . (Free c ff, Applicative (Eff ff es), Ask r `In` es)
     => Eff ff (Local r ': es) a
     -> Eff ff es a
 runLocal = interpret handleLocal
@@ -73,7 +73,7 @@ runLocal = interpret handleLocal
 -- | A handler for the t'Local' effect.
 handleLocal
     :: forall r es ff c
-     . (Free c ff, Applicative (Eff ff es), Ask r :> es)
+     . (Free c ff, Applicative (Eff ff es), Ask r `In` es)
     => Local r ~~> Eff ff es
-handleLocal (Local f a) = a & interpose @(Ask r) \Ask -> f <$> ask
+handleLocal (Local f a) = a & interposeIn @(Ask r) \Ask -> f <$> ask'_
 {-# INLINE handleLocal #-}

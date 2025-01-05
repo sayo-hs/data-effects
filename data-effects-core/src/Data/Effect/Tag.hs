@@ -12,7 +12,7 @@ import Data.Effect (Effect, FirstOrder, LabelOf, OrderOf)
 import Data.Kind (Type)
 
 -- | Tagged effect.
-newtype Tagged tag (e :: Effect) f a = Tag {unTagged :: e f a}
+newtype Tagged tag (e :: Effect) f a = Tag {unTag :: e f a}
     deriving stock (Functor, Foldable, Traversable)
     deriving newtype (HFunctor)
 
