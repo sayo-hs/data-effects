@@ -9,21 +9,16 @@ Maintainer  :  ymdfield@outlook.jp
 
 Effects for holding mutable state values in the context.
 -}
-module Data.Effect.State where
+module Data.Effect.State (
+    module Data.Effect.State,
+    State (..),
+) where
 
-import Data.Effect (Emb)
-import Data.Effect.Reader (Ask (Ask), Local (Local))
+import Data.Effect (Ask (Ask), Emb, Local (Local), State (Get, Put))
 import Data.Functor ((<&>))
 import UnliftIO (newIORef, readIORef, writeIORef)
 
--- | An effect for holding mutable state values in the context.
-data State s :: Effect where
-    -- | Retrieves the current state value from the context.
-    Get :: State s f s
-    -- | Overwrites the state value in the context.
-    Put :: s -> State s f ()
-
-makeEffectF ''State
+makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''State
 
 -- | Retrieves the current state value from the context and returns the value transformed based on the given function.
 gets :: (State s :> es, Functor (Eff ff es), Free c ff) => (s -> a) -> Eff ff es a
@@ -38,7 +33,7 @@ modify f = put . f =<< get
 -- | Interpret the 'State' effect based on an IO-fused semantics using t'Data.IORef.IORef'.
 runStateIORef
     :: forall s es ff a c
-     . (Emb IO `In` es, Monad (Eff ff es), Free c ff)
+     . (Emb IO :> es, Monad (Eff ff es), Free c ff)
     => s
     -> Eff ff (State s ': es) a
     -> Eff ff es (s, a)
@@ -57,7 +52,7 @@ Do not include the final state in the return value.
 -}
 evalStateIORef
     :: forall s es ff a c
-     . (Emb IO `In` es, Monad (Eff ff es), Free c ff)
+     . (Emb IO :> es, Monad (Eff ff es), Free c ff)
     => s
     -> Eff ff (State s ': es) a
     -> Eff ff es a

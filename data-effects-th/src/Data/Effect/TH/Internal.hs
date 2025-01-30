@@ -18,7 +18,7 @@ Portability :  portable
 module Data.Effect.TH.Internal where
 
 import Control.Arrow ((>>>))
-import Control.Effect (Eff, Free, perform, perform', send)
+import Control.Effect (Eff, Free, perform, perform', perform'', send)
 import Control.Lens (Traversal', makeLenses, (%~), (.~), _head)
 import Control.Monad (forM, forM_, replicateM, when)
 import Control.Monad.Reader (ReaderT, ask)
@@ -27,7 +27,7 @@ import Data.Char (toLower)
 import Data.Default (Default, def)
 import Data.Effect (EffectOrder (FirstOrder, HigherOrder), FirstOrder, LabelOf, OrderOf)
 import Data.Effect.OpenUnion (Has, In, (:>))
-import Data.Effect.Tag (Tagged (Tag))
+import Data.Effect.Tag (Tagged)
 import Data.Either.Extra (mapLeft, maybeToEither)
 import Data.Either.Validation (Validation, eitherToValidation, validationToEither)
 import Data.Function ((&))
@@ -108,6 +108,7 @@ data OpInfo = OpInfo
 data EffectConf = EffectConf
     { opConf :: Name -> OpConf
     , doesGenerateLabel :: Bool
+    , doesGenerateOrderInstance :: Bool
     }
 
 alterOpConf :: (OpConf -> OpConf) -> EffectConf -> EffectConf
@@ -165,6 +166,10 @@ noGenerateLabel :: EffectConf -> EffectConf
 noGenerateLabel conf = conf{doesGenerateLabel = False}
 {-# INLINE noGenerateLabel #-}
 
+noGenerateOrderInstance :: EffectConf -> EffectConf
+noGenerateOrderInstance conf = conf{doesGenerateOrderInstance = False}
+{-# INLINE noGenerateOrderInstance #-}
+
 instance Default EffectConf where
     def =
         EffectConf
@@ -191,6 +196,7 @@ instance Default EffectConf where
                             Just $ conf & performerName %~ (++ "'_")
                         }
             , doesGenerateLabel = True
+            , doesGenerateOrderInstance = True
             }
 
 type EffectGenerator =
@@ -203,15 +209,17 @@ genEffect = do
     genLabel conf eInfo & lift & lift >>= tell
 genFOE = do
     genEffect
-    (_, _, _, _, EffectInfo{..}) <- ask
+    (conf, _, _, _, EffectInfo{..}) <- ask
     let eData = foldl AppT (ConT eName) (map (VarT . tyVarName) eParamVars)
-    [d|type instance OrderOf $(pure eData) = 'FirstOrder|] & lift & lift >>= tell
-    [d|instance FirstOrder $(pure eData)|] & lift & lift >>= tell
+    when (doesGenerateOrderInstance conf) do
+        [d|type instance OrderOf $(pure eData) = 'FirstOrder|] & lift & lift >>= tell
+        [d|instance FirstOrder $(pure eData)|] & lift & lift >>= tell
 genHOE = do
     genEffect
-    (_, _, _, _, EffectInfo{..}) <- ask
+    (conf, _, _, _, EffectInfo{..}) <- ask
     let eData = foldl AppT (ConT eName) (map (VarT . tyVarName) eParamVars)
-    [d|type instance OrderOf $(pure eData) = HigherOrder|] & lift & lift >>= tell
+    when (doesGenerateOrderInstance conf) do
+        [d|type instance OrderOf $(pure eData) = HigherOrder|] & lift & lift >>= tell
 
 genPerformers :: EffectConf -> EffectInfo -> Q [Dec]
 genPerformers EffectConf{..} EffectInfo{..} = do
@@ -268,7 +276,7 @@ genTaggedPerformer conf eff = do
     let tag = VarT nTag
 
     genPerformer
-        ((VarE 'perform `AppE`) . (ConE 'Tag `AppTypeE` tag `AppE`))
+        (VarE 'perform'' `AppTypeE` tag `AppE`)
         ( \opDataType es ->
             InfixT (ConT ''Tagged `AppT` tag `AppT` opDataType) ''(:>) es
         )

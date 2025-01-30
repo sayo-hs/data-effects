@@ -10,19 +10,19 @@ Maintainer  :  ymdfield@outlook.jp
 
 Realizes [@unliftio@](https://hackage.haskell.org/package/unliftio) in the form of higher-order effects.
 -}
-module Data.Effect.Unlift where
+module Data.Effect.Unlift (
+    module Data.Effect.Unlift,
+    UnliftBase (..),
+    UnliftIO,
+)
+where
 
 import Control.Effect (sendAt)
 import Control.Effect.Interpret (runEff)
-import Data.Effect (Emb (Emb))
+import Data.Effect (Emb (Emb), UnliftBase (WithRunInBase), UnliftIO)
 import UnliftIO qualified as IO
 
-data UnliftBase b f (a :: Type) where
-    WithRunInBase :: ((forall x. f x -> b x) -> b a) -> UnliftBase b f a
-
-makeEffectH ''UnliftBase
-
-type UnliftIO = UnliftBase IO
+makeEffectH_' (def & noGenerateLabel & noGenerateOrderInstance) ''UnliftBase
 
 pattern WithRunInIO :: (f ~> IO -> IO a) -> UnliftIO f a
 pattern WithRunInIO f = WithRunInBase f
@@ -47,8 +47,3 @@ runUnliftIO =
     runEff . interpret \(WithRunInBase f) ->
         sendAt @0 $ Emb $ IO.withRunInIO \run -> f $ run . runEff
 {-# INLINE runUnliftIO #-}
-
--- fixme: orphan
-instance (UnliftIO :> es, Emb IO `In` es, Monad (Eff ff es), Free c ff) => IO.MonadUnliftIO (Eff ff es) where
-    withRunInIO = withRunInIO
-    {-# INLINE withRunInIO #-}

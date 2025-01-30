@@ -9,30 +9,19 @@ Maintainer  :  ymdfield@outlook.jp
 
 An effect to escape from the normal control structure with an exception value in the middle of a context.
 -}
-module Data.Effect.Except where
+module Data.Effect.Except (
+    module Data.Effect.Except,
+    Catch (..),
+    Throw (..),
+)
+where
 
-import Data.Effect (Emb)
-import Data.Effect.Unlift (UnliftIO)
+import Data.Effect (Catch (Catch), Emb, Throw (Throw), UnliftIO)
 import UnliftIO (Exception, throwIO)
 import UnliftIO qualified as IO
 
--- | An effect to escape from the normal control structure with an exception value of type @e@ in the middle of a context.
-data Throw e :: Effect where
-    -- | Throws an exception; that is, escapes from the normal control structure with an exception value in the middle of a context.
-    Throw :: e -> Throw e f a
-
--- | An effect to catch exceptions.
-data Catch e :: Effect where
-    -- | Catches exceptions within a scope and processes them according to the given exception handler.
-    Catch
-        :: f a
-        -- ^ The scope in which to catch exceptions.
-        -> (e -> f a)
-        -- ^ Exception handler. Defines the processing to perform when an exception is thrown within the scope.
-        -> Catch e f a
-
-makeEffectF ''Throw
-makeEffectH ''Catch
+makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''Throw
+makeEffectH_' (def & noGenerateLabel & noGenerateOrderInstance) ''Catch
 
 -- | Throws the given `Either` value as an exception if it is `Left`.
 liftEither :: (Throw e :> es, Applicative (Eff ff es), Free c ff) => Either e a -> Eff ff es a
@@ -80,7 +69,7 @@ onExcept thing after = thing `withExcept` \(_ :: e) -> after
 -- | Interpret the t'Throw' effect based on an IO-fused semantics using IO-level exceptions.
 runThrowIO
     :: forall e es ff a c
-     . (Emb IO `In` es, Exception e, Monad (Eff ff es), Free c ff)
+     . (Emb IO :> es, Exception e, Monad (Eff ff es), Free c ff)
     => Eff ff (Throw e ': es) a
     -> Eff ff es a
 runThrowIO = interpret \(Throw e) -> throwIO e
@@ -89,7 +78,7 @@ runThrowIO = interpret \(Throw e) -> throwIO e
 -- | Interpret the t'Catch' effect based on an IO-fused semantics using IO-level exceptions.
 runCatchIO
     :: forall e es ff a c
-     . (UnliftIO :> es, Emb IO `In` es, Exception e, Monad (Eff ff es), Free c ff)
+     . (UnliftIO :> es, Emb IO :> es, Exception e, Monad (Eff ff es), Free c ff)
     => Eff ff (Catch e ': es) a
     -> Eff ff es a
 runCatchIO = interpret \(Catch action hdl) -> IO.catch action hdl

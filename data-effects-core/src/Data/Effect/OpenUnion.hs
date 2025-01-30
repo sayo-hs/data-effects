@@ -100,6 +100,9 @@ type instance ResolverName LabelResolver = "label"
 type instance ResolverName KeyResolver = "key"
 type instance ResolverName IdentityResolver = "identity"
 
+infix 6 :>
+infix 6 `In`
+
 type e :> es = MemberBy LabelResolver (Discriminator LabelResolver e) e es
 type Has key e es = MemberBy KeyResolver (KeyDiscriminator key) (e # key) es
 type e `In` es = MemberBy IdentityResolver (IdentityDiscriminator e) e es
@@ -114,6 +117,7 @@ type MemberBy resolver dscr e es =
 class
     (dscr ~ Discriminator resolver e, dscr' ~ Discriminator resolver (HeadOf r)) =>
     FindBy resolver dscr dscr' e r
+        | resolver r -> e
     where
     findBy :: Membership e r
 
@@ -367,3 +371,11 @@ instance
                 then n
                 else unMembership (weakensH @es @(i + 1) $ UnsafeMembership n) + 1
     {-# INLINE weakensH #-}
+
+data A n :: Effect
+data ALabel
+type instance LabelOf (A n) = ALabel
+
+data B n :: Effect
+data BLabel
+type instance LabelOf (B n) = BLabel

@@ -19,6 +19,7 @@ module Data.Effect.TH (
     module Data.Function,
     EffectOrder (..),
     EffectConf (..),
+    OpConf (..),
     keyedPerformerConf,
     normalPerformerConf,
     taggedPerformerConf,
@@ -33,6 +34,8 @@ module Data.Effect.TH (
     noGenerateTaggedPerformer,
     noGenerateKeyedPerformer,
     noGeneratePerformerSignature,
+    noGenerateLabel,
+    noGenerateOrderInstance,
 ) where
 
 import Control.Monad.Reader (ask, runReaderT)
@@ -43,13 +46,16 @@ import Data.Effect.HFunctor.TH.Internal (deriveHFunctor)
 import Data.Effect.TH.Internal (
     EffectConf (..),
     EffectGenerator,
+    OpConf (..),
     PerformerConf (..),
     doesGeneratePerformerSignature,
     genFOE,
     genHOE,
     keyedPerformerConf,
     noGenerateKeyedPerformer,
+    noGenerateLabel,
     noGenerateNormalPerformer,
+    noGenerateOrderInstance,
     noGeneratePerformerSignature,
     noGenerateTaggedPerformer,
     normalPerformerConf,

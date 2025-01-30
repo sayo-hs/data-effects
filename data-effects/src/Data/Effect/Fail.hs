@@ -4,9 +4,12 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-module Data.Effect.Fail where
+module Data.Effect.Fail (
+    module Data.Effect.Fail,
+    Fail (..),
+)
+where
 
-data Fail :: Effect where
-    Fail :: String -> Fail f a
+import Data.Effect (Fail (Fail))
 
-makeEffectF ''Fail
+makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''Fail
