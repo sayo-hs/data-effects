@@ -236,3 +236,12 @@ type instance OrderOf (UnliftBase b) = 'HigherOrder
 instance HFunctor (UnliftBase b) where
     hfmap phi (WithRunInBase f) = WithRunInBase \run -> f $ run . phi
     {-# INLINE hfmap #-}
+
+data SubJump ref :: Effect where
+    SubFork :: SubJump ref f (Either (ref a) a)
+    Jump :: ref a -> a -> SubJump ref f b
+
+data SubJumpLabel
+type instance LabelOf (SubJump ref) = SubJumpLabel
+type instance OrderOf (SubJump ref) = 'FirstOrder
+instance FirstOrder (SubJump ref)

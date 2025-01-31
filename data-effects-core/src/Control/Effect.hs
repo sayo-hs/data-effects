@@ -18,6 +18,7 @@ import Control.Applicative.Free qualified as Tree
 import Control.Applicative.Free.Fast qualified as Fast
 import Control.Applicative.Free.Final qualified as Final
 import Control.Monad (MonadPlus)
+import Control.Monad.Cont qualified as Cont
 import Control.Monad.Except (MonadError, catchError, throwError)
 import Control.Monad.Fix (MonadFix, mfix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -36,6 +37,7 @@ import Data.Effect (
     Fix (Efix),
     Local (Local),
     State (Get, Put),
+    SubJump (Jump, SubFork),
     Tell (Tell),
     Throw (Throw),
     UnliftBase (WithRunInBase),
@@ -287,6 +289,27 @@ instance
     {-# INLINE (<|>) #-}
 
 instance (Empty :> es, ChooseH :> es, Monad (Eff ff es), Free c ff) => MonadPlus (Eff ff es)
+
+instance (SubJump ref :> es, Monad (Eff ff es), Free c ff) => Cont.MonadCont (Eff ff es) where
+    callCC = callCC
+    {-# INLINE callCC #-}
+
+sub
+    :: (SubJump ref :> es, Monad (Eff ff es), Free c ff)
+    => (ref a -> Eff ff es b)
+    -> (a -> Eff ff es b)
+    -> Eff ff es b
+sub p q = perform SubFork >>= either p q
+{-# INLINE sub #-}
+
+callCC
+    :: (SubJump ref :> es, Monad (Eff ff es), Free c ff)
+    => ((a -> Eff ff es b) -> Eff ff es a)
+    -> Eff ff es a
+callCC f = sub (f . jump) pure
+  where
+    jump ref x = perform $ Jump ref x
+{-# INLINE callCC #-}
 
 instance (Emb IO :> es, Monad (Eff ff es), Free c ff) => MonadIO (Eff ff es) where
     liftIO = emb

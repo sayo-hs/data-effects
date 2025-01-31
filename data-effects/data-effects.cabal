@@ -45,23 +45,21 @@ library
         Data.Effect.Writer
         Data.Effect.State
         Data.Effect.Except
-        -- Data.Effect.Accum
-        -- Data.Effect.Select
+        Data.Effect.Accum
+        Data.Effect.Select
         Data.Effect.NonDet
         Data.Effect.Coroutine
         Data.Effect.Input
         Data.Effect.Output
         Data.Effect.Fix
         Data.Effect.Fail
-        -- Data.Effect.Cont
-        -- Data.Effect.Chronicle
         -- Data.Effect.Resource
         -- Data.Effect.Fresh
         -- Data.Effect.Concurrent.Parallel
         -- Data.Effect.Concurrent.Timer
         Data.Effect.Unlift
         -- Data.Effect.Provider
-        -- Data.Effect.SubJump
+        Data.Effect.SubJump
         -- Data.Effect.ShiftReset
         -- Data.Effect.KVStore
         -- Data.Effect.Log

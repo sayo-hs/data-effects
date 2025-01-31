@@ -2,24 +2,20 @@
 
 -- SPDX-License-Identifier: MPL-2.0
 
-module Data.Effect.SubJump where
+module Data.Effect.SubJump (
+    module Data.Effect.SubJump,
+    SubJump (..),
+    callCC,
+    sub,
+)
+where
 
+import Control.Effect (callCC, sub)
+import Data.Effect (SubJump (Jump, SubFork))
 import Data.Function (fix)
 
-data SubJump' ref :: Effect where
-    SubFork :: SubJump' ref f (Either (ref a) a)
-    Jump :: ref a -> a -> SubJump' ref f b
+makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''SubJump
 
-makeKeyedEffectF ''SubJump'
-
-sub :: (PerformBy SubJumpKey (SubJump' ref) m, Monad m) => (ref a -> m b) -> (a -> m b) -> m b
-sub p q = subFork >>= either p q
-{-# INLINE sub #-}
-
-callCC :: (PerformBy SubJumpKey (SubJump' ref) m, Monad m) => ((a -> m b) -> m a) -> m a
-callCC f = sub (f . jump) pure
-{-# INLINE callCC #-}
-
-getCC :: (PerformBy SubJumpKey (SubJump' ref) m, Monad m) => m (m a)
+getCC :: (SubJump ref :> es, Monad (Eff ff es), Free c ff) => Eff ff es (Eff ff es a)
 getCC = callCC $ pure . fix
 {-# INLINE getCC #-}
