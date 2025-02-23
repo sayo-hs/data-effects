@@ -243,7 +243,8 @@ pass m = do
 @
 -}
 pass
-    :: (Tell w :> es, WriterH w :> es, Monad (Eff ff es), Free c ff)
+    :: forall w a es ff c
+     . (Tell w :> es, WriterH w :> es, Monad (Eff ff es), Free c ff)
     => Eff ff es (w -> w, a)
     -> Eff ff es a
 pass m = do
@@ -291,25 +292,27 @@ instance
 instance (Empty :> es, ChooseH :> es, Monad (Eff ff es), Free c ff) => MonadPlus (Eff ff es)
 
 instance (SubJump ref :> es, Monad (Eff ff es), Free c ff) => Cont.MonadCont (Eff ff es) where
-    callCC = callCC
+    callCC = callCC_
     {-# INLINE callCC #-}
 
 sub
-    :: (SubJump ref :> es, Monad (Eff ff es), Free c ff)
+    :: forall ref a b es ff c
+     . (SubJump ref :> es, Monad (Eff ff es), Free c ff)
     => (ref a -> Eff ff es b)
     -> (a -> Eff ff es b)
     -> Eff ff es b
 sub p q = perform SubFork >>= either p q
 {-# INLINE sub #-}
 
-callCC
-    :: (SubJump ref :> es, Monad (Eff ff es), Free c ff)
+callCC_
+    :: forall ref a b es ff c
+     . (SubJump ref :> es, Monad (Eff ff es), Free c ff)
     => ((a -> Eff ff es b) -> Eff ff es a)
     -> Eff ff es a
-callCC f = sub (f . jump) pure
+callCC_ f = sub (f . jump) pure
   where
     jump ref x = perform $ Jump ref x
-{-# INLINE callCC #-}
+{-# INLINE callCC_ #-}
 
 instance (Emb IO :> es, Monad (Eff ff es), Free c ff) => MonadIO (Eff ff es) where
     liftIO = emb

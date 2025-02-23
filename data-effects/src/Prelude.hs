@@ -18,7 +18,7 @@ module Prelude (
 
 import Control.Effect (Eff, Free, type (~>), type (~~>))
 import Control.Effect.Interpret (interposeIn, interpret)
-import Data.Effect (Effect)
+import Data.Effect (Effect, LabelOf)
 import Data.Effect.HFunctor.TH
 import Data.Effect.OpenUnion (Has, In, type (:>))
 import Data.Effect.TH

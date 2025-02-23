@@ -230,8 +230,8 @@ data UnliftBase b f (a :: Type) where
 
 type UnliftIO = UnliftBase IO
 
-data UnliftBaseLabel
-type instance LabelOf (UnliftBase b) = UnliftBaseLabel
+data UnliftBaseLabel (b :: Type -> Type)
+type instance LabelOf (UnliftBase b) = UnliftBaseLabel b
 type instance OrderOf (UnliftBase b) = 'HigherOrder
 instance HFunctor (UnliftBase b) where
     hfmap phi (WithRunInBase f) = WithRunInBase \run -> f $ run . phi

@@ -24,12 +24,14 @@ import Data.Effect.OpenUnion (
     KnownOrder,
     Membership,
     Union,
+    Weaken,
     extract,
     identityMembership,
     keyMembership,
     labelMembership,
     nil,
     project,
+    weakens,
     (!+),
     (:>),
  )
@@ -52,6 +54,15 @@ interpret
     -> Eff ff es a
 interpret i = interpretAll $ i !+ sendUnion
 {-# INLINE interpret #-}
+
+reinterpret
+    :: forall e es es' ff a c
+     . (Weaken es es', Free c ff, KnownOrder e)
+    => (e ~~> Eff ff es')
+    -> Eff ff (e ': es) a
+    -> Eff ff es' a
+reinterpret i = interpretAll $ i !+ sendUnion . weakens
+{-# INLINE reinterpret #-}
 
 interpose
     :: forall e es ff a c
@@ -102,6 +113,24 @@ preinterpose
     -> Eff ff es a
 preinterpose = preinterposeFor labelMembership
 {-# INLINE preinterpose #-}
+
+preinterposeOn
+    :: forall key e es ff a c
+     . (Free c ff, Has key e es)
+    => (e ~~> Eff ff es)
+    -> Eff ff es a
+    -> Eff ff es a
+preinterposeOn f = preinterposeFor (keyMembership @key) (f . unTag)
+{-# INLINE preinterposeOn #-}
+
+preinterposeIn
+    :: forall e es ff a c
+     . (Free c ff, e `In` es)
+    => (e ~~> Eff ff es)
+    -> Eff ff es a
+    -> Eff ff es a
+preinterposeIn = preinterposeFor identityMembership
+{-# INLINE preinterposeIn #-}
 
 preinterposeFor
     :: forall e es ff a c
