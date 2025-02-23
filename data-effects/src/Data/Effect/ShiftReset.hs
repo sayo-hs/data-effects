@@ -7,71 +7,40 @@
 module Data.Effect.ShiftReset where
 
 import Control.Monad ((>=>))
-import Data.Effect.Key (Keyed (Key))
-import Data.Functor (void)
 
-data Shift' (ans :: Type) n :: Effect where
+data Shift (ans :: Type) b :: Effect where
     Shift
-        :: forall ans n m a
-         . ((a -> n ans) -> (forall x. m x -> n x) -> n ans)
-        -> Shift' ans n m a
-makeKeyedEffectH ''Shift'
+        :: forall ans b m a
+         . ((a -> b ans) -> (forall x. m x -> b x) -> b ans)
+        -> Shift ans b m a
+makeEffectH ''Shift
 
 callCC
-    :: forall a m ans n
-     . (PerformBy ShiftKey (Shift' ans n) m, Monad m, Monad n)
-    => ((a -> n ans) -> m a)
-    -> m a
+    :: forall a ans b es ff c
+     . (Shift ans b :> es, Monad (Eff ff es), Monad b, Free c ff)
+    => ((a -> b ans) -> Eff ff es a)
+    -> Eff ff es a
 callCC f = shift \k run -> run (f $ k >=> run . abort) >>= k
+{-# INLINE callCC #-}
 
 abort
-    :: forall a m ans n
-     . (PerformBy ShiftKey (Shift' ans n) m, Applicative n)
+    :: forall a ans b es ff c
+     . (Shift ans b :> es, Applicative b, Free c ff)
     => ans
-    -> m a
+    -> Eff ff es a
 abort ans = shift \_ _ -> pure ans
 {-# INLINE abort #-}
 
 getCC
-    :: forall m ans n
-     . (PerformBy ShiftKey (Shift' ans n) m, Monad m, Monad n)
-    => m (n ans)
+    :: forall ans b es ff c
+     . (Shift ans b :> es, Monad (Eff ff es), Monad b, Free c ff)
+    => Eff ff es (b ans)
 getCC = callCC \exit' -> let a = exit' a in pure a
 
-embed :: forall m ans n. (PerformBy ShiftKey (Shift' ans n) m, Monad n) => n ~> m
+embed :: forall ans b es ff c. (Shift ans b :> es, Monad b, Free c ff) => b ~> Eff ff es
 embed m = shift \k _ -> m >>= k
 {-# INLINE embed #-}
 
 data Reset m (a :: Type) where
     Reset :: m a -> Reset m a
 makeEffectH ''Reset
-
-data Shift_' n m a where
-    Shift_'
-        :: (forall (ans :: Type). (a -> n ans) -> (forall x. m x -> n x) -> n ans)
-        -> Shift_' n m a
-{-# DEPRECATED Shift_' "Use Data.Effect.SubJump" #-}
-
-makeKeyedEffectH ''Shift_'
-
-getCC_ :: forall m n. (PerformBy Shift_Key (Shift_' n) m, Functor n) => m (n ())
-getCC_ = shift_' \k _ -> let k' = k $ void k' in k'
-{-# DEPRECATED Shift_, Shift_Key, shift_', shift_'', shift_''', getCC_ "Use Data.Effect.SubJump" #-}
-
-data ShiftF ans :: Effect where
-    ShiftF :: forall ans f a. ((a -> ans) -> ans) -> ShiftF ans f a
-{-# DEPRECATED ShiftF "Use Data.Effect.SubJump" #-}
-makeEffectF ''ShiftF
-
-fromShiftF :: ShiftF (n ans) f ~> Shift ans n m
-fromShiftF (ShiftF f) = Key $ Shift \k _ -> f k
-{-# INLINE fromShiftF #-}
-
-exitF :: forall ans m a. (ShiftF ans <! m) => ans -> m a
-exitF ans = shiftF @ans $ const ans
-{-# INLINE exitF #-}
-
-embedF :: forall ans n m. (ShiftF (n ans) <! m, Monad n) => n ~> m
-embedF m = shiftF @(n ans) (m >>=)
-{-# INLINE embedF #-}
-{-# DEPRECATED shiftF, shiftF', shiftF'', fromShiftF, exitF, embedF "Use Data.Effect.SubJump" #-}

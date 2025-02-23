@@ -59,9 +59,9 @@ library
         Data.Effect.Unlift
         Data.Effect.Provider
         Data.Effect.SubJump
-        -- Data.Effect.ShiftReset
-        -- Data.Effect.KVStore
-        -- Data.Effect.Log
+        Data.Effect.ShiftReset
+        Data.Effect.KVStore
+        Data.Effect.Log
 
     reexported-modules:
         Data.Effect,
@@ -90,7 +90,9 @@ library
         lens                        >= 5.2.3 && < 5.4,
         time                        >= 1.11.1 && < 1.15,
         infinite-list               ^>= 0.1.1,
-        unliftio
+        unliftio,
+        containers,
+        co-log-core,
 
     hs-source-dirs:   src
     ghc-options:      -Wall

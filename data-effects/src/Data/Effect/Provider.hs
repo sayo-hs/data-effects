@@ -76,7 +76,7 @@ scoped
          -> Eff ff (EachEffect es s ++ Scoped ff t i es r ': r) a
        )
     -> Eff ff es' (t s a)
-scoped i f = scope i \pop -> ScopeC $ f $ unScopeC . pop
+scoped i f = scope i \detach -> ScopeC $ f $ unScopeC . detach
 {-# INLINE scoped #-}
 
 runScoped_

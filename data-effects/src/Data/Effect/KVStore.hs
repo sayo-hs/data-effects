@@ -1,11 +1,13 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 {- |
-Copyright   :  (c) 2024 Sayo Koyoneda
+Copyright   :  (c) 2025 Sayo Koyoneda
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
 Stability   :  experimental
@@ -17,7 +19,14 @@ in the @polysemy-kvstore@ package.
 -}
 module Data.Effect.KVStore where
 
+import Control.Arrow ((>>>))
+import Control.Effect.Transform (raiseUnder)
+import Data.Effect (Emb)
 import Data.Effect.Except (Throw, throw)
+import Data.Effect.State (State, get, modify, runStateIORef)
+import Data.Functor ((<&>))
+import Data.Map (Map)
+import Data.Map qualified as Map
 import Data.Maybe (isJust)
 
 data KVStore k v :: Effect where
@@ -26,23 +35,57 @@ data KVStore k v :: Effect where
 
 makeEffectF ''KVStore
 
-lookupOrThrowKV :: (KVStore k v <! m, Throw e <! m, Monad m) => (k -> e) -> k -> m v
+lookupOrThrowKV
+    :: forall k v e es ff c
+     . (KVStore k v :> es, Throw e :> es, Monad (Eff ff es), Free c ff)
+    => (k -> e)
+    -> k
+    -> Eff ff es v
 lookupOrThrowKV err k =
     lookupKV k >>= maybe (throw $ err k) pure
+{-# INLINE lookupOrThrowKV #-}
 
-existsKV :: forall v k f. (KVStore k v <! f, Functor f) => k -> f Bool
+existsKV :: forall v k es ff c. (KVStore k v :> es, Functor (Eff ff es), Free c ff) => k -> Eff ff es Bool
 existsKV = fmap isJust . lookupKV @k @v
 {-# INLINE existsKV #-}
 
-writeKV :: (KVStore k v <! f) => k -> v -> f ()
+writeKV :: forall k v es ff c. (KVStore k v :> es, Free c ff) => k -> v -> Eff ff es ()
 writeKV k v = updateKV k (Just v)
 {-# INLINE writeKV #-}
 
-deleteKV :: forall v k f. (KVStore k v <! f) => k -> f ()
+deleteKV :: forall v k es ff c. (KVStore k v :> es, Free c ff) => k -> Eff ff es ()
 deleteKV k = updateKV @k @v k Nothing
 {-# INLINE deleteKV #-}
 
-modifyKV :: (KVStore k v <! m, Monad m) => v -> (v -> v) -> k -> m ()
+modifyKV
+    :: forall k v es ff c
+     . (KVStore k v :> es, Monad (Eff ff es), Free c ff)
+    => v
+    -> (v -> v)
+    -> k
+    -> Eff ff es ()
 modifyKV vDefault f k = do
     v <- lookupKV k
     updateKV k (Just $ maybe vDefault f v)
+{-# INLINE modifyKV #-}
+
+runKVStoreIORef
+    :: forall k v a es ff c
+     . (Ord k, Emb IO :> es, forall f. (c (ff f)) => Monad (ff f), Free c ff)
+    => Map k v
+    -> Eff ff (KVStore k v ': es) a
+    -> Eff ff es (Map k v, a)
+runKVStoreIORef initial =
+    raiseUnder
+        >>> runKVStoreAsState
+        >>> runStateIORef initial
+{-# INLINE runKVStoreIORef #-}
+
+runKVStoreAsState
+    :: forall k v es ff c
+     . (Ord k, State (Map k v) :> es, Monad (Eff ff es), Free c ff)
+    => Eff ff (KVStore k v ': es) ~> Eff ff es
+runKVStoreAsState = interpret \case
+    LookupKV k -> get <&> Map.lookup k
+    UpdateKV k v -> modify $ Map.update (const v) k
+{-# INLINE runKVStoreAsState #-}

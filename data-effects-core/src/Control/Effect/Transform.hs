@@ -53,6 +53,10 @@ raisesUnder :: forall es es' a ff c. (WeakenUnder es es', Free c ff) => Eff ff e
 raisesUnder = transAll weakensUnder
 {-# INLINE raisesUnder #-}
 
+raiseUnder :: forall e0 e1 es a ff c. (Free c ff) => Eff ff (e0 ': es) a -> Eff ff (e0 ': e1 ': es) a
+raiseUnder = raisesUnder
+{-# INLINE raiseUnder #-}
+
 raisePrefix
     :: forall es' es a ff c
      . (Free c ff, KnownLength es')
