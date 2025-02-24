@@ -211,6 +211,15 @@ type e ~~> f = e f ~> f
 
 infix 2 ~~>
 
+infixr 3 $
+infixr 4 $$
+
+-- | Type-level infix applcation for functors.
+type (f :: Type -> Type) $ a = f a
+
+-- | Type-level infix applcation for higher-order functors.
+type (h :: (Type -> Type) -> Type -> Type) $$ f = h f
+
 instance
     (Ask r :> es, Local r :> es, Monad (Eff ff es), Free c ff)
     => MonadReader r (Eff ff es)
