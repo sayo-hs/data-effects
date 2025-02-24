@@ -206,7 +206,7 @@ type f ~> g = forall (x :: Type). f x -> g x
 
 infixr 2 ~>
 
--- | A stateless higher-order handler.
+-- | A stateless handler.
 type e ~~> f = e f ~> f
 
 infix 2 ~~>

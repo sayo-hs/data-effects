@@ -162,13 +162,22 @@ interpretAll i = loop
 {-# INLINE interpretAll #-}
 
 iterEff
+    :: forall e f ff a c
+     . (KnownOrder e, c f, Free c ff)
+    => (e ~~> f)
+    -> Eff ff '[e] a
+    -> f a
+iterEff i = iterAllEff (i . extract)
+{-# INLINE iterEff #-}
+
+iterAllEff
     :: forall es f ff a c
      . (Free c ff, c f)
     => (Union es ~~> f)
     -> Eff ff es a
     -> f a
-iterEff i = loop
+iterAllEff i = loop
   where
     loop :: Eff ff es ~> f
     loop = runFree (i . hfmap loop) . unEff
-{-# INLINE iterEff #-}
+{-# INLINE iterAllEff #-}
