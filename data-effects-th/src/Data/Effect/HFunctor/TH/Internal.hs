@@ -4,9 +4,7 @@
 
 {-# HLINT ignore "Use <=<" #-}
 
--- This Source Code Form is subject to the terms of the Mozilla Public
--- License, v. 2.0. If a copy of the MPL was not distributed with this
--- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- SPDX-License-Identifier: MPL-2.0
 
 {-  The code before modification is licensed under the BSD3 License as
     shown in [1].  The modified code, in its entirety, is licensed under
@@ -48,11 +46,9 @@
 
 {- |
 Copyright   :  (c) 2010-2011 Patrick Bahr, Tom Hvitved
-               (c) 2023 Sayo Koyoneda
+               (c) 2023 Sayo contributors
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
-Stability   :  experimental
-Portability :  portable
 -}
 module Data.Effect.HFunctor.TH.Internal where
 

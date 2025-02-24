@@ -2,16 +2,12 @@
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- This Source Code Form is subject to the terms of the Mozilla Public
--- License, v. 2.0. If a copy of the MPL was not distributed with this
--- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- SPDX-License-Identifier: MPL-2.0
 
 {- |
-Copyright   :  (c) 2025 Sayo Koyoneda
+Copyright   :  (c) 2025 Sayo contributors
 License     :  MPL-2.0 (see the file LICENSE)
 Maintainer  :  ymdfield@outlook.jp
-Stability   :  experimental
-Portability :  portable
 
 This module provides the t`KVStore` effect, comes
 from [@Polysemy.KVStore@](https://hackage.haskell.org/package/polysemy-kvstore-0.1.3.0/docs/Polysemy-KVStore.html)
