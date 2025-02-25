@@ -63,6 +63,15 @@ evalStateIORef s0 m = do
         Put s -> writeIORef ref s
 {-# INLINE evalStateIORef #-}
 
+execStateIORef
+    :: forall s es ff a c
+     . (Emb IO :> es, Monad (Eff ff es), Free c ff)
+    => s
+    -> Eff ff (State s ': es) a
+    -> Eff ff es s
+execStateIORef s0 = fmap fst . runStateIORef s0
+{-# INLINE execStateIORef #-}
+
 localToState
     :: forall r es ff a c
      . (State r `In` es, Monad (Eff ff es), Free c ff)
