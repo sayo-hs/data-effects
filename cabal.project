@@ -4,3 +4,4 @@ packages:
     data-effects-core/
     data-effects-th/
 
+tests: True
