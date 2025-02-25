@@ -22,6 +22,7 @@ import Data.Effect.OpenUnion (
     Union,
     Weaken,
     WeakenUnder,
+    bundleUnion,
     identityMembership,
     inject,
     keyMembership,
@@ -31,6 +32,7 @@ import Data.Effect.OpenUnion (
     prefixFor1,
     suffixFor,
     suffixFor1,
+    unbundleUnion,
     weaken,
     weakens,
     weakensUnder,
@@ -88,6 +90,22 @@ raiseSuffix1
     -> Eff ff (es ++ EachEffect fs x) a
 raiseSuffix1 = transAll $ mapUnion $ suffixFor1 @fs @x
 {-# INLINE raiseSuffix1 #-}
+
+bundle
+    :: forall es es' a ff c
+     . (KnownLength es, Free c ff)
+    => Eff ff (es ++ es') a
+    -> Eff ff (Union es ': es') a
+bundle = transAll bundleUnion
+{-# INLINE bundle #-}
+
+unbundle
+    :: forall es es' a ff c
+     . (KnownLength es, Free c ff)
+    => Eff ff (Union es ': es') a
+    -> Eff ff (es ++ es') a
+unbundle = transAll unbundleUnion
+{-# INLINE unbundle #-}
 
 transform
     :: forall e e' es a ff c
