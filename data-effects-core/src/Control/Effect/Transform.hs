@@ -100,7 +100,7 @@ transform f = transAll $ inject Here . f !+ weaken
 
 translate
     :: forall e e' es a ff c
-     . (Free c ff, KnownOrder e, KnownOrder e', e' :> es)
+     . (Free c ff, KnownOrder e, e' :> es)
     => (e (Eff ff es) ~> e' (Eff ff es))
     -> Eff ff (e ': es) a
     -> Eff ff es a
@@ -109,7 +109,7 @@ translate = translateFor labelMembership
 
 translateOn
     :: forall key e e' es a ff c
-     . (Free c ff, KnownOrder e, KnownOrder e', Has key e' es)
+     . (Free c ff, KnownOrder e, Has key e' es)
     => (e (Eff ff es) ~> e' (Eff ff es))
     -> Eff ff (e ': es) a
     -> Eff ff es a
@@ -118,7 +118,7 @@ translateOn f = translateFor (keyMembership @key) (Tag . f)
 
 translateIn
     :: forall e e' es a ff c
-     . (Free c ff, KnownOrder e, KnownOrder e', e' `In` es)
+     . (Free c ff, KnownOrder e, e' `In` es)
     => (e (Eff ff es) ~> e' (Eff ff es))
     -> Eff ff (e ': es) a
     -> Eff ff es a
@@ -137,7 +137,7 @@ translateFor i f = transAll $ inject i . f !+ id
 
 rewrite
     :: forall e es a ff c
-     . (Free c ff, KnownOrder e, e :> es)
+     . (Free c ff, e :> es)
     => (e (Eff ff es) ~> e (Eff ff es))
     -> Eff ff es a
     -> Eff ff es a
@@ -146,7 +146,7 @@ rewrite = rewriteFor labelMembership
 
 rewriteOn
     :: forall key e es a ff c
-     . (Free c ff, KnownOrder e, Has key e es)
+     . (Free c ff, Has key e es)
     => (e (Eff ff es) ~> e (Eff ff es))
     -> Eff ff es a
     -> Eff ff es a
@@ -155,7 +155,7 @@ rewriteOn f = rewriteFor (keyMembership @key) (Tag . f . unTag)
 
 rewriteIn
     :: forall e es a ff c
-     . (Free c ff, KnownOrder e, e `In` es)
+     . (Free c ff, e `In` es)
     => (e (Eff ff es) ~> e (Eff ff es))
     -> Eff ff es a
     -> Eff ff es a
