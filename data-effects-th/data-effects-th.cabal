@@ -60,7 +60,7 @@ library
         template-haskell        >= 2.18 && < 2.23,
         th-abstraction          >= 0.6 && < 0.8,
         lens                    >= 5.2.3 && < 5.4,
-        mtl                     >= 2.2.2 && < 2.4,
+        mtl                     >= 2.3 && < 2.4,
         extra                   ^>= 1.7.14,
         containers              >= 0.6.5 && < 0.8,
         either                  ^>= 5.0.2,
