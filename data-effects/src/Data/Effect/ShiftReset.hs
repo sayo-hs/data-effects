@@ -26,23 +26,39 @@ newtype ShiftC ff ans es a
 shift
     :: forall a ans es es' ff c
      . (Shift ff ans es' :> es, forall f. (c (ff f)) => Monad (ff f), Free c ff)
+    => ((a -> Eff ff es ans) -> Eff ff es ans)
+    -> Eff ff es a
+shift initiate = ushift \k detach -> detach $ initiate $ embShift . k
+{-# INLINE shift #-}
+
+ushift
+    :: forall a ans es es' ff c
+     . (Shift ff ans es' :> es, forall f. (c (ff f)) => Monad (ff f), Free c ff)
     => ( (a -> Eff ff (Shift ff ans es' ': es') ans)
          -> (Eff ff es ~> Eff ff (Shift ff ans es' ': es'))
          -> Eff ff (Shift ff ans es' ': es') ans
        )
     -> Eff ff es a
-shift initiate =
-    unliftShift \k run ->
-        ShiftC $ initiate (unShiftC . k) (unShiftC . run)
-{-# INLINE shift #-}
+ushift initiate =
+    unliftShift \k detach ->
+        ShiftC $ initiate (unShiftC . k) (unShiftC . detach)
+{-# INLINE ushift #-}
 
 callCC
     :: forall a ans es es' ff c
      . (Shift ff ans es' :> es, forall f. (c (ff f)) => Monad (ff f), Free c ff)
+    => ((a -> Eff ff es ans) -> Eff ff es a)
+    -> Eff ff es a
+callCC f = ushift \k detach -> detach (f $ embShift . k >=> abort) >>= k
+{-# INLINE callCC #-}
+
+ucallCC
+    :: forall a ans es es' ff c
+     . (Shift ff ans es' :> es, forall f. (c (ff f)) => Monad (ff f), Free c ff)
     => ((a -> Eff ff (Shift ff ans es' ': es') ans) -> Eff ff es a)
     -> Eff ff es a
-callCC f = shift \k run -> run (f $ k >=> run . abort) >>= k
-{-# INLINE callCC #-}
+ucallCC f = ushift \k detach -> detach (f $ k >=> abort) >>= k
+{-# INLINE ucallCC #-}
 
 abort
     :: forall a ans es es' ff c
@@ -55,17 +71,24 @@ abort ans = unliftShift \_ _ -> ShiftC $ pure ans
 getCC
     :: forall ans es es' ff c
      . (Shift ff ans es' :> es, forall f. (c (ff f)) => Monad (ff f), Free c ff)
-    => Eff ff es (Eff ff (Shift ff ans es' ': es') ans)
+    => Eff ff es (Eff ff es ans)
 getCC = callCC \exit' -> let a = exit' a in pure a
 {-# INLINE getCC #-}
 
-detachShift
+ugetCC
+    :: forall ans es es' ff c
+     . (Shift ff ans es' :> es, forall f. (c (ff f)) => Monad (ff f), Free c ff)
+    => Eff ff es (Eff ff (Shift ff ans es' ': es') ans)
+ugetCC = ucallCC \exit' -> let a = exit' a in pure a
+{-# INLINE ugetCC #-}
+
+embShift
     :: forall ans a es es' ff c
      . (Shift ff ans es' :> es, Monad (Eff ff (Shift ff ans es' ': es')), Free c ff)
     => Eff ff (Shift ff ans es' ': es') a
     -> Eff ff es a
-detachShift m = unliftShift \k _ -> ShiftC $ m >>= unShiftC . k
-{-# INLINE detachShift #-}
+embShift m = unliftShift \k _ -> ShiftC $ m >>= unShiftC . k
+{-# INLINE embShift #-}
 
 data Reset :: Effect where
     Reset :: m a -> Reset m a
