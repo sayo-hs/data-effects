@@ -16,14 +16,14 @@ description:
 bug-reports: https://github.com/sayo-hs/data-effects
 
 -- The license under which the package is released.
-license:            MPL-2.0 AND BSD-3-Clause
+license:            MPL-2.0
 license-file:       LICENSE
 author:             Sayo contributors <ymdfield@outlook.jp>
 maintainer:         ymdfield <ymdfield@outlook.jp>
 
 -- A copyright notice.
 copyright:
-    2023-2024 Sayo contributors,
+    2023-2025 Sayo contributors,
     2020 Michael Szvetits,
     2010-2011 Patrick Bahr
 
@@ -34,7 +34,7 @@ extra-doc-files:
     NOTICE
     README.md
 
-tested-with: GHC == {9.2.8, 9.4.1, 9.6.6, 9.8.2}
+tested-with: GHC == {9.6.6, 9.8.2, 9.10.1, 9.12.1}
 
 source-repository head
     type: git

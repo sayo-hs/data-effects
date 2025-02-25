@@ -2,13 +2,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
--- SPDX-License-Identifier: MPL-2.0
+-- SPDX-License-Identifier: MPL-2.0 AND BSD-3-Clause
 
 {- |
 Copyright   :  (c) 2023-2025 Sayo contributors
                (c) 2010-2011 Patrick Bahr, Tom Hvitved
                (c) 2020 Michael Szvetits
-License     :  MPL-2.0 (see the file LICENSE)
+License     :  MPL-2.0 (see the LICENSE file) AND BSD-3-Clause
 Maintainer  :  ymdfield@outlook.jp
 -}
 module Data.Effect.TH.Internal where

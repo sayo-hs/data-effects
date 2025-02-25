@@ -20,7 +20,7 @@ maintainer:         ymdfield <ymdfield@outlook.jp>
 
 -- A copyright notice.
 copyright:
-    2023-2024 Sayo contributors
+    2023-2025 Sayo contributors
 
 category: Control, Effect
 
@@ -29,7 +29,7 @@ extra-doc-files:
     NOTICE
     README.md
 
-tested-with: GHC == {9.2.8, 9.4.1, 9.6.6, 9.8.2}
+tested-with: GHC == {9.6.6, 9.8.2, 9.10.1, 9.12.1}
 
 source-repository head
     type: git
@@ -55,7 +55,6 @@ library
     -- other-extensions:
     build-depends:
         base                          >= 4.16.4 && < 4.22,
-        compdata                      >= 0.13.1 && < 0.14,
         mtl                           >= 2.2.2 && < 2.4,
         kan-extensions,
         free,

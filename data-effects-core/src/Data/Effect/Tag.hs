@@ -7,8 +7,8 @@ Maintainer  :  ymdfield@outlook.jp
 -}
 module Data.Effect.Tag where
 
-import Data.Comp.Multi.HFunctor (HFunctor)
 import Data.Effect (Effect, FirstOrder, LabelOf, OrderOf)
+import Data.Effect.HFunctor (HFunctor)
 import Data.Kind (Type)
 
 -- | Tagged effect.

@@ -4,7 +4,7 @@
 
 {-# HLINT ignore "Use <=<" #-}
 
--- SPDX-License-Identifier: MPL-2.0
+-- SPDX-License-Identifier: MPL-2.0 AND BSD-3-Clause
 
 {-  The code before modification is licensed under the BSD3 License as
     shown in [1].  The modified code, in its entirety, is licensed under
@@ -47,7 +47,7 @@
 {- |
 Copyright   :  (c) 2010-2011 Patrick Bahr, Tom Hvitved
                (c) 2023 Sayo contributors
-License     :  MPL-2.0 (see the file LICENSE)
+License     :  MPL-2.0 (see the LICENSE file) AND BSD-3-Clause
 Maintainer  :  ymdfield@outlook.jp
 -}
 module Data.Effect.HFunctor.TH.Internal where
