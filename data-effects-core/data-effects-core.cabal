@@ -54,7 +54,7 @@ library
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends:
-        base                          >= 4.16.4 && < 4.21,
+        base                          >= 4.16.4 && < 4.22,
         compdata                      >= 0.13.1 && < 0.14,
         mtl                           >= 2.2.2 && < 2.4,
         kan-extensions,

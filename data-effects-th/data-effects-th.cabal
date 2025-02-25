@@ -55,7 +55,7 @@ library
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends:
-        base                    >= 4.16.4 && < 4.21,
+        base                    >= 4.16.4 && < 4.22,
         data-effects-core       ^>= 0.4,
         template-haskell        >= 2.18 && < 2.23,
         th-abstraction          >= 0.6 && < 0.8,
