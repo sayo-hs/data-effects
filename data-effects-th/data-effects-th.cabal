@@ -57,7 +57,7 @@ library
     build-depends:
         base                    >= 4.16.4 && < 4.22,
         data-effects-core       ^>= 0.4,
-        template-haskell        >= 2.18 && < 2.23,
+        template-haskell        >= 2.18 && < 2.24,
         th-abstraction          >= 0.6 && < 0.8,
         lens                    >= 5.2.3 && < 5.4,
         mtl                     >= 2.3 && < 2.4,
