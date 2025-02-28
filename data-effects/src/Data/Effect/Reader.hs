@@ -23,7 +23,7 @@ where
 import Control.Effect (sendFor)
 import Control.Effect.Interpret (interposeFor)
 import Data.Effect (Ask (Ask), Local (Local))
-import Data.Effect.OpenUnion (IdentityResolver, Membership, membership)
+import Data.Effect.HandlerVec (IdentityResolver, Membership, membership)
 
 makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''Ask
 makeEffectH_' (def & noGenerateLabel & noGenerateOrderInstance) ''Local

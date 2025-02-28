@@ -10,115 +10,98 @@ Maintainer  :  ymdfield@outlook.jp
 -}
 module Control.Effect.Transform where
 
-import Control.Effect (Eff (..), Free, sendFor, sendUnion, type (~>))
-import Control.Effect.Interpret (interposeFor, interpretAll)
-import Data.Effect.OpenUnion (
-    EachEffect,
+import Control.Effect (Eff (..), Free, type (~>))
+import Control.Effect.Interpret (transEff)
+import Data.Effect.HandlerVec (
+    Each,
     Has,
     In,
-    KnownLength,
+    KnownList,
     KnownOrder,
     Membership,
-    Union,
-    Weaken,
-    WeakenUnder,
-    bundleUnion,
+    Suffix,
+    SuffixUnder,
+    handlerFor,
     identityMembership,
-    inject,
     keyMembership,
     labelMembership,
-    mapUnion,
-    prefixFor,
-    prefixFor1,
-    suffixFor,
-    suffixFor1,
-    unbundleUnion,
-    weaken,
-    weakens,
-    weakensUnder,
-    (!+),
-    (:>),
+    override0,
+    overrideFor,
+    suffix,
+    suffixUnder,
+    suffixUnders,
+    (!:),
     pattern Here,
     type (++),
+    type (:>),
  )
+import Data.Effect.HandlerVec qualified as V
 import Data.Effect.Tag (Tagged (Tag), unTag, type (#))
 
-raise :: forall e es a ff c. (Free c ff) => Eff ff es a -> Eff ff (e ': es) a
-raise = transAll weaken
+raise :: forall e es a ff. Eff ff es a -> Eff ff (e ': es) a
+raise = raises
 {-# INLINE raise #-}
 
-raises :: forall es es' a ff c. (Weaken es es', Free c ff) => Eff ff es a -> Eff ff es' a
-raises = transAll weakens
+raises :: forall es es' a ff. (Suffix es es') => Eff ff es a -> Eff ff es' a
+raises = transEff suffix
 {-# INLINE raises #-}
 
-raisesUnder :: forall es es' a ff c. (WeakenUnder es es', Free c ff) => Eff ff es a -> Eff ff es' a
-raisesUnder = transAll weakensUnder
-{-# INLINE raisesUnder #-}
-
-raiseUnder :: forall e0 e1 es a ff c. (Free c ff) => Eff ff (e0 ': es) a -> Eff ff (e0 ': e1 ': es) a
+raiseUnder :: forall e0 e1 es a ff. Eff ff (e0 ': es) a -> Eff ff (e0 ': e1 ': es) a
 raiseUnder = raisesUnder
 {-# INLINE raiseUnder #-}
 
+raisesUnder :: forall e es es' a ff. (Suffix es es') => Eff ff (e ': es) a -> Eff ff (e ': es') a
+raisesUnder = transEff suffixUnder
+{-# INLINE raisesUnder #-}
+
+raisesUnders :: forall es es' a ff. (SuffixUnder es es') => Eff ff es a -> Eff ff es' a
+raisesUnders = transEff suffixUnders
+{-# INLINE raisesUnders #-}
+
 raisePrefix
-    :: forall es' es a ff c
-     . (Free c ff, KnownLength es')
+    :: forall es' es a ff
+     . (KnownList es')
     => Eff ff es a
     -> Eff ff (es' ++ es) a
-raisePrefix = transAll $ mapUnion $ prefixFor @es'
+raisePrefix = transEff $ V.drop @es'
 {-# INLINE raisePrefix #-}
 
 raiseSuffix
-    :: forall es' es a ff c
-     . (Free c ff)
+    :: forall es' es a ff
+     . (KnownList es)
     => Eff ff es a
     -> Eff ff (es ++ es') a
-raiseSuffix = transAll $ mapUnion $ suffixFor @es'
+raiseSuffix = transEff $ V.take @es'
 {-# INLINE raiseSuffix #-}
 
 raisePrefix1
-    :: forall fs x es a ff c
-     . (Free c ff, KnownLength fs)
+    :: forall fs x es a ff
+     . (KnownList fs)
     => Eff ff es a
-    -> Eff ff (EachEffect fs x ++ es) a
-raisePrefix1 = transAll $ mapUnion $ prefixFor1 @fs @x
+    -> Eff ff (Each fs x ++ es) a
+raisePrefix1 = transEff $ V.drop1 @fs @x
 {-# INLINE raisePrefix1 #-}
 
 raiseSuffix1
-    :: forall fs x es a ff c
-     . (Free c ff)
-    => Eff ff es a
-    -> Eff ff (es ++ EachEffect fs x) a
-raiseSuffix1 = transAll $ mapUnion $ suffixFor1 @fs @x
+    :: forall fs x es a ff
+     . (KnownList fs)
+    => Eff ff (Each fs x) a
+    -> Eff ff (Each fs x ++ es) a
+raiseSuffix1 = transEff $ V.take1 @fs @x @es
 {-# INLINE raiseSuffix1 #-}
 
-bundle
-    :: forall es es' a ff c
-     . (KnownLength es, Free c ff)
-    => Eff ff (es ++ es') a
-    -> Eff ff (Union es ': es') a
-bundle = transAll bundleUnion
-{-# INLINE bundle #-}
-
-unbundle
-    :: forall es es' a ff c
-     . (KnownLength es, Free c ff)
-    => Eff ff (Union es ': es') a
-    -> Eff ff (es ++ es') a
-unbundle = transAll unbundleUnion
-{-# INLINE unbundle #-}
-
 transform
-    :: forall e e' es a ff c
-     . (Free c ff, KnownOrder e, KnownOrder e')
+    :: forall e e' es a ff
+     . (KnownOrder e)
     => (e (Eff ff (e' ': es)) ~> e' (Eff ff (e' ': es)))
     -> Eff ff (e ': es) a
     -> Eff ff (e' ': es) a
-transform f = transAll $ inject Here . f !+ weaken
+transform f = transEff \v -> override0 (handlerFor Here v . f) v
 {-# INLINE transform #-}
 
 translate
-    :: forall e e' es a ff c
-     . (Free c ff, KnownOrder e, e' :> es)
+    :: forall e e' es a ff
+     . (KnownOrder e, e' :> es)
     => (e (Eff ff es) ~> e' (Eff ff es))
     -> Eff ff (e ': es) a
     -> Eff ff es a
@@ -126,8 +109,8 @@ translate = translateFor labelMembership
 {-# INLINE translate #-}
 
 translateOn
-    :: forall key e e' es a ff c
-     . (Free c ff, KnownOrder e, Has key e' es)
+    :: forall key e e' es a ff
+     . (KnownOrder e, Has key e' es)
     => (e (Eff ff es) ~> e' (Eff ff es))
     -> Eff ff (e ': es) a
     -> Eff ff es a
@@ -135,8 +118,8 @@ translateOn f = translateFor (keyMembership @key) (Tag . f)
 {-# INLINE translateOn #-}
 
 translateIn
-    :: forall e e' es a ff c
-     . (Free c ff, KnownOrder e, e' `In` es)
+    :: forall e e' es a ff
+     . (KnownOrder e, e' `In` es)
     => (e (Eff ff es) ~> e' (Eff ff es))
     -> Eff ff (e ': es) a
     -> Eff ff es a
@@ -144,13 +127,13 @@ translateIn = translateFor identityMembership
 {-# INLINE translateIn #-}
 
 translateFor
-    :: forall e e' es a ff c
-     . (Free c ff, KnownOrder e, KnownOrder e')
+    :: forall e e' es a ff
+     . (KnownOrder e)
     => Membership e' es
     -> (e (Eff ff es) ~> e' (Eff ff es))
     -> Eff ff (e ': es) a
     -> Eff ff es a
-translateFor i f = transAll $ inject i . f !+ id
+translateFor i f = transEff \v -> handlerFor i v . f !: v
 {-# INLINE translateFor #-}
 
 rewrite
@@ -181,23 +164,14 @@ rewriteIn = rewriteFor identityMembership
 {-# INLINE rewriteIn #-}
 
 rewriteFor
-    :: forall e es a ff c
-     . (Free c ff, KnownOrder e)
+    :: forall e es a ff
+     . (KnownOrder e)
     => Membership e es
     -> (e (Eff ff es) ~> e (Eff ff es))
     -> Eff ff es a
     -> Eff ff es a
-rewriteFor i f = interposeFor i (sendFor i . f)
+rewriteFor i f = transEff \v -> overrideFor i (handlerFor i v . f) v
 {-# INLINE rewriteFor #-}
-
-transAll
-    :: forall es es' ff a c
-     . (Free c ff)
-    => (Union es (Eff ff es') ~> Union es' (Eff ff es'))
-    -> Eff ff es a
-    -> Eff ff es' a
-transAll f = interpretAll $ sendUnion . f
-{-# INLINE transAll #-}
 
 tag
     :: forall tag e es a ff c

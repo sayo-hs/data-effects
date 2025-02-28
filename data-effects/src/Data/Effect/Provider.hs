@@ -15,7 +15,7 @@ in the @effectful@ package.
 module Data.Effect.Provider where
 
 import Control.Effect.Transform (raise, raisePrefix, raisePrefix1)
-import Data.Effect.OpenUnion (EachEffect, KnownLength, type (++))
+import Data.Effect.HandlerVec (Each, KnownList, type (++))
 import Data.Functor.Const (Const (Const))
 import Data.Functor.Identity (Identity (Identity), runIdentity)
 
@@ -41,7 +41,7 @@ newtype Const1 f x (a :: Type) = Const1 {getConst1 :: f a}
 type Scoped ff t i es r = Scope t i (ScopeC ff t i es r)
 
 newtype ScopeC ff t i fs r s a
-    = ScopeC {unScopeC :: Eff ff (EachEffect fs s ++ Scoped ff t i fs r ': r) a}
+    = ScopeC {unScopeC :: Eff ff (Each fs s ++ Scoped ff t i fs r ': r) a}
 
 -- | An effect to introduce a new local scope that provides the effect @e@.
 type Scoped_ ff t i e es = Scope t i (Const1 (ScopeC_ ff t i e es))
@@ -53,10 +53,10 @@ type Provider ff t i e es = Scoped_ ff (Const1 t) (Const i :: () -> Type) e es
 
 runScoped
     :: forall t i a es r ff c
-     . (Free c ff, KnownLength es)
+     . (Free c ff, KnownList es)
     => ( forall s x
           . i s
-         -> Eff ff (EachEffect es s ++ Scoped ff t i es r ': r) x
+         -> Eff ff (Each es s ++ Scoped ff t i es r ': r) x
          -> Eff ff (Scoped ff t i es r ': r) (t s x)
        )
     -> Eff ff (Scoped ff t i es r ': r) a
@@ -72,8 +72,8 @@ scoped
     :: forall s t i a es' es r ff c
      . (Scoped ff t i es r :> es', Free c ff)
     => i s
-    -> ( Eff ff es' ~> Eff ff (EachEffect es s ++ Scoped ff t i es r ': r)
-         -> Eff ff (EachEffect es s ++ Scoped ff t i es r ': r) a
+    -> ( Eff ff es' ~> Eff ff (Each es s ++ Scoped ff t i es r ': r)
+         -> Eff ff (Each es s ++ Scoped ff t i es r ': r) a
        )
     -> Eff ff es' (t s a)
 scoped i f = scope i \detach -> ScopeC $ f $ unScopeC . detach
@@ -81,7 +81,7 @@ scoped i f = scope i \detach -> ScopeC $ f $ unScopeC . detach
 
 runScoped_
     :: forall t i a es r ff c
-     . (Free c ff, KnownLength es)
+     . (Free c ff, KnownList es)
     => ( forall p x
           . i p
          -> Eff ff (es ++ Scoped_ ff t i es r ': r) x
@@ -109,7 +109,7 @@ scoped_ i f = scope i \pop -> Const1 $ ScopeC_ $ f $ unScopeC_ . getConst1 . pop
 
 runProvider
     :: forall t i a es r ff c
-     . (forall f. (c (ff f)) => Functor (ff f), Free c ff, KnownLength es)
+     . (forall f. (c (ff f)) => Functor (ff f), Free c ff, KnownList es)
     => ( forall x
           . i
          -> Eff ff (es ++ Provider ff t i es r ': r) x
@@ -133,7 +133,7 @@ provide i f = getConst1 <$> scoped_ (Const i) f
 
 runProvider_
     :: forall i a es r ff c
-     . (forall f. (c (ff f)) => Functor (ff f), Free c ff, KnownLength es)
+     . (forall f. (c (ff f)) => Functor (ff f), Free c ff, KnownList es)
     => ( forall x
           . i
          -> Eff ff (es ++ Provider ff Identity i es r ': r) x
@@ -157,7 +157,7 @@ provide_ i f = runIdentity <$> provide i f
 
 runProvider__
     :: forall a es r ff c
-     . (forall f. (c (ff f)) => Functor (ff f), Free c ff, KnownLength es)
+     . (forall f. (c (ff f)) => Functor (ff f), Free c ff, KnownList es)
     => ( forall x
           . Eff ff (es ++ Provider ff Identity () es r ': r) x
          -> Eff ff (Provider ff Identity () es r ': r) x

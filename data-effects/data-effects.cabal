@@ -70,7 +70,7 @@ library
         Data.Effect.HFunctor,
         Data.Effect.HFunctor.HCont,
         Data.Effect.HFunctor.TH,
-        Data.Effect.OpenUnion,
+        Data.Effect.HandlerVec,
         Control.Effect,
         Control.Effect.Interpret,
         Control.Effect.Transform,
