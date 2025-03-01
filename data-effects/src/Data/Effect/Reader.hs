@@ -30,8 +30,8 @@ makeEffectH_' (def & noGenerateLabel & noGenerateOrderInstance) ''Local
 
 -- | Obtains a value from the environment and returns it transformed by the given function.
 asks
-    :: forall r es ff a c
-     . (Ask r :> es, Functor (Eff ff es), Free c ff)
+    :: forall r es ff a
+     . (Ask r :> es, Functor (Eff ff es))
     => (r -> a)
     -> Eff ff es a
 asks f = f <$> ask
@@ -39,7 +39,7 @@ asks f = f <$> ask
 
 -- | Interpret the t'Ask'/t'Local' effects.
 runReader
-    :: (Free c ff, forall f. (c (ff f)) => Applicative (ff f))
+    :: (forall f. Applicative (ff f))
     => r
     -> Eff ff (Local r ': Ask r ': es) a
     -> Eff ff es a
@@ -48,8 +48,8 @@ runReader r = runAsk r . runLocal
 
 -- | Interpret the t'Ask' effect.
 runAsk
-    :: forall r es ff a c
-     . (Free c ff, Applicative (Eff ff es))
+    :: forall r es ff a
+     . (Applicative (Eff ff es))
     => r
     -> Eff ff (Ask r ': es) a
     -> Eff ff es a
@@ -58,8 +58,8 @@ runAsk r = interpret \Ask -> pure r
 
 -- | Interpret the t'Local' effect.
 runLocal
-    :: forall r es ff a c
-     . (Free c ff, Applicative (Eff ff es), Ask r `In` es)
+    :: forall r es ff a
+     . (Applicative (Eff ff es), Ask r `In` es)
     => Eff ff (Local r ': es) a
     -> Eff ff es a
 runLocal = interpret handleLocal
@@ -67,16 +67,16 @@ runLocal = interpret handleLocal
 
 -- | A handler for the t'Local' effect.
 handleLocal
-    :: forall r es ff c
-     . (Free c ff, Applicative (Eff ff es), Ask r `In` es)
+    :: forall r es ff
+     . (Applicative (Eff ff es), Ask r `In` es)
     => Local r ~~> Eff ff es
 handleLocal = handleLocalFor $ membership @IdentityResolver
 {-# INLINE handleLocal #-}
 
 -- | A handler for the t'Local' effect.
 handleLocalFor
-    :: forall r es ff c
-     . (Free c ff, Applicative (Eff ff es))
+    :: forall r es ff
+     . (Applicative (Eff ff es))
     => Membership (Ask r) es
     -> Local r ~~> Eff ff es
 handleLocalFor pr (Local f a) = a & interposeFor pr \Ask -> f <$> sendFor pr Ask

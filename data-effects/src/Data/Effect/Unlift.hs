@@ -29,8 +29,8 @@ pattern WithRunInIO f = WithRunInBase f
 {-# COMPLETE WithRunInIO #-}
 
 withRunInIO
-    :: forall es ff a c
-     . (UnliftIO :> es, Free c ff)
+    :: forall es ff a
+     . (UnliftIO :> es)
     => (Eff ff es ~> IO -> IO a)
     -> Eff ff es a
 withRunInIO = withRunInBase

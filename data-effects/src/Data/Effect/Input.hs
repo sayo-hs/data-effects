@@ -24,8 +24,8 @@ makeEffectF ''Input
 
 -- | Returns the value obtained by transforming the input value using the given function.
 inputs
-    :: forall i es ff a c
-     . (Input i :> es, Functor (Eff ff es), Free c ff)
+    :: forall i es ff a
+     . (Input i :> es, Functor (Eff ff es))
     => (i -> a)
     -> Eff ff es a
 inputs f = f <$> input
@@ -33,9 +33,8 @@ inputs f = f <$> input
 
 -- | Interprets the t'Input' effect by executing the given input handler each time an input is required.
 runInputEff
-    :: forall i es ff a c
-     . (Free c ff)
-    => Eff ff es i
+    :: forall i es ff a
+     . Eff ff es i
     -> Eff ff (Input i ': es) a
     -> Eff ff es a
 runInputEff a = interpret \Input -> a
@@ -43,8 +42,8 @@ runInputEff a = interpret \Input -> a
 
 -- | Interprets the t'Input' effect by providing the given constant as input.
 runInputConst
-    :: forall i es ff a c
-     . (Applicative (Eff ff es), Free c ff)
+    :: forall i es ff a
+     . (Applicative (Eff ff es))
     => i
     -> Eff ff (Input i ': es) a
     -> Eff ff es a

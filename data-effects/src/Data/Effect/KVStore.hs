@@ -32,8 +32,8 @@ data KVStore k v :: Effect where
 makeEffectF ''KVStore
 
 lookupOrThrowKV
-    :: forall k v e es ff c
-     . (KVStore k v :> es, Throw e :> es, Monad (Eff ff es), Free c ff)
+    :: forall k v e es ff
+     . (KVStore k v :> es, Throw e :> es, Monad (Eff ff es))
     => (k -> e)
     -> k
     -> Eff ff es v
@@ -41,21 +41,21 @@ lookupOrThrowKV err k =
     lookupKV k >>= maybe (throw $ err k) pure
 {-# INLINE lookupOrThrowKV #-}
 
-existsKV :: forall v k es ff c. (KVStore k v :> es, Functor (Eff ff es), Free c ff) => k -> Eff ff es Bool
+existsKV :: forall v k es ff. (KVStore k v :> es, Functor (Eff ff es)) => k -> Eff ff es Bool
 existsKV = fmap isJust . lookupKV @k @v
 {-# INLINE existsKV #-}
 
-writeKV :: forall k v es ff c. (KVStore k v :> es, Free c ff) => k -> v -> Eff ff es ()
+writeKV :: forall k v es ff. (KVStore k v :> es) => k -> v -> Eff ff es ()
 writeKV k v = updateKV k (Just v)
 {-# INLINE writeKV #-}
 
-deleteKV :: forall v k es ff c. (KVStore k v :> es, Free c ff) => k -> Eff ff es ()
+deleteKV :: forall v k es ff. (KVStore k v :> es) => k -> Eff ff es ()
 deleteKV k = updateKV @k @v k Nothing
 {-# INLINE deleteKV #-}
 
 modifyKV
-    :: forall k v es ff c
-     . (KVStore k v :> es, Monad (Eff ff es), Free c ff)
+    :: forall k v es ff
+     . (KVStore k v :> es, Monad (Eff ff es))
     => v
     -> (v -> v)
     -> k
@@ -66,8 +66,8 @@ modifyKV vDefault f k = do
 {-# INLINE modifyKV #-}
 
 runKVStoreIORef
-    :: forall k v a es ff c
-     . (Ord k, Emb IO :> es, forall f. (c (ff f)) => Monad (ff f), Free c ff)
+    :: forall k v a es ff
+     . (Ord k, Emb IO :> es, forall f. Monad (ff f))
     => Map k v
     -> Eff ff (KVStore k v ': es) a
     -> Eff ff es (Map k v, a)
@@ -78,8 +78,8 @@ runKVStoreIORef initial =
 {-# INLINE runKVStoreIORef #-}
 
 runKVStoreAsState
-    :: forall k v es ff c
-     . (Ord k, State (Map k v) :> es, Monad (Eff ff es), Free c ff)
+    :: forall k v es ff
+     . (Ord k, State (Map k v) :> es, Monad (Eff ff es))
     => Eff ff (KVStore k v ': es) ~> Eff ff es
 runKVStoreAsState = interpret \case
     LookupKV k -> get <&> Map.lookup k

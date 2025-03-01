@@ -41,14 +41,14 @@ makeEffectH_' (def & noGenerateLabel & noGenerateOrderInstance) ''ChooseH
         @choose :: m Bool@
 -}
 runChooseH
-    :: (Choose :> es, Monad (Eff ff es), Free c ff)
+    :: (Choose :> es, Monad (Eff ff es))
     => Eff ff (ChooseH ': es) a
     -> Eff ff es a
 runChooseH = interpret \(ChooseH a b) -> branch a b
 {-# INLINE runChooseH #-}
 
 -- | Faster than `<|>`.
-branch :: (Choose :> es, Monad (Eff ff es), Free c ff) => Eff ff es a -> Eff ff es a -> Eff ff es a
+branch :: (Choose :> es, Monad (Eff ff es)) => Eff ff es a -> Eff ff es a -> Eff ff es a
 branch a b = do
     world <- choose
     bool a b world
@@ -57,14 +57,14 @@ branch a b = do
 infixl 3 `branch`
 
 -- | Selects one element from the list nondeterministically, branching the control as many times as the number of elements.
-choice :: (Choose :> es, Empty :> es, Monad (Eff ff es), Free c ff) => [a] -> Eff ff es a
+choice :: (Choose :> es, Empty :> es, Monad (Eff ff es)) => [a] -> Eff ff es a
 choice = \case
     [] -> empty
     x : xs -> pure x `branch` choice xs
 {-# INLINE choice #-}
 
 -- | Selects one element from the list nondeterministically, branching the control as many times as the number of elements. Uses t'ChooseH'.
-choiceH :: (ChooseH :> es, Empty :> es, Monad (Eff ff es), Free c ff) => [a] -> Eff ff es a
+choiceH :: (ChooseH :> es, Empty :> es, Monad (Eff ff es)) => [a] -> Eff ff es a
 choiceH = \case
     [] -> empty
     x : xs -> pure x <|> choiceH xs
@@ -78,7 +78,7 @@ When 'empty' occurs, an v'EmptyException' is thrown, and unless all branches fro
  as the final result.
 -}
 runNonDetIO
-    :: (UnliftIO :> es, Emb IO :> es, Free c ff, forall f. Monad (ff f))
+    :: (UnliftIO :> es, Emb IO :> es, forall f. Monad (ff f))
     => Eff ff (ChooseH ': Empty ': es) a
     -> Eff ff es (Either SomeException a)
 runNonDetIO m = try do

@@ -14,7 +14,7 @@ Maintainer  :  ymdfield@outlook.jp
 module Data.Effect.TH.Internal where
 
 import Control.Arrow ((>>>))
-import Control.Effect (Eff, Free, perform, perform', perform'', send)
+import Control.Effect (Eff, perform, perform', perform'', send)
 import Control.Lens (Traversal', makeLenses, (%~), (.~), _head)
 import Control.Monad (forM, forM_, replicateM, when)
 import Control.Monad.Reader (ReaderT, ask)
@@ -323,8 +323,6 @@ genPerformerArmor performCxt alterFnSigTVs OpInfo{..} PerformerConf{..} clause =
 
     free <- newName "ff" & lift
     es <- newName "es" & lift
-    c <- newName "c" & lift
-    freeCxt <- [t|Free $(varT c) $(varT free)|] & lift
     carrierCxt <- [t|$(pure carrier) ~ Eff $(varT free) $(varT es)|] & lift
 
     let fnName = mkName _performerName
@@ -333,8 +331,8 @@ genPerformerArmor performCxt alterFnSigTVs OpInfo{..} PerformerConf{..} clause =
             SigD
                 fnName
                 ( ForallT
-                    (opTyVars ++ (opCarrier $> SpecifiedSpec) : map (\n -> PlainTV n () $> SpecifiedSpec) [es, free, c] & alterFnSigTVs)
-                    (freeCxt : carrierCxt : performCxt opDataType (VarT es) : opCxt)
+                    (opTyVars ++ (opCarrier $> SpecifiedSpec) : map (\n -> PlainTV n () $> SpecifiedSpec) [es, free] & alterFnSigTVs)
+                    (carrierCxt : performCxt opDataType (VarT es) : opCxt)
                     (arrowChain opParamTypes (carrier `AppT` opResultType))
                 )
 

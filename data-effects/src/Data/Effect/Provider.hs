@@ -52,8 +52,8 @@ newtype ScopeC_ ff t i es r a
 type Provider ff t i e es = Scoped_ ff (Const1 t) (Const i :: () -> Type) e es
 
 runScoped
-    :: forall t i a es r ff c
-     . (Free c ff, KnownList es)
+    :: forall t i a es r ff
+     . (KnownList es)
     => ( forall s x
           . i s
          -> Eff ff (Each es s ++ Scoped ff t i es r ': r) x
@@ -69,8 +69,8 @@ runScoped run = loop
 {-# INLINE runScoped #-}
 
 scoped
-    :: forall s t i a es' es r ff c
-     . (Scoped ff t i es r :> es', Free c ff)
+    :: forall s t i a es' es r ff
+     . (Scoped ff t i es r :> es')
     => i s
     -> ( Eff ff es' ~> Eff ff (Each es s ++ Scoped ff t i es r ': r)
          -> Eff ff (Each es s ++ Scoped ff t i es r ': r) a
@@ -80,8 +80,8 @@ scoped i f = scope i \detach -> ScopeC $ f $ unScopeC . detach
 {-# INLINE scoped #-}
 
 runScoped_
-    :: forall t i a es r ff c
-     . (Free c ff, KnownList es)
+    :: forall t i a es r ff
+     . (KnownList es)
     => ( forall p x
           . i p
          -> Eff ff (es ++ Scoped_ ff t i es r ': r) x
@@ -97,8 +97,8 @@ runScoped_ run = loop
 {-# INLINE runScoped_ #-}
 
 scoped_
-    :: forall s t i a es' es r ff c
-     . (Scoped_ ff t i es r :> es', Free c ff)
+    :: forall s t i a es' es r ff
+     . (Scoped_ ff t i es r :> es')
     => i s
     -> ( Eff ff es' ~> Eff ff (es ++ Scoped_ ff t i es r ': r)
          -> Eff ff (es ++ Scoped_ ff t i es r ': r) a
@@ -108,8 +108,8 @@ scoped_ i f = scope i \pop -> Const1 $ ScopeC_ $ f $ unScopeC_ . getConst1 . pop
 {-# INLINE scoped_ #-}
 
 runProvider
-    :: forall t i a es r ff c
-     . (forall f. (c (ff f)) => Functor (ff f), Free c ff, KnownList es)
+    :: forall t i a es r ff
+     . (forall f. Functor (ff f), KnownList es)
     => ( forall x
           . i
          -> Eff ff (es ++ Provider ff t i es r ': r) x
@@ -121,8 +121,8 @@ runProvider run = runScoped_ \(Const i) a -> Const1 <$> run i a
 {-# INLINE runProvider #-}
 
 provide
-    :: forall t i a es' es r ff c
-     . (Provider ff t i es r :> es', forall f. (c (ff f)) => Functor (ff f), Free c ff)
+    :: forall t i a es' es r ff
+     . (Provider ff t i es r :> es', forall f. Functor (ff f))
     => i
     -> ( Eff ff es' ~> Eff ff (es ++ Provider ff t i es r ': r)
          -> Eff ff (es ++ Provider ff t i es r ': r) a
@@ -132,8 +132,8 @@ provide i f = getConst1 <$> scoped_ (Const i) f
 {-# INLINE provide #-}
 
 runProvider_
-    :: forall i a es r ff c
-     . (forall f. (c (ff f)) => Functor (ff f), Free c ff, KnownList es)
+    :: forall i a es r ff
+     . (forall f. Functor (ff f), KnownList es)
     => ( forall x
           . i
          -> Eff ff (es ++ Provider ff Identity i es r ': r) x
@@ -145,8 +145,8 @@ runProvider_ run = runProvider \i a -> Identity <$> run i a
 {-# INLINE runProvider_ #-}
 
 provide_
-    :: forall i a es' es r ff c
-     . (Provider ff Identity i es r :> es', forall f. (c (ff f)) => Functor (ff f), Free c ff)
+    :: forall i a es' es r ff
+     . (Provider ff Identity i es r :> es', forall f. Functor (ff f))
     => i
     -> ( Eff ff es' ~> Eff ff (es ++ Provider ff Identity i es r ': r)
          -> Eff ff (es ++ Provider ff Identity i es r ': r) a
@@ -156,8 +156,8 @@ provide_ i f = runIdentity <$> provide i f
 {-# INLINE provide_ #-}
 
 runProvider__
-    :: forall a es r ff c
-     . (forall f. (c (ff f)) => Functor (ff f), Free c ff, KnownList es)
+    :: forall a es r ff
+     . (forall f. Functor (ff f), KnownList es)
     => ( forall x
           . Eff ff (es ++ Provider ff Identity () es r ': r) x
          -> Eff ff (Provider ff Identity () es r ': r) x
@@ -168,8 +168,8 @@ runProvider__ run = runProvider_ \() -> run
 {-# INLINE runProvider__ #-}
 
 provide__
-    :: forall a es' es r ff c
-     . (Provider ff Identity () es r :> es', forall f. (c (ff f)) => Functor (ff f), Free c ff)
+    :: forall a es' es r ff
+     . (Provider ff Identity () es r :> es', forall f. Functor (ff f))
     => ( Eff ff es' ~> Eff ff (es ++ Provider ff Identity () es r ': r)
          -> Eff ff (es ++ Provider ff Identity () es r ': r) a
        )

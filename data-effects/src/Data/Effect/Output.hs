@@ -24,9 +24,8 @@ makeEffectF ''Output
 
 -- | Interprets the t'Output' effect using the given output handler.
 runOutputEff
-    :: forall o es ff a c
-     . (Free c ff)
-    => (o -> Eff ff es ())
+    :: forall o es ff a
+     . (o -> Eff ff es ())
     -> Eff ff (Output o ': es) a
     -> Eff ff es a
 runOutputEff f = interpret \(Output o) -> f o
@@ -34,8 +33,8 @@ runOutputEff f = interpret \(Output o) -> f o
 
 -- | Interprets the t'Output' effect by ignoring the outputs.
 ignoreOutput
-    :: forall o es ff a c
-     . (Applicative (Eff ff es), Free c ff)
+    :: forall o es ff a
+     . (Applicative (Eff ff es))
     => Eff ff (Output o ': es) a
     -> Eff ff es a
 ignoreOutput = runOutputEff $ const $ pure ()
