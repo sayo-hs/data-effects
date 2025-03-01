@@ -39,6 +39,7 @@ import Data.Kind (Constraint)
 import GHC.TypeError (ErrorMessage (..), TypeError)
 import GHC.TypeLits (Symbol)
 import GHC.TypeNats (KnownNat, type (+))
+import Unsafe.Coerce (unsafeCoerce)
 
 newtype HandlerVec es f r
     = HandlerVec
@@ -47,6 +48,10 @@ newtype HandlerVec es f r
          . (forall x. g x -> f x)
         -> Rec (Handler g r) es
     }
+
+coerceFOEs :: (FOEs es) => HandlerVec es f r -> HandlerVec es g r
+coerceFOEs = unsafeCoerce
+{-# INLINE coerceFOEs #-}
 
 hcfmapVec :: (forall x. f x -> g x) -> HandlerVec es g r -> HandlerVec es f r
 hcfmapVec phi (HandlerVec f) = HandlerVec \kk -> f $ phi . kk
@@ -109,10 +114,6 @@ newtype Handler f r (e :: Effect)
     = Handler {getHandler :: forall x. e f x -> r x}
 
 type KnownOrder e = Elem e (OrderOf e)
-
-class KnownOrders (es :: [Effect])
-instance (KnownOrder e, KnownOrders es) => KnownOrders (e ': es)
-instance KnownOrders '[]
 
 -- todo: replace `KnownOrder` use with just `HFunctor` and bench
 class (order ~ OrderOf e) => Elem e order where

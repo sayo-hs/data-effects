@@ -26,7 +26,6 @@ import Data.Effect.HandlerVec (
     Has,
     In,
     KnownOrder,
-    KnownOrders,
     empty,
     hcfmapVec,
     hfmapElem,
@@ -81,8 +80,7 @@ reinterpret i = transEff \v -> runAllEff v . i !: suffix v
 
 interprets
     :: forall es r ff a
-     . (KnownOrders es)
-    => HandlerVec es (Eff ff r) (Eff ff r)
+     . HandlerVec es (Eff ff r) (Eff ff r)
     -> Eff ff (es ++ r) a
     -> Eff ff r a
 interprets i = transEff \v -> vmapVec (runAllEff v) i `VH.concat` v
@@ -90,7 +88,7 @@ interprets i = transEff \v -> vmapVec (runAllEff v) i `VH.concat` v
 
 reinterprets
     :: forall es r r' ff a
-     . (Suffix r r', KnownOrders es)
+     . (Suffix r r')
     => HandlerVec es (Eff ff r') (Eff ff r')
     -> Eff ff (es ++ r) a
     -> Eff ff r' a
