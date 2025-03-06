@@ -109,7 +109,7 @@ scoped_ i f = scope i \pop -> Const1 $ ScopeC_ $ f $ unScopeC_ . getConst1 . pop
 
 runProvider
     :: forall t i a es r ff
-     . (forall f. Functor (ff f), KnownList es)
+     . (forall es'. Functor (Eff ff es'), KnownList es)
     => ( forall x
           . i
          -> Eff ff (es ++ Provider ff t i es r ': r) x
@@ -122,7 +122,7 @@ runProvider run = runScoped_ \(Const i) a -> Const1 <$> run i a
 
 provide
     :: forall t i a es' es r ff
-     . (Provider ff t i es r :> es', forall f. Functor (ff f))
+     . (Provider ff t i es r :> es', forall es''. Functor (Eff ff es''))
     => i
     -> ( Eff ff es' ~> Eff ff (es ++ Provider ff t i es r ': r)
          -> Eff ff (es ++ Provider ff t i es r ': r) a
@@ -133,7 +133,7 @@ provide i f = getConst1 <$> scoped_ (Const i) f
 
 runProvider_
     :: forall i a es r ff
-     . (forall f. Functor (ff f), KnownList es)
+     . (forall es'. Functor (Eff ff es'), KnownList es)
     => ( forall x
           . i
          -> Eff ff (es ++ Provider ff Identity i es r ': r) x
@@ -146,7 +146,7 @@ runProvider_ run = runProvider \i a -> Identity <$> run i a
 
 provide_
     :: forall i a es' es r ff
-     . (Provider ff Identity i es r :> es', forall f. Functor (ff f))
+     . (Provider ff Identity i es r :> es', forall es''. Functor (Eff ff es''))
     => i
     -> ( Eff ff es' ~> Eff ff (es ++ Provider ff Identity i es r ': r)
          -> Eff ff (es ++ Provider ff Identity i es r ': r) a
@@ -157,7 +157,7 @@ provide_ i f = runIdentity <$> provide i f
 
 runProvider__
     :: forall a es r ff
-     . (forall f. Functor (ff f), KnownList es)
+     . (forall es'. Functor (Eff ff es'), KnownList es)
     => ( forall x
           . Eff ff (es ++ Provider ff Identity () es r ': r) x
          -> Eff ff (Provider ff Identity () es r ': r) x
@@ -169,7 +169,7 @@ runProvider__ run = runProvider_ \() -> run
 
 provide__
     :: forall a es' es r ff
-     . (Provider ff Identity () es r :> es', forall f. Functor (ff f))
+     . (Provider ff Identity () es r :> es', forall es''. Functor (Eff ff es''))
     => ( Eff ff es' ~> Eff ff (es ++ Provider ff Identity () es r ': r)
          -> Eff ff (es ++ Provider ff Identity () es r ': r) a
        )

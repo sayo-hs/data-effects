@@ -16,7 +16,9 @@ import Control.Arrow ((>>>))
 import Control.Effect (
     Eff (..),
     Free (liftFree),
+    ViaFree (ViaFree, unViaFree),
     retract,
+    runAllEff,
     type (~>),
     type (~~>),
  )
@@ -48,16 +50,12 @@ import Data.Effect.HandlerVec.Rec (
 import Data.Effect.Tag (unTag)
 import Data.Functor.Identity (Identity, runIdentity)
 
-runEff :: (Free c ff, c f) => Eff ff '[Emb f] a -> f a
-runEff (Eff f) = retract $ f $ H.singleton \(Emb a) -> liftFree a
+runEff :: (Free c ff, c f) => Eff (ViaFree ff) '[Emb f] a -> f a
+runEff (Eff m) = retract $ unViaFree $ m id $ H.singleton \(Emb a) -> ViaFree $ liftFree a
 {-# INLINE runEff #-}
 
-runAllEff :: HandlerVec es (Eff ff es) (ff r) -> Eff ff es a -> ff r a
-runAllEff hdl (Eff f) = f hdl
-{-# INLINE runAllEff #-}
-
-runPure :: (Free c ff, c Identity) => Eff ff '[] a -> a
-runPure (Eff f) = runIdentity $ retract $ f empty
+runPure :: (Free c ff, c Identity) => Eff (ViaFree ff) '[] a -> a
+runPure (Eff m) = runIdentity $ retract $ unViaFree $ m id empty
 {-# INLINE runPure #-}
 
 interpret
@@ -66,7 +64,7 @@ interpret
     => (e ~~> Eff ff es)
     -> Eff ff (e ': es) a
     -> Eff ff es a
-interpret i = transEff \v -> runAllEff v . i !: v
+interpret i = transEff \kk v -> runAllEff kk v . i !: v
 {-# INLINE interpret #-}
 
 reinterpret
@@ -75,7 +73,7 @@ reinterpret
     => (e ~~> Eff ff es')
     -> Eff ff (e ': es) a
     -> Eff ff es' a
-reinterpret i = transEff \v -> runAllEff v . i !: suffix v
+reinterpret i = transEff \kk v -> runAllEff kk v . i !: suffix v
 {-# INLINE reinterpret #-}
 
 interprets
@@ -83,7 +81,7 @@ interprets
      . HandlerVec es (Eff ff r) (Eff ff r)
     -> Eff ff (es ++ r) a
     -> Eff ff r a
-interprets i = transEff \v -> vmapVec (runAllEff v) i `VH.concat` v
+interprets i = transEff \kk v -> vmapVec (runAllEff kk v) i `VH.concat` v
 {-# INLINE interprets #-}
 
 reinterprets
@@ -92,7 +90,7 @@ reinterprets
     => HandlerVec es (Eff ff r') (Eff ff r')
     -> Eff ff (es ++ r) a
     -> Eff ff r' a
-reinterprets i = transEff \v -> vmapVec (runAllEff v) i `VH.concat` suffix @r v
+reinterprets i = transEff \kk v -> vmapVec (runAllEff kk v) i `VH.concat` suffix @r v
 {-# INLINE reinterprets #-}
 
 interpose
@@ -129,21 +127,22 @@ interposeFor
     -> (e ~~> Eff ff es)
     -> Eff ff es a
     -> Eff ff es a
-interposeFor i f = transEff \v -> overrideFor i (runAllEff v . f) v
+interposeFor i f = transEff \kk v -> overrideFor i (runAllEff kk v . f) v
 {-# INLINE interposeFor #-}
 
 transEff
-    :: forall a es es' ff
-     . ( forall r
-          . HandlerVec es' (Eff ff es') (ff r)
-         -> HandlerVec es (Eff ff es') (ff r)
+    :: forall es es' a ff
+     . ( forall r es''
+          . (Eff ff es' ~> Eff ff es'')
+         -> HandlerVec es' (Eff ff es') (ff (Eff ff es'') r)
+         -> HandlerVec es (Eff ff es') (ff (Eff ff es'') r)
        )
     -> Eff ff es a
     -> Eff ff es' a
 transEff f = loop
   where
     loop :: Eff ff es ~> Eff ff es'
-    loop (Eff g) = Eff $ g . hcfmapVec loop . f
+    loop (Eff m) = Eff \kk v -> m (kk . loop) (hcfmapVec loop $ f kk v)
 {-# INLINE transEff #-}
 
 preinterpose
@@ -183,27 +182,29 @@ preinterposeFor
 preinterposeFor i f = loop
   where
     loop :: Eff ff es ~> Eff ff es
-    loop (Eff g) = Eff $ hcfmapVec loop >>> \v -> g $ overrideFor i (runAllEff v . f) v
+    loop (Eff g) = Eff \kk ->
+        hcfmapVec loop >>> \v ->
+            g kk $ overrideFor i (runAllEff kk v . f) v
 {-# INLINE preinterposeFor #-}
 
 iterEff
     :: forall e f ff a c
      . (KnownOrder e, c f, Free c ff)
     => (e ~~> f)
-    -> Eff ff '[e] a
+    -> Eff (ViaFree ff) '[e] a
     -> f a
 iterEff i = loop
   where
-    loop :: Eff ff '[e] ~> f
-    loop = retract . runAllEff (H.singleton $ liftFree . i . hfmapElem loop)
+    loop :: Eff (ViaFree ff) '[e] ~> f
+    loop = retract . unViaFree . runAllEff id (H.singleton $ ViaFree . liftFree . i . hfmapElem loop)
 {-# INLINE iterEff #-}
 
 -- | /O(n)/ where /n/ = @length es@
 iterAllEff
     :: forall es f ff a c
      . (Free c ff, c f)
-    => HandlerVec es (Eff ff es) f
-    -> Eff ff es a
+    => HandlerVec es (Eff (ViaFree ff) es) f
+    -> Eff (ViaFree ff) es a
     -> f a
-iterAllEff hdl = retract . runAllEff (vmapVec liftFree hdl)
+iterAllEff hdl = retract . unViaFree . runAllEff id (vmapVec (ViaFree . liftFree) hdl)
 {-# INLINE iterAllEff #-}

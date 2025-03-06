@@ -1,5 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use const" #-}
 
 -- SPDX-License-Identifier: MPL-2.0
 
@@ -10,7 +13,7 @@ Maintainer  :  ymdfield@outlook.jp
 -}
 module Control.Effect.Transform where
 
-import Control.Effect (Eff (..), Free, type (~>))
+import Control.Effect (Eff (..), type (~>))
 import Control.Effect.Interpret (transEff)
 import Data.Effect.HandlerVec (
     Each,
@@ -43,7 +46,7 @@ raise = raises
 {-# INLINE raise #-}
 
 raises :: forall es es' a ff. (Suffix es es') => Eff ff es a -> Eff ff es' a
-raises = transEff suffix
+raises = transEff \_ -> suffix
 {-# INLINE raises #-}
 
 raiseUnder :: forall e0 e1 es a ff. Eff ff (e0 ': es) a -> Eff ff (e0 ': e1 ': es) a
@@ -51,11 +54,11 @@ raiseUnder = raisesUnder
 {-# INLINE raiseUnder #-}
 
 raisesUnder :: forall e es es' a ff. (Suffix es es') => Eff ff (e ': es) a -> Eff ff (e ': es') a
-raisesUnder = transEff suffixUnder
+raisesUnder = transEff \_ -> suffixUnder
 {-# INLINE raisesUnder #-}
 
 raisesUnders :: forall es es' a ff. (SuffixUnder es es') => Eff ff es a -> Eff ff es' a
-raisesUnders = transEff suffixUnders
+raisesUnders = transEff \_ -> suffixUnders
 {-# INLINE raisesUnders #-}
 
 raisePrefix
@@ -63,7 +66,7 @@ raisePrefix
      . (KnownList es')
     => Eff ff es a
     -> Eff ff (es' ++ es) a
-raisePrefix = transEff $ V.drop @es'
+raisePrefix = transEff $ const $ V.drop @es'
 {-# INLINE raisePrefix #-}
 
 raiseSuffix
@@ -71,7 +74,7 @@ raiseSuffix
      . (KnownList es)
     => Eff ff es a
     -> Eff ff (es ++ es') a
-raiseSuffix = transEff $ V.take @es'
+raiseSuffix = transEff $ const $ V.take @es'
 {-# INLINE raiseSuffix #-}
 
 raisePrefix1
@@ -79,7 +82,7 @@ raisePrefix1
      . (KnownList fs)
     => Eff ff es a
     -> Eff ff (Each fs x ++ es) a
-raisePrefix1 = transEff $ V.drop1 @fs @x
+raisePrefix1 = transEff $ const $ V.drop1 @fs @x
 {-# INLINE raisePrefix1 #-}
 
 raiseSuffix1
@@ -87,7 +90,7 @@ raiseSuffix1
      . (KnownList fs)
     => Eff ff (Each fs x) a
     -> Eff ff (Each fs x ++ es) a
-raiseSuffix1 = transEff $ V.take1 @fs @x @es
+raiseSuffix1 = transEff $ const $ V.take1 @fs @x @es
 {-# INLINE raiseSuffix1 #-}
 
 transform
@@ -96,7 +99,7 @@ transform
     => (e (Eff ff (e' ': es)) ~> e' (Eff ff (e' ': es)))
     -> Eff ff (e ': es) a
     -> Eff ff (e' ': es) a
-transform f = transEff \v -> override0 (handlerFor Here v . f) v
+transform f = transEff \_ v -> override0 (handlerFor Here v . f) v
 {-# INLINE transform #-}
 
 translate
@@ -133,12 +136,12 @@ translateFor
     -> (e (Eff ff es) ~> e' (Eff ff es))
     -> Eff ff (e ': es) a
     -> Eff ff es a
-translateFor i f = transEff \v -> handlerFor i v . f !: v
+translateFor i f = transEff \_ v -> handlerFor i v . f !: v
 {-# INLINE translateFor #-}
 
 rewrite
-    :: forall e es a ff c
-     . (Free c ff, e :> es)
+    :: forall e es a ff
+     . (e :> es)
     => (e (Eff ff es) ~> e (Eff ff es))
     -> Eff ff es a
     -> Eff ff es a
@@ -146,8 +149,8 @@ rewrite = rewriteFor labelMembership
 {-# INLINE rewrite #-}
 
 rewriteOn
-    :: forall key e es a ff c
-     . (Free c ff, Has key e es)
+    :: forall key e es a ff
+     . (Has key e es)
     => (e (Eff ff es) ~> e (Eff ff es))
     -> Eff ff es a
     -> Eff ff es a
@@ -155,8 +158,8 @@ rewriteOn f = rewriteFor (keyMembership @key) (Tag . f . unTag)
 {-# INLINE rewriteOn #-}
 
 rewriteIn
-    :: forall e es a ff c
-     . (Free c ff, e `In` es)
+    :: forall e es a ff
+     . (e `In` es)
     => (e (Eff ff es) ~> e (Eff ff es))
     -> Eff ff es a
     -> Eff ff es a
@@ -170,20 +173,20 @@ rewriteFor
     -> (e (Eff ff es) ~> e (Eff ff es))
     -> Eff ff es a
     -> Eff ff es a
-rewriteFor i f = transEff \v -> overrideFor i (handlerFor i v . f) v
+rewriteFor i f = transEff \_ v -> overrideFor i (handlerFor i v . f) v
 {-# INLINE rewriteFor #-}
 
 tag
-    :: forall tag e es a ff c
-     . (Free c ff, KnownOrder e, KnownOrder (e # tag))
+    :: forall tag e es a ff
+     . (KnownOrder e)
     => Eff ff (e ': es) a
     -> Eff ff (e # tag ': es) a
 tag = transform Tag
 {-# INLINE tag #-}
 
 untag
-    :: forall tag e es a ff c
-     . (Free c ff, KnownOrder e, KnownOrder (e # tag))
+    :: forall tag e es a ff
+     . (KnownOrder (e # tag))
     => Eff ff (e # tag ': es) a
     -> Eff ff (e ': es) a
 untag = transform unTag

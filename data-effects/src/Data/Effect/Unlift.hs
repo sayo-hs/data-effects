@@ -17,7 +17,7 @@ module Data.Effect.Unlift (
 )
 where
 
-import Control.Effect (sendAt)
+import Control.Effect (ViaFree, sendAt)
 import Control.Effect.Interpret (runEff)
 import Data.Effect (Emb (Emb), UnliftBase (WithRunInBase), UnliftIO)
 import UnliftIO qualified as IO
@@ -36,13 +36,13 @@ withRunInIO
 withRunInIO = withRunInBase
 {-# INLINE withRunInIO #-}
 
-runUnliftBase :: forall b ff a c. (c b, Free c ff) => Eff ff '[UnliftBase b, Emb b] a -> b a
+runUnliftBase :: forall b ff a c. (c b, Free c ff) => Eff (ViaFree ff) '[UnliftBase b, Emb b] a -> b a
 runUnliftBase =
     runEff . interpret \(WithRunInBase f) ->
         sendAt @0 $ Emb $ f runEff
 {-# INLINE runUnliftBase #-}
 
-runUnliftIO :: (IO.MonadUnliftIO m, Free c ff, c m) => Eff ff '[UnliftIO, Emb m] a -> m a
+runUnliftIO :: (IO.MonadUnliftIO m, Free c ff, c m) => Eff (ViaFree ff) '[UnliftIO, Emb m] a -> m a
 runUnliftIO =
     runEff . interpret \(WithRunInBase f) ->
         sendAt @0 $ Emb $ IO.withRunInIO \run -> f $ run . runEff

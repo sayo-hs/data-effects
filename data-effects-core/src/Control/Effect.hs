@@ -66,55 +66,21 @@ import Data.Kind (Type)
 import Data.Tuple (swap)
 import UnliftIO qualified as IO
 
-newtype Eff ff es a = Eff {unEff :: forall r. HandlerVec es (Eff ff es) (ff r) -> ff r a}
+newtype Eff ff es a = Eff
+    { unEff
+        :: forall r es'
+         . (forall x. Eff ff es x -> Eff ff es' x)
+        -> HandlerVec es (Eff ff es) (ff (Eff ff es') r)
+        -> ff (Eff ff es') r a
+    }
 
-instance (forall r. Functor (ff r)) => Functor (Eff ff es) where
-    fmap f (Eff m) = Eff $ fmap f . m
-    {-# INLINE fmap #-}
-
-instance (forall r. Applicative (ff r)) => Applicative (Eff ff es) where
-    pure x = Eff \_ -> pure x
-    Eff ff <*> Eff fm = Eff \v -> ff v <*> fm v
-    {-# INLINE pure #-}
-    {-# INLINE (<*>) #-}
-
-instance (forall r. Monad (ff r)) => Monad (Eff ff es) where
-    Eff m >>= f = Eff \v -> m v >>= \x -> unEff (f x) v
-    {-# INLINE (>>=) #-}
-
--- | /O(n)/ where /n/ = @length es@
-convertEff
-    :: forall ff gg es a c c'
-     . (Free c ff, Free c' gg, forall r. c (gg r), forall r. c' (ff r))
-    => Eff ff es a
-    -> Eff gg es a
-convertEff = loop
-  where
-    loop :: Eff ff es ~> Eff gg es
-    loop (Eff f) = Eff $ convertFree . f . hcfmapVec loop . vmapVec convertFree
-{-# INLINE convertEff #-}
-
-convertFree :: (Free c ff, Free c' gg, c (gg r)) => ff r a -> gg r a
-convertFree = runFree liftFree
-{-# INLINE convertFree #-}
-
-class (forall f. c (ff f)) => Free c (ff :: (Type -> Type) -> Type -> Type) | ff -> c where
-    {-# MINIMAL liftFree, (runFree | (retract, hoist)) #-}
-
-    liftFree :: f a -> ff f a
-    runFree :: (c g) => (forall x. f x -> g x) -> ff f a -> g a
-    retract :: (c f) => ff f a -> f a
-    hoist :: (forall x. f x -> g x) -> ff f a -> ff g a
-
-    runFree f = retract . hoist f
-    retract = runFree id
-
-    default hoist :: (c (ff g)) => (forall x. f x -> g x) -> ff f a -> ff g a
-    hoist phi = runFree $ liftFree . phi
-
-    {-# INLINE runFree #-}
-    {-# INLINE retract #-}
-    {-# INLINE hoist #-}
+runAllEff
+    :: (forall x. Eff ff es x -> Eff ff es' x)
+    -> HandlerVec es (Eff ff es) (ff (Eff ff es') r)
+    -> Eff ff es a
+    -> ff (Eff ff es') r a
+runAllEff kk v (Eff m) = m kk v
+{-# INLINE runAllEff #-}
 
 perform :: forall e es ff a. (e :> es) => e (Eff ff es) a -> Eff ff es a
 perform = sendFor $ membership @LabelResolver
@@ -141,74 +107,12 @@ sendFor
      . Membership e es
     -> e (Eff ff es) a
     -> Eff ff es a
-sendFor i e = Eff \hs -> handlerFor i hs e
+sendFor i e = Eff \_ v -> handlerFor i v e
 {-# INLINE sendFor #-}
 
 emb :: forall f es ff a. (Emb f :> es) => f a -> Eff ff es a
 emb = perform . Emb
 {-# INLINE emb #-}
-
-instance Free Functor Coyoneda where
-    liftFree = liftCoyoneda
-    runFree f (Coyoneda g x) = g <$> f x
-    retract = lowerCoyoneda
-    hoist = hoistCoyoneda
-
-    {-# INLINE liftFree #-}
-    {-# INLINE runFree #-}
-    {-# INLINE retract #-}
-    {-# INLINE hoist #-}
-
-instance Free Applicative Tree.Ap where
-    liftFree = Tree.liftAp
-    runFree = Tree.runAp
-    retract = Tree.retractAp
-    hoist = Tree.hoistAp
-
-    {-# INLINE liftFree #-}
-    {-# INLINE runFree #-}
-    {-# INLINE retract #-}
-    {-# INLINE hoist #-}
-
-instance Free Applicative Fast.Ap where
-    liftFree = Fast.liftAp
-    runFree = Fast.runAp
-    retract = Fast.retractAp
-    hoist = Fast.hoistAp
-
-    {-# INLINE liftFree #-}
-    {-# INLINE runFree #-}
-    {-# INLINE retract #-}
-    {-# INLINE hoist #-}
-
-instance Free Applicative Final.Ap where
-    liftFree = Final.liftAp
-    runFree = Final.runAp
-    retract = Final.retractAp
-    hoist = Final.hoistAp
-
-    {-# INLINE liftFree #-}
-    {-# INLINE runFree #-}
-    {-# INLINE retract #-}
-    {-# INLINE hoist #-}
-
-instance Free Alternative Tree.Alt where
-    liftFree = Tree.liftAlt
-    runFree = Tree.runAlt
-    hoist = Tree.hoistAlt
-
-    {-# INLINE liftFree #-}
-    {-# INLINE runFree #-}
-    {-# INLINE hoist #-}
-
-instance Free Alternative Final.Alt where
-    liftFree = Final.liftAlt
-    runFree = Final.runAlt
-    hoist = Final.hoistAlt
-
-    {-# INLINE liftFree #-}
-    {-# INLINE runFree #-}
-    {-# INLINE hoist #-}
 
 -- | A natural transformation.
 type f ~> g = forall (x :: Type). f x -> g x
@@ -308,7 +212,7 @@ instance
 
 instance (Empty :> es, ChooseH :> es, Monad (Eff ff es)) => MonadPlus (Eff ff es)
 
-instance (SubJump ref :> es, Monad (Eff ff es), Free c ff) => Cont.MonadCont (Eff ff es) where
+instance (SubJump ref :> es, Monad (Eff ff es)) => Cont.MonadCont (Eff ff es) where
     callCC = callCC_
     {-# INLINE callCC #-}
 
@@ -349,3 +253,120 @@ instance
     where
     withRunInIO f = perform $ WithRunInBase f
     {-# INLINE withRunInIO #-}
+
+-- Free
+
+class (forall f. c (ff f)) => Free c (ff :: (Type -> Type) -> Type -> Type) | ff -> c where
+    {-# MINIMAL liftFree, (runFree | (retract, hoist)) #-}
+
+    liftFree :: f a -> ff f a
+    runFree :: (c g) => (forall x. f x -> g x) -> ff f a -> g a
+    retract :: (c f) => ff f a -> f a
+    hoist :: (forall x. f x -> g x) -> ff f a -> ff g a
+
+    runFree f = retract . hoist f
+    retract = runFree id
+
+    default hoist :: (c (ff g)) => (forall x. f x -> g x) -> ff f a -> ff g a
+    hoist phi = runFree $ liftFree . phi
+
+    {-# INLINE runFree #-}
+    {-# INLINE retract #-}
+    {-# INLINE hoist #-}
+
+-- | /O(n)/ where /n/ = @length es@
+convertEff
+    :: forall ff gg es a c c'
+     . (Free c ff, Free c' gg, forall r. c (gg r), forall r. c' (ff r))
+    => Eff (ViaFree ff) es a
+    -> Eff (ViaFree gg) es a
+convertEff = loop
+  where
+    loop :: Eff (ViaFree ff) es ~> Eff (ViaFree gg) es
+    loop (Eff f) = Eff \_ v ->
+        ViaFree . convertFree . unViaFree $
+            f id (hcfmapVec loop . vmapVec (ViaFree . convertFree . unViaFree) $ v)
+{-# INLINE convertEff #-}
+
+convertFree :: (Free c ff, Free c' gg, c (gg r)) => ff r a -> gg r a
+convertFree = runFree liftFree
+{-# INLINE convertFree #-}
+
+newtype ViaFree ff (f :: Type -> Type) (r :: Type -> Type) (a :: Type) = ViaFree {unViaFree :: ff r a}
+    deriving newtype (Functor, Applicative, Monad)
+
+instance (forall r. Functor (ff r)) => Functor (Eff (ViaFree ff) es) where
+    fmap f (Eff m) = Eff \kk v -> f <$> m kk v
+    {-# INLINE fmap #-}
+
+instance (forall r. Applicative (ff r)) => Applicative (Eff (ViaFree ff) es) where
+    pure x = Eff \_ _ -> pure x
+    Eff ff <*> Eff fm = Eff \kk v -> ff kk v <*> fm kk v
+    {-# INLINE pure #-}
+    {-# INLINE (<*>) #-}
+
+instance (forall r. Monad (ff r)) => Monad (Eff (ViaFree ff) es) where
+    Eff m >>= f = Eff \kk v -> m kk v >>= \x -> unEff (f x) kk v
+    {-# INLINE (>>=) #-}
+
+instance Free Functor Coyoneda where
+    liftFree = liftCoyoneda
+    runFree f (Coyoneda g x) = g <$> f x
+    retract = lowerCoyoneda
+    hoist = hoistCoyoneda
+
+    {-# INLINE liftFree #-}
+    {-# INLINE runFree #-}
+    {-# INLINE retract #-}
+    {-# INLINE hoist #-}
+
+instance Free Applicative Tree.Ap where
+    liftFree = Tree.liftAp
+    runFree = Tree.runAp
+    retract = Tree.retractAp
+    hoist = Tree.hoistAp
+
+    {-# INLINE liftFree #-}
+    {-# INLINE runFree #-}
+    {-# INLINE retract #-}
+    {-# INLINE hoist #-}
+
+instance Free Applicative Fast.Ap where
+    liftFree = Fast.liftAp
+    runFree = Fast.runAp
+    retract = Fast.retractAp
+    hoist = Fast.hoistAp
+
+    {-# INLINE liftFree #-}
+    {-# INLINE runFree #-}
+    {-# INLINE retract #-}
+    {-# INLINE hoist #-}
+
+instance Free Applicative Final.Ap where
+    liftFree = Final.liftAp
+    runFree = Final.runAp
+    retract = Final.retractAp
+    hoist = Final.hoistAp
+
+    {-# INLINE liftFree #-}
+    {-# INLINE runFree #-}
+    {-# INLINE retract #-}
+    {-# INLINE hoist #-}
+
+instance Free Alternative Tree.Alt where
+    liftFree = Tree.liftAlt
+    runFree = Tree.runAlt
+    hoist = Tree.hoistAlt
+
+    {-# INLINE liftFree #-}
+    {-# INLINE runFree #-}
+    {-# INLINE hoist #-}
+
+instance Free Alternative Final.Alt where
+    liftFree = Final.liftAlt
+    runFree = Final.runAlt
+    hoist = Final.hoistAlt
+
+    {-# INLINE liftFree #-}
+    {-# INLINE runFree #-}
+    {-# INLINE hoist #-}

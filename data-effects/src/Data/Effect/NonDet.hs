@@ -78,7 +78,7 @@ When 'empty' occurs, an v'EmptyException' is thrown, and unless all branches fro
  as the final result.
 -}
 runNonDetIO
-    :: (UnliftIO :> es, Emb IO :> es, forall f. Monad (ff f))
+    :: (UnliftIO :> es, Emb IO :> es, forall es'. Monad (Eff ff es'))
     => Eff ff (ChooseH ': Empty ': es) a
     -> Eff ff es (Either SomeException a)
 runNonDetIO m = try do

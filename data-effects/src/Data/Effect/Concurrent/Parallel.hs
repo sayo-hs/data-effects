@@ -100,8 +100,8 @@ Executes three actions in parallel and blocks until all are complete.
 Finally, aggregates the execution results based on the specified function.
 -}
 liftP3
-    :: forall a b c d es ff ct
-     . (Parallel :> es, Applicative (Eff ff es), Free ct ff)
+    :: forall a b c d es ff
+     . (Parallel :> es, Applicative (Eff ff es))
     => (a -> b -> c -> d)
     -- ^ A function that aggregates the three execution results.
     -> Eff ff es a
@@ -180,7 +180,7 @@ forToParallel (For iters) = runConcurrently $ traverse Concurrently iters
 
 runConcurrentIO
     :: forall a es ff
-     . (UnliftIO :> es, Emb IO :> es, forall f. Monad (ff f))
+     . (UnliftIO :> es, Emb IO :> es, forall es'. Monad (Eff ff es'))
     => Eff ff (Parallel ': Race ': Poll ': Halt ': es) a
     -> Eff ff es a
 runConcurrentIO = runHaltIO . runPollIO . runRaceIO . runParallelIO
@@ -286,8 +286,8 @@ parallelToSequential (LiftP2 f a b) = liftA2 f a b
 {-# INLINE parallelToSequential #-}
 
 runForAsParallel
-    :: forall t a es ff c
-     . (Parallel :> es, Traversable t, Applicative (Eff ff es), Free c ff)
+    :: forall t a es ff
+     . (Parallel :> es, Traversable t, Applicative (Eff ff es))
     => Eff ff (For t ': es) a
     -> Eff ff es a
 runForAsParallel = interpret forToParallel

@@ -25,7 +25,7 @@ newtype ShiftC ff ans es a
 
 shift
     :: forall a ans es es' ff
-     . (Shift ff ans es' :> es, forall f. Monad (ff f))
+     . (Shift ff ans es' :> es, forall es''. Monad (Eff ff es''))
     => ((a -> Eff ff es ans) -> Eff ff es ans)
     -> Eff ff es a
 shift initiate = ushift \k detach -> detach $ initiate $ embShift . k
@@ -33,7 +33,7 @@ shift initiate = ushift \k detach -> detach $ initiate $ embShift . k
 
 ushift
     :: forall a ans es es' ff
-     . (Shift ff ans es' :> es, forall f. Monad (ff f))
+     . (Shift ff ans es' :> es, forall es''. Monad (Eff ff es''))
     => ( (a -> Eff ff (Shift ff ans es' ': es') ans)
          -> (Eff ff es ~> Eff ff (Shift ff ans es' ': es'))
          -> Eff ff (Shift ff ans es' ': es') ans
@@ -46,7 +46,7 @@ ushift initiate =
 
 callCC
     :: forall a ans es es' ff
-     . (Shift ff ans es' :> es, forall f. Monad (ff f))
+     . (Shift ff ans es' :> es, forall es''. Monad (Eff ff es''))
     => ((a -> Eff ff es ans) -> Eff ff es a)
     -> Eff ff es a
 callCC f = ushift \k detach -> detach (f $ embShift . k >=> abort) >>= k
@@ -54,7 +54,7 @@ callCC f = ushift \k detach -> detach (f $ embShift . k >=> abort) >>= k
 
 ucallCC
     :: forall a ans es es' ff
-     . (Shift ff ans es' :> es, forall f. Monad (ff f))
+     . (Shift ff ans es' :> es, forall es''. Monad (Eff ff es''))
     => ((a -> Eff ff (Shift ff ans es' ': es') ans) -> Eff ff es a)
     -> Eff ff es a
 ucallCC f = ushift \k detach -> detach (f $ k >=> abort) >>= k
@@ -70,14 +70,14 @@ abort ans = unliftShift \_ _ -> ShiftC $ pure ans
 
 getCC
     :: forall ans es es' ff
-     . (Shift ff ans es' :> es, forall f. Monad (ff f))
+     . (Shift ff ans es' :> es, forall es''. Monad (Eff ff es''))
     => Eff ff es (Eff ff es ans)
 getCC = callCC \exit' -> let a = exit' a in pure a
 {-# INLINE getCC #-}
 
 ugetCC
     :: forall ans es es' ff
-     . (Shift ff ans es' :> es, forall f. Monad (ff f))
+     . (Shift ff ans es' :> es, forall es''. Monad (Eff ff es''))
     => Eff ff es (Eff ff (Shift ff ans es' ': es') ans)
 ugetCC = ucallCC \exit' -> let a = exit' a in pure a
 {-# INLINE ugetCC #-}

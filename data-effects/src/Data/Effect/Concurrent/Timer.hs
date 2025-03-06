@@ -39,8 +39,8 @@ Creates a scope where elapsed time can be obtained.
 An action to retrieve the elapsed time, re-zeroed at the start of the scope, is passed to the scope.
 -}
 withElapsedTime
-    :: forall a es ff c
-     . (Timer :> es, Monad (Eff ff es), Free c ff)
+    :: forall a es ff
+     . (Timer :> es, Monad (Eff ff es))
     => (Eff ff es DiffTime -> Eff ff es a)
     -- ^ A scope where the elapsed time can be obtained.
     -- An action to retrieve the elapsed time is passed as an argument.
@@ -52,8 +52,8 @@ withElapsedTime f = do
 
 -- | Returns the time taken for a computation along with the result as a pair.
 measureTime
-    :: forall a es ff c
-     . (Timer :> es, Monad (Eff ff es), Free c ff)
+    :: forall a es ff
+     . (Timer :> es, Monad (Eff ff es))
     => Eff ff es a
     -> Eff ff es (DiffTime, a)
 measureTime m = withElapsedTime \elapsedTime -> do

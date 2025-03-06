@@ -39,7 +39,7 @@ asks f = f <$> ask
 
 -- | Interpret the t'Ask'/t'Local' effects.
 runReader
-    :: (forall f. Applicative (ff f))
+    :: (forall es'. Applicative (Eff ff es'))
     => r
     -> Eff ff (Local r ': Ask r ': es) a
     -> Eff ff es a

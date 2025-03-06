@@ -67,7 +67,7 @@ modifyKV vDefault f k = do
 
 runKVStoreIORef
     :: forall k v a es ff
-     . (Ord k, Emb IO :> es, forall f. Monad (ff f))
+     . (Ord k, Emb IO :> es, forall es'. Monad (Eff ff es'))
     => Map k v
     -> Eff ff (KVStore k v ': es) a
     -> Eff ff es (Map k v, a)
