@@ -68,18 +68,16 @@ import UnliftIO qualified as IO
 
 newtype Eff ff es a = Eff
     { unEff
-        :: forall r es'
-         . (forall x. Eff ff es x -> Eff ff es' x)
-        -> HandlerVec es (Eff ff es) (ff (Eff ff es') r)
-        -> ff (Eff ff es') r a
+        :: forall r
+         . HandlerVec es (Eff ff es) (ff r)
+        -> ff r a
     }
 
 runAllEff
-    :: (forall x. Eff ff es x -> Eff ff es' x)
-    -> HandlerVec es (Eff ff es) (ff (Eff ff es') r)
+    :: HandlerVec es (Eff ff es) (ff r)
     -> Eff ff es a
-    -> ff (Eff ff es') r a
-runAllEff kk v (Eff m) = m kk v
+    -> ff r a
+runAllEff v (Eff m) = m v
 {-# INLINE runAllEff #-}
 
 perform :: forall e es ff a. (e :> es) => e (Eff ff es) a -> Eff ff es a
@@ -107,7 +105,7 @@ sendFor
      . Membership e es
     -> e (Eff ff es) a
     -> Eff ff es a
-sendFor i e = Eff \_ v -> handlerFor i v e
+sendFor i e = Eff \v -> handlerFor i v e
 {-# INLINE sendFor #-}
 
 emb :: forall f es ff a. (Emb f :> es) => f a -> Eff ff es a
@@ -278,35 +276,31 @@ class (forall f. c (ff f)) => Free c (ff :: (Type -> Type) -> Type -> Type) | ff
 convertEff
     :: forall ff gg es a c c'
      . (Free c ff, Free c' gg, forall r. c (gg r), forall r. c' (ff r))
-    => Eff (ViaFree ff) es a
-    -> Eff (ViaFree gg) es a
+    => Eff ff es a
+    -> Eff gg es a
 convertEff = loop
   where
-    loop :: Eff (ViaFree ff) es ~> Eff (ViaFree gg) es
-    loop (Eff f) = Eff \_ v ->
-        ViaFree . convertFree . unViaFree $
-            f id (hcfmapVec loop . vmapVec (ViaFree . convertFree . unViaFree) $ v)
+    loop :: Eff ff es ~> Eff gg es
+    loop (Eff f) = Eff \v ->
+        convertFree $ f (hcfmapVec loop . vmapVec convertFree $ v)
 {-# INLINE convertEff #-}
 
 convertFree :: (Free c ff, Free c' gg, c (gg r)) => ff r a -> gg r a
 convertFree = runFree liftFree
 {-# INLINE convertFree #-}
 
-newtype ViaFree ff (f :: Type -> Type) (r :: Type -> Type) (a :: Type) = ViaFree {unViaFree :: ff r a}
-    deriving newtype (Functor, Applicative, Monad)
-
-instance (forall r. Functor (ff r)) => Functor (Eff (ViaFree ff) es) where
-    fmap f (Eff m) = Eff \kk v -> f <$> m kk v
+instance (forall r. Functor (ff r)) => Functor (Eff ff es) where
+    fmap f (Eff m) = Eff $ fmap f . m
     {-# INLINE fmap #-}
 
-instance (forall r. Applicative (ff r)) => Applicative (Eff (ViaFree ff) es) where
-    pure x = Eff \_ _ -> pure x
-    Eff ff <*> Eff fm = Eff \kk v -> ff kk v <*> fm kk v
+instance (forall r. Applicative (ff r)) => Applicative (Eff ff es) where
+    pure x = Eff \_ -> pure x
+    Eff ff <*> Eff fm = Eff \v -> ff v <*> fm v
     {-# INLINE pure #-}
     {-# INLINE (<*>) #-}
 
-instance (forall r. Monad (ff r)) => Monad (Eff (ViaFree ff) es) where
-    Eff m >>= f = Eff \kk v -> m kk v >>= \x -> unEff (f x) kk v
+instance (forall r. Monad (ff r)) => Monad (Eff ff es) where
+    Eff m >>= f = Eff \v -> m v >>= \x -> unEff (f x) v
     {-# INLINE (>>=) #-}
 
 instance Free Functor Coyoneda where

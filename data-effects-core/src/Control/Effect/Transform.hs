@@ -46,7 +46,7 @@ raise = raises
 {-# INLINE raise #-}
 
 raises :: forall es es' a ff. (Suffix es es') => Eff ff es a -> Eff ff es' a
-raises = transEff \_ -> suffix
+raises = transEff suffix
 {-# INLINE raises #-}
 
 raiseUnder :: forall e0 e1 es a ff. Eff ff (e0 ': es) a -> Eff ff (e0 ': e1 ': es) a
@@ -54,11 +54,11 @@ raiseUnder = raisesUnder
 {-# INLINE raiseUnder #-}
 
 raisesUnder :: forall e es es' a ff. (Suffix es es') => Eff ff (e ': es) a -> Eff ff (e ': es') a
-raisesUnder = transEff \_ -> suffixUnder
+raisesUnder = transEff suffixUnder
 {-# INLINE raisesUnder #-}
 
 raisesUnders :: forall es es' a ff. (SuffixUnder es es') => Eff ff es a -> Eff ff es' a
-raisesUnders = transEff \_ -> suffixUnders
+raisesUnders = transEff suffixUnders
 {-# INLINE raisesUnders #-}
 
 raisePrefix
@@ -66,7 +66,7 @@ raisePrefix
      . (KnownList es')
     => Eff ff es a
     -> Eff ff (es' ++ es) a
-raisePrefix = transEff $ const $ V.drop @es'
+raisePrefix = transEff $ V.drop @es'
 {-# INLINE raisePrefix #-}
 
 raiseSuffix
@@ -74,7 +74,7 @@ raiseSuffix
      . (KnownList es)
     => Eff ff es a
     -> Eff ff (es ++ es') a
-raiseSuffix = transEff $ const $ V.take @es'
+raiseSuffix = transEff $ V.take @es'
 {-# INLINE raiseSuffix #-}
 
 raisePrefix1
@@ -82,7 +82,7 @@ raisePrefix1
      . (KnownList fs)
     => Eff ff es a
     -> Eff ff (Each fs x ++ es) a
-raisePrefix1 = transEff $ const $ V.drop1 @fs @x
+raisePrefix1 = transEff $ V.drop1 @fs @x
 {-# INLINE raisePrefix1 #-}
 
 raiseSuffix1
@@ -90,7 +90,7 @@ raiseSuffix1
      . (KnownList fs)
     => Eff ff (Each fs x) a
     -> Eff ff (Each fs x ++ es) a
-raiseSuffix1 = transEff $ const $ V.take1 @fs @x @es
+raiseSuffix1 = transEff $ V.take1 @fs @x @es
 {-# INLINE raiseSuffix1 #-}
 
 transform
@@ -99,7 +99,7 @@ transform
     => (e (Eff ff (e' ': es)) ~> e' (Eff ff (e' ': es)))
     -> Eff ff (e ': es) a
     -> Eff ff (e' ': es) a
-transform f = transEff \_ v -> override0 (handlerFor Here v . f) v
+transform f = transEff \v -> override0 (handlerFor Here v . f) v
 {-# INLINE transform #-}
 
 translate
@@ -136,7 +136,7 @@ translateFor
     -> (e (Eff ff es) ~> e' (Eff ff es))
     -> Eff ff (e ': es) a
     -> Eff ff es a
-translateFor i f = transEff \_ v -> handlerFor i v . f !: v
+translateFor i f = transEff \v -> handlerFor i v . f !: v
 {-# INLINE translateFor #-}
 
 rewrite
@@ -173,7 +173,7 @@ rewriteFor
     -> (e (Eff ff es) ~> e (Eff ff es))
     -> Eff ff es a
     -> Eff ff es a
-rewriteFor i f = transEff \_ v -> overrideFor i (handlerFor i v . f) v
+rewriteFor i f = transEff \v -> overrideFor i (handlerFor i v . f) v
 {-# INLINE rewriteFor #-}
 
 tag
