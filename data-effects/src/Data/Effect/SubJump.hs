@@ -1,4 +1,6 @@
+{-# HLINT ignore "Avoid lambda" #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 -- SPDX-License-Identifier: MPL-2.0
 
@@ -24,9 +26,9 @@ makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''SubJump
 callCC
     :: forall ref a es ff
      . (SubJump ref :> es, Monad (Eff ff es))
-    => (forall b. (a -> Eff ff es b) -> Eff ff es a)
+    => ((forall b. a -> Eff ff es b) -> Eff ff es a)
     -> Eff ff es a
-callCC f = sub (f . jump) pure
+callCC f = sub (\x -> f $ jump x) pure
 {-# INLINE callCC #-}
 
 getCC
