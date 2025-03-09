@@ -12,7 +12,7 @@ module Data.Effect.HandlerVec (
 )
 where
 
-import Data.Coerce (coerce)
+import Data.Coerce (Coercible, coerce)
 import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, LabelOf, OrderCase, OrderOf)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.HandlerVec.Rec (
@@ -61,6 +61,12 @@ hcfmapVec phi (HandlerVec f) = HandlerVec \kk -> f $ phi . kk
 vmapVec :: (forall x. r x -> r' x) -> HandlerVec es g r -> HandlerVec es g r'
 vmapVec f = transVec $ Rec.map \(Handler h) -> Handler $ f . h
 {-# INLINE vmapVec #-}
+
+hfmapCoerceVec :: (Coercible r r') => HandlerVec es g r -> HandlerVec es g r'
+hfmapCoerceVec = coerce
+
+hcfmapCoerceVec :: (Coercible f g) => HandlerVec es g r -> HandlerVec es f r
+hcfmapCoerceVec = coerce
 
 suffix :: forall es es' g r. (Suffix es es') => HandlerVec es' g r -> HandlerVec es g r
 suffix = transVec Rec.suffix

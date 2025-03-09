@@ -43,8 +43,10 @@ import Data.Effect (
     UnliftBase (WithRunInBase),
     UnliftIO,
     WriterH (Listen),
+    getEmb,
  )
 import Data.Effect.HandlerVec (
+    FOEs,
     HandlerVec,
     Has,
     IdentityResolver,
@@ -53,8 +55,10 @@ import Data.Effect.HandlerVec (
     KeyResolver,
     KnownIndex,
     LabelResolver,
+    coerceFOEs,
     handlerFor,
     hcfmapVec,
+    hfmapCoerceVec,
     membership,
     vmapVec,
     type (:>),
@@ -66,12 +70,7 @@ import Data.Kind (Type)
 import Data.Tuple (swap)
 import UnliftIO qualified as IO
 
-newtype Eff ff es a = Eff
-    { unEff
-        :: forall r
-         . HandlerVec es (Eff ff es) (ff r)
-        -> ff r a
-    }
+newtype Eff ff es a = Eff {unEff :: forall r. HandlerVec es (Eff ff es) (ff r) -> ff r a}
 
 runAllEff
     :: HandlerVec es (Eff ff es) (ff r)
@@ -130,6 +129,26 @@ type (f :: Type -> Type) $ a = f a
 
 -- | Type-level infix applcation for higher-order functors.
 type (h :: (Type -> Type) -> Type -> Type) $$ f = h f
+
+type EffFrame ff r = Eff (Emb (ff r))
+
+frame :: (FOEs es) => (forall r. EffFrame ff r es a) -> Eff ff es a
+frame m = Eff $ getEmb . unEff m . coerceFOEs . hfmapCoerceVec
+{-# INLINE frame #-}
+
+unframe :: Eff ff es a -> EffFrame ff r es a
+unframe = loop
+  where
+    loop :: Eff ff es ~> EffFrame ff r es
+    loop (Eff m) = Eff $ Emb . m . hcfmapVec loop . hfmapCoerceVec
+{-# INLINE unframe #-}
+
+runEffFrame
+    :: HandlerVec es (EffFrame ff r es) (ff r)
+    -> EffFrame ff r es a
+    -> ff r a
+runEffFrame v m = getEmb $ unEff m $ hfmapCoerceVec v
+{-# INLINE runEffFrame #-}
 
 instance
     (Ask r :> es, Local r :> es, Monad (Eff ff es))
@@ -289,17 +308,22 @@ convertFree :: (Free c ff, Free c' gg, c (gg r)) => ff r a -> gg r a
 convertFree = runFree liftFree
 {-# INLINE convertFree #-}
 
-instance (forall r. Functor (ff r)) => Functor (Eff ff es) where
+newtype ViaFree (ff :: (Type -> Type) -> Type -> Type) f a = ViaFree {unViaFree :: ff f a}
+    deriving newtype (Functor, Applicative, Monad)
+
+deriving newtype instance (Free c ff, forall f. c (ViaFree ff f)) => Free c (ViaFree ff)
+
+instance (forall r. Functor (ff r)) => Functor (Eff (ViaFree ff) es) where
     fmap f (Eff m) = Eff $ fmap f . m
     {-# INLINE fmap #-}
 
-instance (forall r. Applicative (ff r)) => Applicative (Eff ff es) where
+instance (forall r. Applicative (ff r)) => Applicative (Eff (ViaFree ff) es) where
     pure x = Eff \_ -> pure x
     Eff ff <*> Eff fm = Eff \v -> ff v <*> fm v
     {-# INLINE pure #-}
     {-# INLINE (<*>) #-}
 
-instance (forall r. Monad (ff r)) => Monad (Eff ff es) where
+instance (forall r. Monad (ff r)) => Monad (Eff (ViaFree ff) es) where
     Eff m >>= f = Eff \v -> m v >>= \x -> unEff (f x) v
     {-# INLINE (>>=) #-}
 
