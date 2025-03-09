@@ -1,6 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- SPDX-License-Identifier: MPL-2.0
 
@@ -133,22 +135,37 @@ type (h :: (Type -> Type) -> Type -> Type) $$ f = h f
 type EffFrame ff r = Eff (Emb (ff r))
 
 frame :: (FOEs es) => (forall r. EffFrame ff r es a) -> Eff ff es a
-frame m = Eff $ getEmb . unEff m . coerceFOEs . hfmapCoerceVec
+frame a = Eff $ unEffFrame a . coerceFOEs
 {-# INLINE frame #-}
 
-unframe :: Eff ff es a -> EffFrame ff r es a
-unframe = loop
+liftFrame :: Eff ff es a -> EffFrame ff r es a
+liftFrame = loop
   where
     loop :: Eff ff es ~> EffFrame ff r es
-    loop (Eff m) = Eff $ Emb . m . hcfmapVec loop . hfmapCoerceVec
-{-# INLINE unframe #-}
+    loop (Eff f) = EffFrame $ f . hcfmapVec loop
+{-# INLINE liftFrame #-}
 
 runEffFrame
     :: HandlerVec es (EffFrame ff r es) (ff r)
     -> EffFrame ff r es a
     -> ff r a
-runEffFrame v m = getEmb $ unEff m $ hfmapCoerceVec v
+runEffFrame = flip unEffFrame
 {-# INLINE runEffFrame #-}
+
+pattern EffFrame :: (HandlerVec es (EffFrame ff r es) (ff r) -> ff r a) -> EffFrame ff r es a
+pattern EffFrame f <- (unEffFrame -> f)
+    where
+        EffFrame f = Eff $ Emb . f . hfmapCoerceVec
+{-# INLINE EffFrame #-}
+
+{-# COMPLETE EffFrame #-}
+
+unEffFrame
+    :: EffFrame ff r es a
+    -> HandlerVec es (EffFrame ff r es) (ff r)
+    -> ff r a
+unEffFrame (Eff f) = getEmb . f . hfmapCoerceVec
+{-# INLINE unEffFrame #-}
 
 instance
     (Ask r :> es, Local r :> es, Monad (Eff ff es))
