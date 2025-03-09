@@ -47,6 +47,8 @@ type instance OrderOf Nop = 'FirstOrder
 
 newtype Emb e (f :: Type -> Type) (a :: Type) = Emb {getEmb :: e a}
     deriving anyclass (FirstOrder)
+    deriving newtype (Functor, Applicative, Monad, Foldable)
+    deriving stock (Traversable)
 
 data EmbLabel (e :: Type -> Type)
 type instance LabelOf (Emb e) = EmbLabel e
