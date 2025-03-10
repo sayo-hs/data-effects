@@ -164,8 +164,10 @@ generate (HandlerVec v) h = HandlerVec \_ ->
     unsafeCoerce $ Rec.generate (v $ absurd . getConst) \i -> Handler $ h i
 {-# INLINE generate #-}
 
+type HFunctors = Forall HFunctor
+
 generateHF
-    :: (Forall HFunctor es)
+    :: (HFunctors es)
     => HandlerVec es g r'
     -> (forall e x. (HFunctor e) => Membership e es -> e f x -> r x)
     -> HandlerVec es f r
