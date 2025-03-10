@@ -31,6 +31,7 @@ import Data.Effect.HandlerVec.Rec (
     Rec,
     Suffix,
     SuffixUnder,
+    compareMembership,
     cons,
     index,
     intVal,
@@ -161,13 +162,13 @@ generate
 generate (HandlerVec v) h = HandlerVec \_ -> Rec.generate (v $ absurd . getConst) \i -> Handler $ h i . unsafeCoerce
 {-# INLINE generate #-}
 
-override0 :: (KnownOrder e') => (forall x. e' f x -> r x) -> HandlerVec (e ': es) f r -> HandlerVec (e' ': es) f r
-override0 h (HandlerVec f) = HandlerVec \kk -> update0 (Handler $ h . hfmapElem kk) (f kk)
-{-# INLINE override0 #-}
-
 overrideFor :: (KnownOrder e) => Membership e es -> (forall x. e f x -> r x) -> HandlerVec es f r -> HandlerVec es f r
 overrideFor i h (HandlerVec f) = HandlerVec \kk -> update i (Handler $ h . hfmapElem kk) (f kk)
 {-# INLINE overrideFor #-}
+
+override0 :: (KnownOrder e') => (forall x. e' f x -> r x) -> HandlerVec (e ': es) f r -> HandlerVec (e' ': es) f r
+override0 h (HandlerVec f) = HandlerVec \kk -> update0 (Handler $ h . hfmapElem kk) (f kk)
+{-# INLINE override0 #-}
 
 hcfmapHandler :: (KnownOrder e) => (forall x. f x -> g x) -> Handler g r e -> Handler f r e
 hcfmapHandler phi (Handler f) = Handler \v -> f $ hfmapElem phi v

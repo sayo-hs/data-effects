@@ -177,13 +177,13 @@ update0 :: forall e e' es f. f e' -> Rec f (e ': es) -> Rec f (e' ': es)
 update0 x (Rec vec) = Rec $ Vec.update 0 (toAny x) vec
 {-# INLINE update0 #-}
 
-modify0 :: forall e e' es f. (f e -> f e') -> Rec f (e ': es) -> Rec f (e' ': es)
-modify0 f (Rec vec) = Rec $ Vec.update 0 (toAny $ f $ fromAny $ Vec.index 0 vec) vec
-{-# INLINE modify0 #-}
-
 modify :: forall e es f. Membership e es -> (f e -> f e) -> Rec f es -> Rec f es
 modify (UnsafeMembership i) f (Rec vec) = Rec $ Vec.update i (toAny $ f $ fromAny $ Vec.index i vec) vec
 {-# INLINE modify #-}
+
+modify0 :: forall e e' es f. (f e -> f e') -> Rec f (e ': es) -> Rec f (e' ': es)
+modify0 f (Rec vec) = Rec $ Vec.update 0 (toAny $ f $ fromAny $ Vec.index 0 vec) vec
+{-# INLINE modify0 #-}
 
 map :: forall es f g. (forall x. f x -> g x) -> Rec f es -> Rec g es
 map f (Rec v) = Rec $ Vec.map (toAny . f . fromAny) v
@@ -237,6 +237,7 @@ compareMembership :: Membership e es -> Membership e' es -> Maybe (e :~: e')
 compareMembership (UnsafeMembership m) (UnsafeMembership n)
     | m == n = Just $ unsafeCoerce Refl
     | otherwise = Nothing
+{-# INLINE compareMembership #-}
 
 type family At i es where
     At 0 '[] = TypeError ('Text "Effect index out of range")
