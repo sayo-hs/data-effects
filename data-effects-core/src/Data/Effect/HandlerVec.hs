@@ -14,7 +14,14 @@ module Data.Effect.HandlerVec (
 where
 
 import Data.Coerce (Coercible, coerce)
-import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), Emb, FirstOrder, LabelOf, OrderCase, OrderOf)
+import Data.Effect (
+    Effect,
+    EffectOrder (FirstOrder, HigherOrder),
+    FirstOrder,
+    LabelOf,
+    OrderCase,
+    OrderOf,
+ )
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.HandlerVec.Rec (
     At,
@@ -31,13 +38,14 @@ import Data.Effect.HandlerVec.Rec (
     update,
     update0,
     weakenFor,
+    weakensFor,
     pattern Here,
     type (++),
  )
 import Data.Effect.HandlerVec.Rec qualified as Rec
 import Data.Effect.Tag (type (#))
 import Data.Functor.Const (getConst)
-import Data.Kind (Constraint, Type)
+import Data.Kind (Constraint)
 import Data.Void (absurd)
 import GHC.TypeError (ErrorMessage (..), TypeError)
 import GHC.TypeLits (Symbol)
