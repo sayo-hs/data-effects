@@ -71,6 +71,8 @@ library
         Data.Effect.HFunctor.HCont,
         Data.Effect.HFunctor.TH,
         Data.Effect.HandlerVec,
+        Data.Effect.HandlerVec.Rec,
+        Data.Effect.HandlerVec.Vec,
         Control.Effect,
         Control.Effect.Interpret,
         Control.Effect.Transform,

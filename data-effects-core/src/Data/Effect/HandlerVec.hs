@@ -26,6 +26,7 @@ import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.HandlerVec.Rec (
     At,
     Each,
+    Forall,
     KnownList,
     Membership (UnsafeMembership),
     Rec,
@@ -159,8 +160,18 @@ generate
     => HandlerVec es g r'
     -> (forall e x. Membership e es -> e h x -> r x)
     -> HandlerVec es f r
-generate (HandlerVec v) h = HandlerVec \_ -> Rec.generate (v $ absurd . getConst) \i -> Handler $ h i . unsafeCoerce
+generate (HandlerVec v) h = HandlerVec \_ ->
+    unsafeCoerce $ Rec.generate (v $ absurd . getConst) \i -> Handler $ h i
 {-# INLINE generate #-}
+
+generateHF
+    :: (Forall HFunctor es)
+    => HandlerVec es g r'
+    -> (forall e x. (HFunctor e) => Membership e es -> e f x -> r x)
+    -> HandlerVec es f r
+generateHF (HandlerVec v) h = HandlerVec \phi ->
+    Rec.generateWith @HFunctor (v $ absurd . getConst) \i -> Handler $ h i . hfmap phi
+{-# INLINE generateHF #-}
 
 overrideFor :: (KnownOrder e) => Membership e es -> (forall x. e f x -> r x) -> HandlerVec es f r -> HandlerVec es f r
 overrideFor i h (HandlerVec f) = HandlerVec \kk -> update i (Handler $ h . hfmapElem kk) (f kk)

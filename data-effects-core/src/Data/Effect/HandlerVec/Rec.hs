@@ -2,15 +2,53 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE ViewPatterns #-}
 
+-- SPDX-License-Identifier: MPL-2.0 AND BSD-3-Clause
+
+{-  The code before modification is licensed under the BSD3 License as
+    shown in [1].  The modified code, in its entirety, is licensed under
+    MPL 2.0. When redistributing, please ensure that you do not remove
+    the BSD3 License text as indicated in [1].
+    <https://github.com/re-xyr/speff/blob/705bf6949dcb78a5d486f68c628e42977660278e/src/Sp/Internal/Env.hs>
+
+    [1] Copyright (c) 2021 Xy Ren
+
+        All rights reserved.
+
+        Redistribution and use in source and binary forms, with or without
+        modification, are permitted provided that the following conditions are met:
+
+            * Redistributions of source code must retain the above copyright
+            notice, this list of conditions and the following disclaimer.
+
+            * Redistributions in binary form must reproduce the above
+            copyright notice, this list of conditions and the following
+            disclaimer in the documentation and/or other materials provided
+            with the distribution.
+
+            * Neither the name of Author name here nor the names of other
+            contributors may be used to endorse or promote products derived
+            from this software without specific prior written permission.
+
+        THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+        "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+        LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+        A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+        OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+        SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+        LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+        DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+        THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+        (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+        OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-}
+
 {- |
-Copyright: (c) 2021 Xy Ren
-License: BSD3
-Maintainer: xy.r@outlook.com
-Stability: experimental
-Portability: non-portable (GHC only)
+Copyright   :  (c) 2021 Xy Ren
+               (c) 2023-2024 Sayo contributors
+License     :  MPL-2.0 (see the LICENSE file) AND BSD-3-Clause
+Maintainer  :  ymdfield@outlook.jp
 
 This module defines an immutable extensible record type, similar to @vinyl@ and @data-diverse@. However this
 implementation focuses on fast reads, hence has very different performance characteristics from other libraries:
@@ -23,9 +61,14 @@ implementation focuses on fast reads, hence has very different performance chara
 module Data.Effect.HandlerVec.Rec where
 
 import Control.Arrow ((&&&))
-import Data.Effect.HandlerVec.Vec (Vec)
+import Control.Monad (void)
+import Control.Monad.ST (ST)
+import Data.Effect (Effect)
+import Data.Effect.HFunctor (HFunctor, hfmap)
+import Data.Effect.HandlerVec.Vec (Vec (Vec))
 import Data.Effect.HandlerVec.Vec qualified as Vec
 import Data.Kind (Constraint, Type)
+import Data.Primitive.Array (Array, MutableArray, createArray, writeArray)
 import Data.Proxy (Proxy (Proxy))
 import Data.Type.Equality ((:~:) (Refl))
 import GHC.Exts (Any)
@@ -81,6 +124,56 @@ singleton x = Rec $ Vec.singleton (toAny x)
 generate :: forall f g es. Rec g es -> (forall e. Membership e es -> f e) -> Rec f es
 generate v f = Rec $ Vec.generate (length v) (toAny . f . UnsafeMembership)
 {-# INLINE generate #-}
+
+{-
+generateHFMaps :: forall es g. (HFunctors es) => Rec g es -> Rec HFMap es
+generateHFMaps v =
+    let len = length v
+     in Rec $ Vec 0 len $ createArray len Vec.nil \marr -> writeHFMapVec @es marr 0
+
+newtype HFMap (e :: Effect)
+    = HFMap {getHFMap :: forall f g a. (forall x. f x -> g x) -> e f a -> e g a}
+
+class HFunctors (es :: [Effect]) where
+    writeHFMapVec :: MutableArray s Any -> Int -> ST s ()
+
+instance (HFunctor e, HFunctors es) => HFunctors (e ': es) where
+    writeHFMapVec marr ix = do
+        writeArray marr ix $ toAny $ HFMap @e hfmap
+        writeHFMapVec @es marr (ix + 1)
+    {-# INLINE writeHFMapVec #-}
+
+instance HFunctors '[] where
+    writeHFMapVec _ _ = pure ()
+    {-# INLINE writeHFMapVec #-}
+-}
+
+generateWith
+    :: forall c f es g
+     . (Forall c es)
+    => Rec g es
+    -> (forall e. (c e) => Membership e es -> f e)
+    -> Rec f es
+generateWith v f =
+    let len = length v
+     in Rec $ Vec 0 len $ createArray len Vec.nil \marr ->
+            writeVecWith @c @es marr 0 \(_ :: Proxy e) ix ->
+                toAny $ f @e (UnsafeMembership ix)
+{-# INLINE generateWith #-}
+
+type Forall :: forall {k}. (k -> Constraint) -> [k] -> Constraint
+class Forall c es where
+    writeVecWith :: MutableArray s a -> Int -> (forall e. (c e) => Proxy e -> Int -> a) -> ST s ()
+
+instance (c e, Forall c es) => Forall c (e ': es) where
+    writeVecWith marr ix f = do
+        writeArray marr ix (f @e Proxy ix)
+        writeVecWith @c @es marr (ix + 1) f
+    {-# INLINE writeVecWith #-}
+
+instance Forall c '[] where
+    writeVecWith _ _ _ = pure ()
+    {-# INLINE writeVecWith #-}
 
 -- | Type level list concatenation.
 type family (xs :: [k]) ++ (ys :: [k]) where
