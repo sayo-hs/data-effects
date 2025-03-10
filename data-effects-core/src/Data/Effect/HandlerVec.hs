@@ -1,10 +1,11 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# HLINT ignore "Avoid lambda" #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# HLINT ignore "Use const" #-}
+{-# HLINT ignore "Avoid lambda" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use const" #-}
+-- SPDX-License-Identifier: MPL-2.0
 
 module Data.Effect.HandlerVec (
     module Data.Effect.HandlerVec,
@@ -13,7 +14,7 @@ module Data.Effect.HandlerVec (
 where
 
 import Data.Coerce (Coercible, coerce)
-import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, LabelOf, OrderCase, OrderOf)
+import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), Emb, FirstOrder, LabelOf, OrderCase, OrderOf)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.HandlerVec.Rec (
     At,
@@ -35,7 +36,9 @@ import Data.Effect.HandlerVec.Rec (
  )
 import Data.Effect.HandlerVec.Rec qualified as Rec
 import Data.Effect.Tag (type (#))
-import Data.Kind (Constraint)
+import Data.Functor.Const (getConst)
+import Data.Kind (Constraint, Type)
+import Data.Void (absurd)
 import GHC.TypeError (ErrorMessage (..), TypeError)
 import GHC.TypeLits (Symbol)
 import GHC.TypeNats (KnownNat, type (+))
@@ -141,6 +144,14 @@ infixr 5 !:
 (!:) :: (KnownOrder e) => (forall x. e f x -> r x) -> HandlerVec es f r -> HandlerVec (e ': es) f r
 h !: HandlerVec hs = HandlerVec \kk -> cons (Handler $ h . hfmapElem kk) (hs kk)
 {-# INLINE (!:) #-}
+
+generate
+    :: (FOEs es)
+    => HandlerVec es g r'
+    -> (forall e x. Membership e es -> e h x -> r x)
+    -> HandlerVec es f r
+generate (HandlerVec v) h = HandlerVec \_ -> Rec.generate (v $ absurd . getConst) \i -> Handler $ h i . unsafeCoerce
+{-# INLINE generate #-}
 
 override0 :: (KnownOrder e') => (forall x. e' f x -> r x) -> HandlerVec (e ': es) f r -> HandlerVec (e' ': es) f r
 override0 h (HandlerVec f) = HandlerVec \kk -> update0 (Handler $ h . hfmapElem kk) (f kk)

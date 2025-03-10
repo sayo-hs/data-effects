@@ -78,6 +78,10 @@ singleton :: f e -> Rec f '[e]
 singleton x = Rec $ Vec.singleton (toAny x)
 {-# INLINE singleton #-}
 
+generate :: forall f g es. Rec g es -> (forall e. Membership e es -> f e) -> Rec f es
+generate v f = Rec $ Vec.generate (length v) (toAny . f . UnsafeMembership)
+{-# INLINE generate #-}
+
 -- | Type level list concatenation.
 type family (xs :: [k]) ++ (ys :: [k]) where
     '[] ++ ys = ys

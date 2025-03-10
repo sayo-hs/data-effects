@@ -11,6 +11,7 @@ Portability: non-portable (GHC only)
 -}
 module Data.Effect.HandlerVec.Vec where
 
+import Control.Monad (when)
 import Data.Foldable (for_)
 import Data.Kind (Type)
 import Data.Primitive.Array (
@@ -45,6 +46,15 @@ empty = Vec 0 0 emptyArray
 
 singleton :: a -> Vec a
 singleton x = Vec 0 1 $ runArray $ newArray 1 x
+
+generate :: Int -> (Int -> a) -> Vec a
+generate len f = Vec 0 len $ runArray do
+    marr <- newArray len nil
+    let go !ix = when (ix < len) do
+            writeArray marr ix (f ix)
+            go $ ix + 1
+    go 0
+    pure marr
 
 -- | Prepend one entry to the vector. \( O(n) \).
 cons :: a -> Vec a -> Vec a
