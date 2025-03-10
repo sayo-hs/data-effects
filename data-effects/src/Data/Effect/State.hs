@@ -18,7 +18,7 @@ import Data.Effect (Ask (Ask), Emb, Local (Local), State (Get, Put))
 import Data.Functor ((<&>))
 import UnliftIO (newIORef, readIORef, writeIORef)
 
-makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''State
+makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''State
 
 -- | Retrieves the current state value from the context and returns the value transformed based on the given function.
 gets :: (State s :> es, Functor (Eff ff es)) => (s -> a) -> Eff ff es a

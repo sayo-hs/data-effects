@@ -26,8 +26,8 @@ import Data.Bool (bool)
 import Data.Effect (Choose (Choose), ChooseH (ChooseH), Emb, Empty (Empty), UnliftIO)
 import UnliftIO (throwIO, try)
 
-makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''Empty
-makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''Choose
+makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''Empty
+makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''Choose
 makeEffectH_' (def & noGenerateLabel & noGenerateOrderInstance) ''ChooseH
 
 {- | t'ChooseH' effect elaborator.

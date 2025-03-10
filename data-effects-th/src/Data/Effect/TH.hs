@@ -68,7 +68,12 @@ import Language.Haskell.TH (Dec, Name, Q, Type (TupleT))
 makeEffectF :: Name -> Q [Dec]
 makeEffectsF :: [Name] -> Q [Dec]
 makeEffectF' :: EffectConf -> Name -> Q [Dec]
-(makeEffectF, makeEffectsF, makeEffectF') = effectMakers genFOE
+(makeEffectF, makeEffectsF, makeEffectF') = effectMakers genFOEwithHFunctor
+
+makeEffectF_ :: Name -> Q [Dec]
+makeEffectsF_ :: [Name] -> Q [Dec]
+makeEffectF_' :: EffectConf -> Name -> Q [Dec]
+(makeEffectF_, makeEffectsF_, makeEffectF_') = effectMakers genFOE
 
 makeEffectH :: Name -> Q [Dec]
 makeEffectsH :: [Name] -> Q [Dec]
@@ -95,6 +100,12 @@ effectMakers gen =
     gen' conf e = do
         (info, dataInfo, eInfo) <- reifyEffect e & lift
         runReaderT gen (conf, e, info, dataInfo, eInfo)
+
+genFOEwithHFunctor :: EffectGenerator
+genFOEwithHFunctor = do
+    genFOE
+    (_, _, _, dataInfo, _) <- ask
+    deriveHFunctor (const $ pure $ TupleT 0) dataInfo & lift & lift >>= tell
 
 genHOEwithHFunctor :: EffectGenerator
 genHOEwithHFunctor = do

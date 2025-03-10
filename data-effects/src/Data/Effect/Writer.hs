@@ -20,7 +20,7 @@ where
 import Control.Effect (pass)
 import Data.Effect (Tell (Tell), WriterH (Censor, Listen))
 
-makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''Tell
+makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''Tell
 makeEffectH_' (def & noGenerateLabel & noGenerateOrderInstance) ''WriterH
 
 -- | 'censor' with pre-applying semantics.

@@ -15,4 +15,4 @@ where
 
 import Data.Effect (Fail (Fail))
 
-makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''Fail
+makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''Fail

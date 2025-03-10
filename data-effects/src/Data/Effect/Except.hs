@@ -20,7 +20,7 @@ import Data.Effect (Catch (Catch), Emb, Throw (Throw), UnliftIO)
 import UnliftIO (Exception, throwIO)
 import UnliftIO qualified as IO
 
-makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''Throw
+makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''Throw
 makeEffectH_' (def & noGenerateLabel & noGenerateOrderInstance) ''Catch
 
 -- | Throws the given `Either` value as an exception if it is `Left`.

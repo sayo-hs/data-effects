@@ -21,7 +21,7 @@ import Control.Effect (callCC_, sub)
 import Data.Effect (SubJump (Jump, SubFork))
 import Data.Function (fix)
 
-makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''SubJump
+makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''SubJump
 
 callCC
     :: forall ref a es ff

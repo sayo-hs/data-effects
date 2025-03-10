@@ -25,7 +25,7 @@ import Control.Effect.Interpret (interposeFor)
 import Data.Effect (Ask (Ask), Local (Local))
 import Data.Effect.HandlerVec (IdentityResolver, Membership, membership)
 
-makeEffectF' (def & noGenerateLabel & noGenerateOrderInstance) ''Ask
+makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''Ask
 makeEffectH_' (def & noGenerateLabel & noGenerateOrderInstance) ''Local
 
 -- | Obtains a value from the environment and returns it transformed by the given function.

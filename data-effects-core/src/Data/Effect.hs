@@ -10,7 +10,7 @@ Maintainer  :  ymdfield@outlook.jp
 -}
 module Data.Effect where
 
-import Data.Coerce (Coercible)
+import Data.Coerce (Coercible, coerce)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Kind (Type)
 
@@ -41,7 +41,12 @@ class
 data Nop :: Effect
     deriving anyclass (FirstOrder)
 
+data NopLabel
+type instance LabelOf Nop = NopLabel
 type instance OrderOf Nop = 'FirstOrder
+instance HFunctor Nop where
+    hfmap _ = \case {}
+    {-# INLINE hfmap #-}
 
 -- * Embedding Effect
 
@@ -53,6 +58,9 @@ newtype Emb e (f :: Type -> Type) (a :: Type) = Emb {getEmb :: e a}
 data EmbLabel (e :: Type -> Type)
 type instance LabelOf (Emb e) = EmbLabel e
 type instance OrderOf (Emb e) = 'FirstOrder
+instance HFunctor (Emb e) where
+    hfmap _ = coerce
+    {-# INLINE hfmap #-}
 
 newtype Unemb e a = Unemb {getUnemb :: forall f. e f a}
 
@@ -67,6 +75,9 @@ data AskLabel
 type instance LabelOf (Ask r) = AskLabel
 type instance OrderOf (Ask r) = 'FirstOrder
 instance FirstOrder (Ask r)
+instance HFunctor (Ask r) where
+    hfmap _ = coerce
+    {-# INLINE hfmap #-}
 
 -- | An effect that locally modifies the value held in the environment.
 data Local r :: Effect where
@@ -98,6 +109,9 @@ data StateLabel
 type instance LabelOf (State s) = StateLabel
 type instance OrderOf (State s) = 'FirstOrder
 instance FirstOrder (State s)
+instance HFunctor (State s) where
+    hfmap _ = coerce
+    {-# INLINE hfmap #-}
 
 -- * Writer Effects
 
@@ -110,6 +124,9 @@ data TellLabel
 type instance LabelOf (Tell w) = TellLabel
 type instance OrderOf (Tell w) = 'FirstOrder
 instance FirstOrder (Tell w)
+instance HFunctor (Tell w) where
+    hfmap _ = coerce
+    {-# INLINE hfmap #-}
 
 -- | An effect that performs local operations on accumulations in the context on a per-scope basis.
 data WriterH w :: Effect where
@@ -146,6 +163,9 @@ data ThrowLabel
 type instance LabelOf (Throw e) = ThrowLabel
 type instance OrderOf (Throw e) = 'FirstOrder
 instance FirstOrder (Throw e)
+instance HFunctor (Throw e) where
+    hfmap _ = coerce
+    {-# INLINE hfmap #-}
 
 -- | An effect to catch exceptions.
 data Catch e :: Effect where
@@ -175,6 +195,9 @@ data EmptyLabel
 type instance LabelOf Empty = EmptyLabel
 type instance OrderOf Empty = 'FirstOrder
 instance FirstOrder Empty
+instance HFunctor Empty where
+    hfmap _ = coerce
+    {-# INLINE hfmap #-}
 
 -- | An effect that splits the computation into two branches.
 data Choose :: Effect where
@@ -186,6 +209,9 @@ data ChooseLabel
 type instance LabelOf Choose = ChooseLabel
 type instance OrderOf Choose = 'FirstOrder
 instance FirstOrder Choose
+instance HFunctor Choose where
+    hfmap _ = coerce
+    {-# INLINE hfmap #-}
 
 {- |
 An effect that executes two branches as scopes.
@@ -212,6 +238,9 @@ data FailLabel
 type instance LabelOf Fail = FailLabel
 type instance OrderOf Fail = 'FirstOrder
 instance FirstOrder Fail
+instance HFunctor Fail where
+    hfmap _ = coerce
+    {-# INLINE hfmap #-}
 
 -- * Fix Effect
 
@@ -239,6 +268,8 @@ instance HFunctor (UnliftBase b) where
     hfmap phi (WithRunInBase f) = WithRunInBase \run -> f $ run . phi
     {-# INLINE hfmap #-}
 
+-- * Sub/Jump Effect
+
 data SubJump ref :: Effect where
     SubFork :: SubJump ref f (Either (ref a) a)
     Jump :: ref a -> a -> SubJump ref f b
@@ -247,3 +278,6 @@ data SubJumpLabel
 type instance LabelOf (SubJump ref) = SubJumpLabel
 type instance OrderOf (SubJump ref) = 'FirstOrder
 instance FirstOrder (SubJump ref)
+instance HFunctor (SubJump ref) where
+    hfmap _ = coerce
+    {-# INLINE hfmap #-}
