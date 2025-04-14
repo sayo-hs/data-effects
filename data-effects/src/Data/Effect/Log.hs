@@ -23,18 +23,18 @@ data Log msg :: Effect where
     Log :: msg -> Log msg f ()
 makeEffectF ''Log
 
-runLogAsOutput :: forall msg a es ff. (Output msg :> es) => Eff ff (Log msg ': es) a -> Eff ff es a
+runLogAsOutput :: forall msg a es ff c. (Output msg :> es, Free c ff) => Eff ff (Log msg ': es) a -> Eff ff es a
 runLogAsOutput = interpret \(Log msg) -> output msg
 {-# INLINE runLogAsOutput #-}
 
-runOutputAsLog :: forall msg a es ff. (Log msg :> es) => Eff ff (Output msg ': es) a -> Eff ff es a
+runOutputAsLog :: forall msg a es ff c. (Log msg :> es, Free c ff) => Eff ff (Output msg ': es) a -> Eff ff es a
 runOutputAsLog = interpret \(Output msg) -> log msg
 {-# INLINE runOutputAsLog #-}
 
-runLogAction :: forall msg a es ff. LogAction (Eff ff es) msg -> Eff ff (Log msg ': es) a -> Eff ff es a
+runLogAction :: forall msg a es ff c. (Free c ff) => LogAction (Eff ff es) msg -> Eff ff (Log msg ': es) a -> Eff ff es a
 runLogAction (LogAction f) = interpret \(Log msg) -> f msg
 {-# INLINE runLogAction #-}
 
-runLogActionEmbed :: forall msg f a es ff. (Emb f :> es) => LogAction f msg -> Eff ff (Log msg ': es) a -> Eff ff es a
+runLogActionEmbed :: forall msg f a es ff c. (Emb f :> es, Free c ff) => LogAction f msg -> Eff ff (Log msg ': es) a -> Eff ff es a
 runLogActionEmbed (LogAction f) = interpret \(Log msg) -> emb $ f msg
 {-# INLINE runLogActionEmbed #-}

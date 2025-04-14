@@ -1,8 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns #-}
 
 -- SPDX-License-Identifier: MPL-2.0
 
@@ -45,71 +43,63 @@ import Data.Effect (
     UnliftBase (WithRunInBase),
     UnliftIO,
     WriterH (Listen),
-    getEmb,
  )
-import Data.Effect.HandlerVec (
-    FOEs,
-    HandlerVec,
+import Data.Effect.OpenUnion (
+    At,
     Has,
     IdentityResolver,
     In,
     KeyDiscriminator,
     KeyResolver,
     KnownIndex,
+    KnownOrder,
     LabelResolver,
-    coerceFOEs,
-    handlerFor,
-    hcfmapVec,
-    hfmapCoerceVec,
+    Membership,
+    Union,
+    hfmapUnion,
+    inject,
     membership,
-    vmapVec,
+    membershipAt,
     type (:>),
  )
-import Data.Effect.HandlerVec.Rec (At, Membership, membershipAt)
 import Data.Effect.Tag (Tagged (Tag), type (#))
 import Data.Functor.Coyoneda (Coyoneda (Coyoneda), hoistCoyoneda, liftCoyoneda, lowerCoyoneda)
 import Data.Kind (Type)
 import Data.Tuple (swap)
 import UnliftIO qualified as IO
 
-newtype Eff ff es a = Eff {unEff :: forall r. HandlerVec es (Eff ff es) (ff r) -> ff r a}
+newtype Eff ff es a = Eff {unEff :: ff (Union es (Eff ff es)) a}
 
-runAllEff
-    :: HandlerVec es (Eff ff es) (ff r)
-    -> Eff ff es a
-    -> ff r a
-runAllEff v (Eff m) = m v
-{-# INLINE runAllEff #-}
-
-perform :: forall e es ff a. (e :> es) => e (Eff ff es) a -> Eff ff es a
+perform :: forall e es ff a c. (e :> es, Free c ff) => e (Eff ff es) a -> Eff ff es a
 perform = sendFor $ membership @LabelResolver
 {-# INLINE perform #-}
 
-perform' :: forall key e es ff a. (Has key e es) => e (Eff ff es) a -> Eff ff es a
+perform' :: forall key e es ff a c. (Has key e es, Free c ff) => e (Eff ff es) a -> Eff ff es a
 perform' = sendFor (membership @KeyResolver @(KeyDiscriminator key)) . Tag
 {-# INLINE perform' #-}
 
-perform'' :: forall tag e es ff a. (e # tag :> es) => e (Eff ff es) a -> Eff ff es a
+perform'' :: forall tag e es ff a c. (e # tag :> es, Free c ff) => e (Eff ff es) a -> Eff ff es a
 perform'' = perform . Tag @tag
 {-# INLINE perform'' #-}
 
-send :: forall e es ff a. (e `In` es) => e (Eff ff es) a -> Eff ff es a
+send :: forall e es ff a c. (e `In` es, Free c ff) => e (Eff ff es) a -> Eff ff es a
 send = sendFor $ membership @IdentityResolver
 {-# INLINE send #-}
 
-sendAt :: forall i es ff a. (KnownIndex i es) => At i es (Eff ff es) a -> Eff ff es a
+sendAt :: forall i es ff a c. (KnownIndex i es, Free c ff) => At i es (Eff ff es) a -> Eff ff es a
 sendAt = sendFor $ membershipAt @i
 {-# INLINE sendAt #-}
 
 sendFor
-    :: forall e es ff a
-     . Membership e es
+    :: forall e es ff a c
+     . (KnownOrder e, Free c ff)
+    => Membership e es
     -> e (Eff ff es) a
     -> Eff ff es a
-sendFor i e = Eff \v -> handlerFor i v e
+sendFor i = Eff . liftFree . inject i
 {-# INLINE sendFor #-}
 
-emb :: forall f es ff a. (Emb f :> es) => f a -> Eff ff es a
+emb :: forall f es ff a c. (Emb f :> es, Free c ff) => f a -> Eff ff es a
 emb = perform . Emb
 {-# INLINE emb #-}
 
@@ -118,7 +108,6 @@ type f ~> g = forall (x :: Type). f x -> g x
 
 infixr 2 ~>
 
--- | A stateless handler.
 type e ~~> f = e f ~> f
 
 infix 2 ~~>
@@ -132,43 +121,8 @@ type (f :: Type -> Type) $ a = f a
 -- | Type-level infix applcation for higher-order functors.
 type (h :: (Type -> Type) -> Type -> Type) $$ f = h f
 
-type EffFrame ff r = Eff (Emb (ff r))
-
-frame :: (FOEs es) => (forall r. EffFrame ff r es a) -> Eff ff es a
-frame a = Eff $ unEffFrame a . coerceFOEs
-{-# INLINE frame #-}
-
-liftFrame :: Eff ff es a -> EffFrame ff r es a
-liftFrame = loop
-  where
-    loop :: Eff ff es ~> EffFrame ff r es
-    loop (Eff f) = EffFrame $ f . hcfmapVec loop
-{-# INLINE liftFrame #-}
-
-runEffFrame
-    :: HandlerVec es (EffFrame ff r es) (ff r)
-    -> EffFrame ff r es a
-    -> ff r a
-runEffFrame = flip unEffFrame
-{-# INLINE runEffFrame #-}
-
-pattern EffFrame :: (HandlerVec es (EffFrame ff r es) (ff r) -> ff r a) -> EffFrame ff r es a
-pattern EffFrame f <- (unEffFrame -> f)
-    where
-        EffFrame f = Eff $ Emb . f . hfmapCoerceVec
-{-# INLINE EffFrame #-}
-
-{-# COMPLETE EffFrame #-}
-
-unEffFrame
-    :: EffFrame ff r es a
-    -> HandlerVec es (EffFrame ff r es) (ff r)
-    -> ff r a
-unEffFrame (Eff f) = getEmb . f . hfmapCoerceVec
-{-# INLINE unEffFrame #-}
-
 instance
-    (Ask r :> es, Local r :> es, Monad (Eff ff es))
+    (Ask r :> es, Local r :> es, Monad (Eff ff es), Free c ff)
     => MonadReader r (Eff ff es)
     where
     ask = perform Ask
@@ -177,7 +131,7 @@ instance
     {-# INLINE local #-}
 
 instance
-    (Tell w :> es, WriterH w :> es, Monoid w, Monad (Eff ff es))
+    (Tell w :> es, WriterH w :> es, Monoid w, Monad (Eff ff es), Free c ff)
     => MonadWriter w (Eff ff es)
     where
     tell = perform . Tell
@@ -199,8 +153,8 @@ pass m = do
 @
 -}
 pass
-    :: forall w a es ff
-     . (Tell w :> es, WriterH w :> es, Monad (Eff ff es))
+    :: forall w a es ff c
+     . (Tell w :> es, WriterH w :> es, Monad (Eff ff es), Free c ff)
     => Eff ff es (w -> w, a)
     -> Eff ff es a
 pass m = do
@@ -209,7 +163,7 @@ pass m = do
     pure a
 {-# INLINE pass #-}
 
-instance (State s :> es, Monad (Eff ff es)) => MonadState s (Eff ff es) where
+instance (State s :> es, Monad (Eff ff es), Free c ff) => MonadState s (Eff ff es) where
     get = perform Get
     put = perform . Put
     {-# INLINE get #-}
@@ -223,11 +177,12 @@ instance
     , State s :> es
     , Monoid w
     , Monad (Eff ff es)
+    , Free c ff
     )
     => MonadRWS r w s (Eff ff es)
 
 instance
-    (Throw e :> es, Catch e :> es, Monad (Eff ff es))
+    (Throw e :> es, Catch e :> es, Monad (Eff ff es), Free c ff)
     => MonadError e (Eff ff es)
     where
     throwError = perform . Throw
@@ -236,7 +191,7 @@ instance
     {-# INLINE catchError #-}
 
 instance
-    (Empty :> es, ChooseH :> es, Applicative (Eff ff es))
+    (Empty :> es, ChooseH :> es, Applicative (Eff ff es), Free c ff)
     => Alternative (Eff ff es)
     where
     empty = perform Empty
@@ -244,15 +199,15 @@ instance
     {-# INLINE empty #-}
     {-# INLINE (<|>) #-}
 
-instance (Empty :> es, ChooseH :> es, Monad (Eff ff es)) => MonadPlus (Eff ff es)
+instance (Empty :> es, ChooseH :> es, Monad (Eff ff es), Free c ff) => MonadPlus (Eff ff es)
 
-instance (SubJump ref :> es, Monad (Eff ff es)) => Cont.MonadCont (Eff ff es) where
+instance (SubJump ref :> es, Monad (Eff ff es), Free c ff) => Cont.MonadCont (Eff ff es) where
     callCC = callCC_
     {-# INLINE callCC #-}
 
 sub
-    :: forall ref a b es ff
-     . (SubJump ref :> es, Monad (Eff ff es))
+    :: forall ref a b es ff c
+     . (SubJump ref :> es, Monad (Eff ff es), Free c ff)
     => (ref a -> Eff ff es b)
     -> (a -> Eff ff es b)
     -> Eff ff es b
@@ -260,8 +215,8 @@ sub p q = perform SubFork >>= either p q
 {-# INLINE sub #-}
 
 callCC_
-    :: forall ref a b es ff
-     . (SubJump ref :> es, Monad (Eff ff es))
+    :: forall ref a b es ff c
+     . (SubJump ref :> es, Monad (Eff ff es), Free c ff)
     => ((a -> Eff ff es b) -> Eff ff es a)
     -> Eff ff es a
 callCC_ f = sub (f . jump) pure
@@ -269,20 +224,20 @@ callCC_ f = sub (f . jump) pure
     jump ref x = perform $ Jump ref x
 {-# INLINE callCC_ #-}
 
-instance (Emb IO :> es, Monad (Eff ff es)) => MonadIO (Eff ff es) where
+instance (Emb IO :> es, Monad (Eff ff es), Free c ff) => MonadIO (Eff ff es) where
     liftIO = emb
     {-# INLINE liftIO #-}
 
-instance (Fail :> es, Monad (Eff ff es)) => MonadFail (Eff ff es) where
+instance (Fail :> es, Monad (Eff ff es), Free c ff) => MonadFail (Eff ff es) where
     fail = perform . Fail
     {-# INLINE fail #-}
 
-instance (Fix :> es, Monad (Eff ff es)) => MonadFix (Eff ff es) where
+instance (Fix :> es, Monad (Eff ff es), Free c ff) => MonadFix (Eff ff es) where
     mfix = perform . Efix
     {-# INLINE mfix #-}
 
 instance
-    (UnliftIO :> es, Emb IO :> es, Monad (Eff ff es))
+    (UnliftIO :> es, Emb IO :> es, Monad (Eff ff es), Free c ff)
     => IO.MonadUnliftIO (Eff ff es)
     where
     withRunInIO f = perform $ WithRunInBase f
@@ -308,41 +263,24 @@ class (forall f. c (ff f)) => Free c (ff :: (Type -> Type) -> Type -> Type) | ff
     {-# INLINE retract #-}
     {-# INLINE hoist #-}
 
--- | /O(n)/ where /n/ = @length es@
 convertEff
     :: forall ff gg es a c c'
      . (Free c ff, Free c' gg, forall r. c (gg r), forall r. c' (ff r))
     => Eff ff es a
     -> Eff gg es a
-convertEff = loop
+convertEff = go
   where
-    loop :: Eff ff es ~> Eff gg es
-    loop (Eff f) = Eff \v ->
-        convertFree $ f (hcfmapVec loop . vmapVec convertFree $ v)
+    go :: Eff ff es ~> Eff gg es
+    go = Eff . hoist (hfmapUnion go) . convertFree . unEff
 {-# INLINE convertEff #-}
 
 convertFree :: (Free c ff, Free c' gg, c (gg r)) => ff r a -> gg r a
 convertFree = runFree liftFree
 {-# INLINE convertFree #-}
 
-newtype ViaFree (ff :: (Type -> Type) -> Type -> Type) f a = ViaFree {unViaFree :: ff f a}
-    deriving newtype (Functor, Applicative, Monad)
-
-deriving newtype instance (Free c ff, forall f. c (ViaFree ff f)) => Free c (ViaFree ff)
-
-instance (forall r. Functor (ff r)) => Functor (Eff (ViaFree ff) es) where
-    fmap f (Eff m) = Eff $ fmap f . m
-    {-# INLINE fmap #-}
-
-instance (forall r. Applicative (ff r)) => Applicative (Eff (ViaFree ff) es) where
-    pure x = Eff \_ -> pure x
-    Eff ff <*> Eff fm = Eff \v -> ff v <*> fm v
-    {-# INLINE pure #-}
-    {-# INLINE (<*>) #-}
-
-instance (forall r. Monad (ff r)) => Monad (Eff (ViaFree ff) es) where
-    Eff m >>= f = Eff \v -> m v >>= \x -> unEff (f x) v
-    {-# INLINE (>>=) #-}
+deriving instance (forall f. Functor (ff f)) => Functor (Eff ff es)
+deriving instance (forall r. Applicative (ff r)) => Applicative (Eff ff es)
+deriving instance (forall r. Monad (ff r)) => Monad (Eff ff es)
 
 instance Free Functor Coyoneda where
     liftFree = liftCoyoneda

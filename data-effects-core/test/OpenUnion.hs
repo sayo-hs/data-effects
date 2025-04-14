@@ -1,9 +1,12 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 -- SPDX-License-Identifier: MPL-2.0
+{-# LANGUAGE QuantifiedConstraints #-}
 
 module OpenUnion where
 
+import Control.Effect (Eff, Free, perform)
 import Data.Effect (Effect, LabelOf)
-import Data.Effect.OpenUnion (Membership (UnsafeMembership), labelMembership)
+import Data.Effect.OpenUnion (Membership (UnsafeMembership), labelMembership, (:>))
 import Data.Proxy (Proxy (Proxy))
 import GHC.TypeNats (KnownNat, Natural, natVal)
 import Test.Hspec (Spec, describe, it, shouldBe)

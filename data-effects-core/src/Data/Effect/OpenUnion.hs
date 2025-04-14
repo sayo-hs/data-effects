@@ -25,7 +25,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 data Union (es :: [Effect]) (f :: Type -> Type) (a :: Type) where
     UnsafeUnion
-        :: {-# UNPACK #-} !Word
+        :: {-# UNPACK #-} !Int
         -- ^ A natural number tag to identify the element of the union.
         -> e g a
         -> {-# UNPACK #-} !EffectOrder
@@ -39,6 +39,13 @@ instance HFunctor (Union es) where
             HigherOrder -> UnsafeUnion n e HigherOrder (phi . koi)
     {-# INLINE hfmap #-}
 
+hfmapUnion :: (forall x. f x -> g x) -> Union es f a -> Union es g a
+hfmapUnion phi u@(UnsafeUnion n e order koi) =
+    case order of
+        FirstOrder -> unsafeCoerce u
+        HigherOrder -> UnsafeUnion n e HigherOrder (phi . koi)
+{-# INLINE hfmapUnion #-}
+
 class FOEs es
 instance FOEs '[]
 instance (FirstOrder e, FOEs es) => FOEs (e ': es)
@@ -50,7 +57,7 @@ coerceFOEs = unsafeCoerce
 -- fixme: FirstOrder (Union es) if FOEs es
 type instance OrderOf (Union es) = 'HigherOrder
 
-newtype Membership (e :: Effect) (es :: [Effect]) = UnsafeMembership {unMembership :: Word}
+newtype Membership (e :: Effect) (es :: [Effect]) = UnsafeMembership {unMembership :: Int}
     deriving stock (Eq, Show)
 
 pattern Here :: Membership e (e ': es)
@@ -79,7 +86,7 @@ mapUnion f (UnsafeUnion n e order koi) =
 {-# INLINE mapUnion #-}
 
 membershipAt :: forall i es. (KnownNat i) => Membership (At i es) es
-membershipAt = UnsafeMembership $ wordVal @i
+membershipAt = UnsafeMembership $ intVal @i
 {-# INLINE membershipAt #-}
 
 compareMembership :: Membership e es -> Membership e' es -> Maybe (e :~: e')
@@ -92,9 +99,9 @@ type family At i es where
     At 0 (e ': es) = e
     At n (e ': es) = At (n - 1) es
 
-wordVal :: forall n. (KnownNat n) => Word
-wordVal = fromIntegral $ natVal @n Proxy
-{-# INLINE wordVal #-}
+intVal :: forall n. (KnownNat n) => Int
+intVal = fromIntegral $ natVal @n Proxy
+{-# INLINE intVal #-}
 
 data LabelResolver
 data KeyResolver
@@ -231,13 +238,13 @@ type KnownOrder e = Elem e (OrderOf e)
 class (order ~ OrderOf e) => Elem e order where
     inject :: Membership e es -> e f a -> Union es f a
     project :: Membership e es -> Union es f a -> Maybe (e f a)
-    (!+) :: (e f a -> r) -> (Union es f a -> r) -> Union (e ': es) f a -> r
+    (!:) :: (e f a -> r) -> (Union es f a -> r) -> Union (e ': es) f a -> r
     extract :: Union '[e] f a -> e f a
 
-    infixr 5 !+
+    infixr 5 !:
 
 decomp :: (KnownOrder e, HFunctor e) => Union (e ': es) f a -> Either (e f a) (Union es f a)
-decomp = Left !+ Right
+decomp = Left !: Right
 {-# INLINE decomp #-}
 
 instance (FirstOrder e) => Elem e 'FirstOrder where
@@ -254,7 +261,7 @@ instance (FirstOrder e) => Elem e 'FirstOrder where
             then Just $ unsafeCoerce e
             else Nothing
 
-    (f !+ g) (UnsafeUnion n e koi order) =
+    (f !: g) (UnsafeUnion n e koi order) =
         if n == 0
             then f $ unsafeCoerce e
             else g $ UnsafeUnion (n - 1) e koi order
@@ -263,7 +270,7 @@ instance (FirstOrder e) => Elem e 'FirstOrder where
 
     {-# INLINE inject #-}
     {-# INLINE project #-}
-    {-# INLINE (!+) #-}
+    {-# INLINE (!:) #-}
     {-# INLINE extract #-}
 
 instance (OrderOf e ~ 'HigherOrder, HFunctor e) => Elem e 'HigherOrder where
@@ -276,7 +283,7 @@ instance (OrderOf e ~ 'HigherOrder, HFunctor e) => Elem e 'HigherOrder where
             then Just $ hfmap koi (unsafeCoerce e)
             else Nothing
 
-    (f !+ g) (UnsafeUnion n e _ koi) =
+    (f !: g) (UnsafeUnion n e _ koi) =
         if n == 0
             then f $ hfmap koi (unsafeCoerce e)
             else g $ UnsafeUnion (n - 1) e HigherOrder koi
@@ -285,7 +292,7 @@ instance (OrderOf e ~ 'HigherOrder, HFunctor e) => Elem e 'HigherOrder where
 
     {-# INLINE inject #-}
     {-# INLINE project #-}
-    {-# INLINE (!+) #-}
+    {-# INLINE (!:) #-}
     {-# INLINE extract #-}
 
 projectAnyOrder :: forall e es f a. (HFunctor e) => Membership e es -> Union es f a -> Maybe (e f a)
@@ -318,40 +325,40 @@ hfmapDynUnsafeCoerce order phi e = case order of
 nil :: Union '[] f a -> r
 nil _ = error "Effect system internal error: nil - An empty effect union, which should not be possible to create, has been created."
 
-weakensFor :: forall es es' e. (Weaken es es') => Membership e es -> Membership e es'
+weakensFor :: forall es es' e. (Suffix es es') => Membership e es -> Membership e es'
 weakensFor (UnsafeMembership n) = UnsafeMembership $ n + prefixLen @es @es'
 {-# INLINE weakensFor #-}
 
-class Weaken (es :: [Effect]) (es' :: [Effect]) where
-    prefixLen :: Word
+class Suffix (es :: [Effect]) (es' :: [Effect]) where
+    prefixLen :: Int
 
-instance {-# INCOHERENT #-} Weaken es es where
+instance {-# INCOHERENT #-} Suffix es es where
     prefixLen = 0
     {-# INLINE prefixLen #-}
 
-instance (Weaken es es') => Weaken es (e ': es') where
+instance (Suffix es es') => Suffix es (e ': es') where
     prefixLen = prefixLen @es @es' + 1
     {-# INLINE prefixLen #-}
 
-class WeakenUnder (es :: [Effect]) (es' :: [Effect]) where
-    prefixLenUnder :: Word
-    offset :: Word
+class SuffixUnder (es :: [Effect]) (es' :: [Effect]) where
+    prefixLenUnder :: Int
+    offset :: Int
 
-instance {-# INCOHERENT #-} (Weaken es es') => WeakenUnder es es' where
+instance {-# INCOHERENT #-} (Suffix es es') => SuffixUnder es es' where
     prefixLenUnder = prefixLen @es @es'
     offset = 0
 
     {-# INLINE prefixLenUnder #-}
     {-# INLINE offset #-}
 
-instance (WeakenUnder es es') => WeakenUnder (e ': es) (e ': es') where
+instance (SuffixUnder es es') => SuffixUnder (e ': es) (e ': es') where
     prefixLenUnder = prefixLenUnder @es @es'
     offset = offset @es @es' + 1
 
     {-# INLINE prefixLenUnder #-}
     {-# INLINE offset #-}
 
-weakensUnderFor :: forall es es' e. (WeakenUnder es es') => Membership e es -> Membership e es'
+weakensUnderFor :: forall es es' e. (SuffixUnder es es') => Membership e es -> Membership e es'
 weakensUnderFor (UnsafeMembership n) =
     UnsafeMembership
         if n < offset @es @es'
@@ -364,29 +371,29 @@ type family RemoveHOEs (es :: [Effect]) where
     RemoveHOEs (e ': es) =
         OrderCase (OrderOf e) (e ': RemoveHOEs es) (RemoveHOEs es)
 
-type KnownOrders es = WeakenH es 0 (OrderOfHead es)
+type KnownOrders es = SuffixH es 0 (OrderOfHead es)
 
 type family OrderOfHead es where
     OrderOfHead (e ': es) = OrderOf e
 
-class (FOEs (RemoveHOEs es), orderOfHead ~ OrderOfHead es) => WeakenH es i orderOfHead where
+class (FOEs (RemoveHOEs es), orderOfHead ~ OrderOfHead es) => SuffixH es i orderOfHead where
     weakenHFor :: Membership e (RemoveHOEs es) -> Membership e es
 
-instance (OrderOfHead '[] ~ orderOfHead) => WeakenH '[] i orderOfHead where
+instance (OrderOfHead '[] ~ orderOfHead) => SuffixH '[] i orderOfHead where
     weakenHFor = id
     {-# INLINE weakenHFor #-}
 
-instance (FirstOrder e, WeakenH es (i + 1) _orderOfHead) => WeakenH (e ': es) i 'FirstOrder where
+instance (FirstOrder e, SuffixH es (i + 1) _orderOfHead) => SuffixH (e ': es) i 'FirstOrder where
     weakenHFor = coerce $ weakenHFor @es @(i + 1)
     {-# INLINE weakenHFor #-}
 
 instance
-    (OrderOf e ~ 'HigherOrder, WeakenH es (i + 1) _orderOfHead, FOEs (RemoveHOEs es), KnownNat i)
-    => WeakenH (e ': es) i 'HigherOrder
+    (OrderOf e ~ 'HigherOrder, SuffixH es (i + 1) _orderOfHead, FOEs (RemoveHOEs es), KnownNat i)
+    => SuffixH (e ': es) i 'HigherOrder
     where
     weakenHFor (UnsafeMembership n) =
         UnsafeMembership $
-            if n < wordVal @i
+            if n < intVal @i
                 then n
                 else unMembership (weakenHFor @es @(i + 1) $ UnsafeMembership n) + 1
     {-# INLINE weakenHFor #-}
@@ -395,11 +402,11 @@ weaken :: Union es f a -> Union (e ': es) f a
 weaken = mapUnion weakenFor
 {-# INLINE weaken #-}
 
-weakens :: (Weaken es es') => Union es f a -> Union es' f a
+weakens :: (Suffix es es') => Union es f a -> Union es' f a
 weakens = mapUnion weakensFor
 {-# INLINE weakens #-}
 
-weakensUnder :: (WeakenUnder es es') => Union es f a -> Union es' f a
+weakensUnder :: (SuffixUnder es es') => Union es f a -> Union es' f a
 weakensUnder = mapUnion weakensUnderFor
 {-# INLINE weakensUnder #-}
 
@@ -409,7 +416,7 @@ weakenH = mapUnion $ weakenHFor @es @0
 
 type KnownLength :: forall {k}. [k] -> Constraint
 class KnownLength xs where
-    reifyLength :: Word
+    reifyLength :: Int
 
 instance KnownLength '[] where
     reifyLength = 0
@@ -424,6 +431,15 @@ infixr 5 ++
 type family (es :: [Effect]) ++ (es' :: [Effect]) where
     '[] ++ es = es
     (e ': es) ++ es' = e ': (es ++ es')
+
+infixr 5 !++
+
+(!++) :: forall es es' f a r. (KnownLength es) => (Union es f a -> r) -> (Union es' f a -> r) -> Union (es ++ es') f a -> r
+(h !++ h') (UnsafeUnion n e o koi) =
+    if n < reifyLength @es
+        then h $ UnsafeUnion n e o koi
+        else h' $ UnsafeUnion (n - reifyLength @es) e o koi
+{-# INLINE (!++) #-}
 
 bundleUnion
     :: forall es es' f a
@@ -442,7 +458,7 @@ unbundleUnion
      . (KnownLength es)
     => Union (Union es ': es') f a
     -> Union (es ++ es') f a
-unbundleUnion = mapUnion (suffixFor @es') !+ mapUnion (prefixFor @es)
+unbundleUnion = mapUnion (suffixFor @es') !: mapUnion (prefixFor @es)
 {-# INLINE unbundleUnion #-}
 
 splitUnion
@@ -487,15 +503,15 @@ prefixFor :: forall es' es e. (KnownLength es') => Membership e es -> Membership
 prefixFor (UnsafeMembership n) = UnsafeMembership $ reifyLength @es' + n
 {-# INLINE prefixFor #-}
 
-type family EachEffect (fs :: [k -> Effect]) x where
-    EachEffect (f ': fs) x = (f x ': EachEffect fs x)
-    EachEffect '[] x = '[]
+type family Each (fs :: [k -> Effect]) x where
+    Each (f ': fs) x = (f x ': Each fs x)
+    Each '[] x = '[]
 
-suffixFor1 :: forall fs x es e. Membership e es -> Membership e (es ++ EachEffect fs x)
+suffixFor1 :: forall fs x es e. Membership e (Each fs x) -> Membership e (Each fs x ++ es)
 suffixFor1 = coerce
 {-# INLINE suffixFor1 #-}
 
-prefixFor1 :: forall fs x es e. (KnownLength fs) => Membership e es -> Membership e (EachEffect fs x ++ es)
+prefixFor1 :: forall fs x es e. (KnownLength fs) => Membership e es -> Membership e (Each fs x ++ es)
 prefixFor1 (UnsafeMembership n) = UnsafeMembership $ reifyLength @fs + n
 {-# INLINE prefixFor1 #-}
 

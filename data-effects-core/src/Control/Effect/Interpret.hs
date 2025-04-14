@@ -12,196 +12,186 @@ Maintainer  :  ymdfield@outlook.jp
 -}
 module Control.Effect.Interpret where
 
-import Control.Arrow ((>>>))
 import Control.Effect (
     Eff (..),
     Free (liftFree),
-    retract,
-    runAllEff,
+    hoist,
+    runFree,
     type (~>),
     type (~~>),
  )
-import Data.Effect (Emb (Emb))
-import Data.Effect.HandlerVec (
-    HandlerVec,
+import Data.Effect (Emb, getEmb)
+import Data.Effect.HFunctor (hfmap)
+import Data.Effect.OpenUnion (
     Has,
     In,
+    KnownLength,
     KnownOrder,
-    empty,
-    hcfmapVec,
-    hfmapElem,
+    Membership,
+    Suffix,
+    Union,
     identityMembership,
     keyMembership,
     labelMembership,
-    overrideFor,
-    suffix,
-    vmapVec,
+    nil,
+    project,
+    weakens,
+    (!++),
     (!:),
     (:>),
- )
-import Data.Effect.HandlerVec qualified as H
-import Data.Effect.HandlerVec qualified as VH
-import Data.Effect.HandlerVec.Rec (
-    Membership,
-    Suffix,
     type (++),
  )
 import Data.Effect.Tag (unTag)
 import Data.Functor.Identity (Identity, runIdentity)
 
 runEff :: (Free c ff, c f) => Eff ff '[Emb f] a -> f a
-runEff (Eff m) = retract $ m $ H.singleton \(Emb a) -> liftFree a
+runEff = runFree (getEmb !: nil) . unEff
 {-# INLINE runEff #-}
 
 runPure :: (Free c ff, c Identity) => Eff ff '[] a -> a
-runPure (Eff m) = runIdentity $ retract $ m empty
+runPure = runIdentity . runFree nil . unEff
 {-# INLINE runPure #-}
 
 interpret
-    :: forall e es ff a
-     . (KnownOrder e)
-    => (e ~~> Eff ff es)
+    :: forall e es ff a c
+     . (KnownOrder e, Free c ff)
+    => e ~~> Eff ff es
     -> Eff ff (e ': es) a
     -> Eff ff es a
-interpret i = transEff \v -> runAllEff v . i !: v
+interpret i = interpretAll $ i !: Eff . liftFree
 {-# INLINE interpret #-}
 
 reinterpret
-    :: forall e es es' ff a
-     . (Suffix es es', KnownOrder e)
-    => (e ~~> Eff ff es')
+    :: forall e es es' ff a c
+     . (Suffix es es', KnownOrder e, Free c ff)
+    => e ~~> Eff ff es'
     -> Eff ff (e ': es) a
     -> Eff ff es' a
-reinterpret i = transEff \v -> runAllEff v . i !: suffix v
+reinterpret i = interpretAll $ i !: Eff . liftFree . weakens
 {-# INLINE reinterpret #-}
 
 interprets
-    :: forall es r ff a
-     . HandlerVec es (Eff ff r) (Eff ff r)
+    :: forall es r ff a c
+     . (KnownLength es, Free c ff)
+    => Union es ~~> Eff ff r
     -> Eff ff (es ++ r) a
     -> Eff ff r a
-interprets i = transEff \v -> vmapVec (runAllEff v) i `VH.concat` v
+interprets i = interpretAll $ i !++ Eff . liftFree
 {-# INLINE interprets #-}
 
 reinterprets
-    :: forall es r r' ff a
-     . (Suffix r r')
-    => HandlerVec es (Eff ff r') (Eff ff r')
+    :: forall es r r' ff a c
+     . (Suffix r r', KnownLength es, Free c ff)
+    => (Union es (Eff ff r') ~> Eff ff r')
     -> Eff ff (es ++ r) a
     -> Eff ff r' a
-reinterprets i = transEff \v -> vmapVec (runAllEff v) i `VH.concat` suffix @r v
+reinterprets i = interpretAll $ i !++ Eff . liftFree . weakens @r
 {-# INLINE reinterprets #-}
 
 interpose
-    :: forall e es ff a
-     . (e :> es)
-    => (e ~~> Eff ff es)
+    :: forall e es ff a c
+     . (e :> es, Free c ff)
+    => e ~~> Eff ff es
     -> Eff ff es a
     -> Eff ff es a
 interpose = interposeFor labelMembership
 {-# INLINE interpose #-}
 
 interposeOn
-    :: forall key e es ff a
-     . (Has key e es)
-    => (e ~~> Eff ff es)
+    :: forall key e es ff a c
+     . (Has key e es, Free c ff)
+    => e ~~> Eff ff es
     -> Eff ff es a
     -> Eff ff es a
 interposeOn f = interposeFor (keyMembership @key) (f . unTag)
 {-# INLINE interposeOn #-}
 
 interposeIn
-    :: forall e es ff a
-     . (e `In` es)
-    => (e ~~> Eff ff es)
+    :: forall e es ff a c
+     . (e `In` es, Free c ff)
+    => e ~~> Eff ff es
     -> Eff ff es a
     -> Eff ff es a
 interposeIn = interposeFor identityMembership
 {-# INLINE interposeIn #-}
 
 interposeFor
-    :: forall e es ff a
-     . (KnownOrder e)
+    :: forall e es ff a c
+     . (KnownOrder e, Free c ff)
     => Membership e es
-    -> (e ~~> Eff ff es)
+    -> e ~~> Eff ff es
     -> Eff ff es a
     -> Eff ff es a
-interposeFor i f = transEff \v -> overrideFor i (runAllEff v . f) v
+interposeFor i f =
+    interpretAll \u ->
+        case project i u of
+            Just e -> f e
+            Nothing -> Eff $ liftFree u
 {-# INLINE interposeFor #-}
 
-transEff
-    :: forall es es' a ff
-     . ( forall r
-          . HandlerVec es' (Eff ff es') (ff r)
-         -> HandlerVec es (Eff ff es') (ff r)
-       )
-    -> Eff ff es a
-    -> Eff ff es' a
-transEff f = loop
-  where
-    loop :: Eff ff es ~> Eff ff es'
-    loop (Eff m) = Eff \v -> m (hcfmapVec loop $ f v)
-{-# INLINE transEff #-}
-
 preinterpose
-    :: forall e es ff a
-     . (e :> es)
-    => (e ~~> Eff ff es)
+    :: forall e es ff a c
+     . (e :> es, Free c ff)
+    => e ~~> Eff ff es
     -> Eff ff es a
     -> Eff ff es a
 preinterpose = preinterposeFor labelMembership
 {-# INLINE preinterpose #-}
 
 preinterposeOn
-    :: forall key e es ff a
-     . (Has key e es)
-    => (e ~~> Eff ff es)
+    :: forall key e es ff a c
+     . (Has key e es, Free c ff)
+    => e ~~> Eff ff es
     -> Eff ff es a
     -> Eff ff es a
 preinterposeOn f = preinterposeFor (keyMembership @key) (f . unTag)
 {-# INLINE preinterposeOn #-}
 
 preinterposeIn
-    :: forall e es ff a
-     . (e `In` es)
-    => (e ~~> Eff ff es)
+    :: forall e es ff a c
+     . (e `In` es, Free c ff)
+    => e ~~> Eff ff es
     -> Eff ff es a
     -> Eff ff es a
 preinterposeIn = preinterposeFor identityMembership
 {-# INLINE preinterposeIn #-}
 
 preinterposeFor
-    :: forall e es ff a
-     . (KnownOrder e)
+    :: forall e es ff a c
+     . (KnownOrder e, Free c ff)
     => Membership e es
-    -> (e ~~> Eff ff es)
+    -> e ~~> Eff ff es
     -> Eff ff es a
     -> Eff ff es a
-preinterposeFor i f = loop
+preinterposeFor i f = go
   where
-    loop :: Eff ff es ~> Eff ff es
-    loop (Eff g) =
-        Eff $ hcfmapVec loop >>> \v -> g $ overrideFor i (runAllEff v . f) v
+    go :: Eff ff es ~> Eff ff es
+    go (Eff a) = Eff $ (`runFree` a) \u ->
+        hoist (hfmap go) $ case project i u of
+            Just e -> unEff $ f e
+            Nothing -> liftFree u
 {-# INLINE preinterposeFor #-}
 
-iterEff
-    :: forall e f ff a c
-     . (KnownOrder e, c f, Free c ff)
-    => (e ~~> f)
-    -> Eff ff '[e] a
-    -> f a
-iterEff i = loop
+interpretAll
+    :: forall es es' ff a c
+     . (Free c ff)
+    => (Union es ~~> Eff ff es')
+    -> Eff ff es a
+    -> Eff ff es' a
+interpretAll i = go
   where
-    loop :: Eff ff '[e] ~> f
-    loop = retract . runAllEff (H.singleton $ liftFree . i . hfmapElem loop)
-{-# INLINE iterEff #-}
+    go :: Eff ff es ~> Eff ff es'
+    go = Eff . runFree (unEff . i . hfmap go) . unEff
+{-# INLINE interpretAll #-}
 
--- | /O(n)/ where /n/ = @length es@
 iterAllEff
     :: forall es f ff a c
      . (Free c ff, c f)
-    => HandlerVec es (Eff ff es) f
+    => Union es ~~> f
     -> Eff ff es a
     -> f a
-iterAllEff hdl = retract . runAllEff (vmapVec liftFree hdl)
+iterAllEff i = go
+  where
+    go :: Eff ff es ~> f
+    go = runFree (i . hfmap go) . unEff
 {-# INLINE iterAllEff #-}

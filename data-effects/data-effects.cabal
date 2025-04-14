@@ -59,7 +59,7 @@ library
         Data.Effect.Unlift
         Data.Effect.Provider
         Data.Effect.SubJump
-        Data.Effect.ShiftReset
+        Data.Effect.Shift
         Data.Effect.KVStore
         Data.Effect.Log
 
@@ -70,9 +70,7 @@ library
         Data.Effect.HFunctor,
         Data.Effect.HFunctor.HCont,
         Data.Effect.HFunctor.TH,
-        Data.Effect.HandlerVec,
-        Data.Effect.HandlerVec.Rec,
-        Data.Effect.HandlerVec.Vec,
+        Data.Effect.OpenUnion,
         Control.Effect,
         Control.Effect.Interpret,
         Control.Effect.Transform,

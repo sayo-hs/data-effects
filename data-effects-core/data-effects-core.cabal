@@ -44,9 +44,7 @@ library
         Data.Effect.Tag
         Data.Effect.HFunctor
         Data.Effect.HFunctor.HCont
-        Data.Effect.HandlerVec
-        Data.Effect.HandlerVec.Vec
-        Data.Effect.HandlerVec.Rec
+        Data.Effect.OpenUnion
         Control.Effect
         Control.Effect.Interpret
         Control.Effect.Transform

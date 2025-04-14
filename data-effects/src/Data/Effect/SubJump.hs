@@ -24,16 +24,16 @@ import Data.Function (fix)
 makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''SubJump
 
 callCC
-    :: forall ref a es ff
-     . (SubJump ref :> es, Monad (Eff ff es))
+    :: forall a ref es ff c
+     . (SubJump ref :> es, Monad (Eff ff es), Free c ff)
     => ((forall b. a -> Eff ff es b) -> Eff ff es a)
     -> Eff ff es a
 callCC f = sub (\x -> f $ jump x) pure
 {-# INLINE callCC #-}
 
 getCC
-    :: forall ref a es ff
-     . (SubJump ref :> es, Monad (Eff ff es))
+    :: forall a ref es ff c
+     . (SubJump ref :> es, Monad (Eff ff es), Free c ff)
     => Eff ff es (Eff ff es a)
 getCC = callCC_ $ pure . fix
 {-# INLINE getCC #-}

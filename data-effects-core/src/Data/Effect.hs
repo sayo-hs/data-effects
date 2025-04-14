@@ -281,3 +281,17 @@ instance FirstOrder (SubJump ref)
 instance HFunctor (SubJump ref) where
     hfmap _ = coerce
     {-# INLINE hfmap #-}
+
+-- * Shift Effect
+
+data Shift ans ref :: Effect where
+    SubShiftFork :: Shift ans ref f (Either (ref a) a)
+    Call :: ref a -> a -> Shift ans ref f ans
+
+data ShiftLabel
+type instance LabelOf (Shift ans ref) = ShiftLabel
+type instance OrderOf (Shift ans ref) = 'FirstOrder
+instance FirstOrder (Shift ans ref)
+instance HFunctor (Shift ans ref) where
+    hfmap _ = coerce
+    {-# INLINE hfmap #-}

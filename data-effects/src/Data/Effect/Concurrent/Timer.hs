@@ -39,8 +39,8 @@ Creates a scope where elapsed time can be obtained.
 An action to retrieve the elapsed time, re-zeroed at the start of the scope, is passed to the scope.
 -}
 withElapsedTime
-    :: forall a es ff
-     . (Timer :> es, Monad (Eff ff es))
+    :: forall a es ff c
+     . (Timer :> es, Monad (Eff ff es), Free c ff)
     => (Eff ff es DiffTime -> Eff ff es a)
     -- ^ A scope where the elapsed time can be obtained.
     -- An action to retrieve the elapsed time is passed as an argument.
@@ -52,8 +52,8 @@ withElapsedTime f = do
 
 -- | Returns the time taken for a computation along with the result as a pair.
 measureTime
-    :: forall a es ff
-     . (Timer :> es, Monad (Eff ff es))
+    :: forall a es ff c
+     . (Timer :> es, Monad (Eff ff es), Free c ff)
     => Eff ff es a
     -> Eff ff es (DiffTime, a)
 measureTime m = withElapsedTime \elapsedTime -> do
@@ -65,7 +65,7 @@ measureTime m = withElapsedTime \elapsedTime -> do
 Temporarily suspends computation until the relative time from the fixed reference point in the current scope's context, as given by the argument.
 If the specified resume time has already passed, returns the elapsed time (positive value) in `Just`.
 -}
-sleepUntil :: forall es ff. (Timer :> es, Monad (Eff ff es)) => DiffTime -> Eff ff es (Maybe DiffTime)
+sleepUntil :: forall es ff c. (Timer :> es, Monad (Eff ff es), Free c ff) => DiffTime -> Eff ff es (Maybe DiffTime)
 sleepUntil t = do
     now <- clock
     when (t > now) do
@@ -78,8 +78,8 @@ Repeats a computation indefinitely. Controls so that each loop occurs at a speci
 If the computation time exceeds and the requested interval cannot be realized, the excess delay occurs, which accumulates and is not canceled.
 -}
 runCyclic
-    :: forall a es ff
-     . (Timer :> es, Monad (Eff ff es))
+    :: forall a es ff c
+     . (Timer :> es, Monad (Eff ff es), Free c ff)
     => Eff ff es DiffTime
     -- ^ An action called at the start of each loop to determine the time interval until the next loop.
     --   For example, @pure 1@ would control the loop to have a 1-second interval.
@@ -100,8 +100,8 @@ Controls to repeat a specified computation at fixed time intervals. A specialize
 If the computation time exceeds and the requested interval cannot be realized, the excess delay occurs, which accumulates and is not canceled.
 -}
 runPeriodic
-    :: forall a es ff
-     . (Timer :> es, Monad (Eff ff es))
+    :: forall a es ff c
+     . (Timer :> es, Monad (Eff ff es), Free c ff)
     => DiffTime
     -- ^ Loop interval
     -> Eff ff es ()
@@ -115,8 +115,8 @@ Calls `yield` of a coroutine at fixed intervals.
 If the computation time exceeds and the requested interval cannot be realized, the excess delay occurs, which accumulates and is not canceled.
 -}
 periodicTimer
-    :: forall a es ff
-     . (Timer :> es, Yield () () :> es, Monad (Eff ff es))
+    :: forall a es ff c
+     . (Timer :> es, Yield () () :> es, Monad (Eff ff es), Free c ff)
     => DiffTime
     -> Eff ff es a
 periodicTimer interval = runPeriodic interval $ yield ()
@@ -128,8 +128,8 @@ Controls so that the time returned by `yield` becomes the time interval until th
 If the computation time exceeds and the requested interval cannot be realized, the excess delay occurs, which accumulates and is not canceled.
 -}
 cyclicTimer
-    :: forall a es ff
-     . (Timer :> es, Yield () DiffTime :> es, Monad (Eff ff es))
+    :: forall a es ff c
+     . (Timer :> es, Yield () DiffTime :> es, Monad (Eff ff es), Free c ff)
     => Eff ff es a
 cyclicTimer = runCyclic (yield ()) (pure ())
 {-# INLINE cyclicTimer #-}
@@ -142,8 +142,8 @@ data CyclicTimer :: Effect where
 makeEffectF ''CyclicTimer
 
 runTimerIO
-    :: forall a ff es
-     . (Emb IO :> es, Monad (Eff ff es))
+    :: forall a ff es c
+     . (Emb IO :> es, Monad (Eff ff es), Free c ff)
     => Eff ff (Timer ': es) a
     -> Eff ff es a
 runTimerIO =
@@ -156,7 +156,7 @@ runTimerIO =
 {-# INLINE runTimerIO #-}
 
 -- | Re-zeros the clock time in the local scope.
-restartClock :: forall a ff es. (Timer :> es, Monad (Eff ff es)) => Eff ff es a -> Eff ff es a
+restartClock :: forall a ff es c. (Timer :> es, Monad (Eff ff es), Free c ff) => Eff ff es a -> Eff ff es a
 restartClock a = do
     t0 <- clock
     a & interpose \case

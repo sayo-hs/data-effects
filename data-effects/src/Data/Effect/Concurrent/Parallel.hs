@@ -76,7 +76,7 @@ newtype Concurrently ff es a = Concurrently {runConcurrently :: Eff ff es a}
 deriving instance (Functor (Eff ff es)) => Functor (Concurrently ff es)
 
 instance
-    (Parallel :> es, Applicative (Eff ff es))
+    (Parallel :> es, Applicative (Eff ff es), Free c ff)
     => Applicative (Concurrently ff es)
     where
     pure = Concurrently . pure
@@ -86,7 +86,7 @@ instance
     {-# INLINE liftA2 #-}
 
 instance
-    (Race :> es, Halt :> es, Parallel :> es, Applicative (Eff ff es))
+    (Race :> es, Halt :> es, Parallel :> es, Applicative (Eff ff es), Free c ff)
     => Alternative (Concurrently ff es)
     where
     empty = Concurrently halt
@@ -100,8 +100,8 @@ Executes three actions in parallel and blocks until all are complete.
 Finally, aggregates the execution results based on the specified function.
 -}
 liftP3
-    :: forall a b c d es ff
-     . (Parallel :> es, Applicative (Eff ff es))
+    :: forall a b c d es ff con
+     . (Parallel :> es, Applicative (Eff ff es), Free con ff)
     => (a -> b -> c -> d)
     -- ^ A function that aggregates the three execution results.
     -> Eff ff es a
@@ -139,8 +139,8 @@ makeEffectH ''Poll
 
 -- | Executes two actions in parallel. If the first action completes before the second, the second action is canceled.
 cancels
-    :: forall a b es ff
-     . (Poll :> es, Applicative (Eff ff es))
+    :: forall a b es ff c
+     . (Poll :> es, Applicative (Eff ff es), Free c ff)
     => Eff ff es a
     -- ^ The action that controls the cancellation.
     -> Eff ff es b
@@ -151,8 +151,8 @@ cancels = poldl $ curry $ pure . Left
 
 -- | Executes two actions in parallel. If the second action completes before the first, the first action is canceled.
 cancelBy
-    :: forall a b es ff
-     . (Poll :> es, Applicative (Eff ff es))
+    :: forall a b es ff c
+     . (Poll :> es, Applicative (Eff ff es), Free c ff)
     => Eff ff es a
     -- ^ The action to be canceled.
     -> Eff ff es b
@@ -171,24 +171,24 @@ makeHFunctor' ''For \(t :< _) -> [t|Functor $t|]
 
 -- | Converts the `Traversable` container-based parallel computation effect t`For` into the `Applicative`-based parallel computation effect `Parallel`.
 forToParallel
-    :: forall t a es ff
-     . (Parallel :> es, Traversable t, Applicative (Eff ff es))
+    :: forall t a es ff c
+     . (Parallel :> es, Traversable t, Applicative (Eff ff es), Free c ff)
     => For t (Eff ff es) a
     -> Eff ff es a
 forToParallel (For iters) = runConcurrently $ traverse Concurrently iters
 {-# INLINE forToParallel #-}
 
 runConcurrentIO
-    :: forall a es ff
-     . (UnliftIO :> es, Emb IO :> es, forall es'. Monad (Eff ff es'))
+    :: forall a es ff c
+     . (UnliftIO :> es, Emb IO :> es, forall es'. Monad (Eff ff es'), Free c ff)
     => Eff ff (Parallel ': Race ': Poll ': Halt ': es) a
     -> Eff ff es a
 runConcurrentIO = runHaltIO . runPollIO . runRaceIO . runParallelIO
 {-# INLINE runConcurrentIO #-}
 
 runParallelIO
-    :: forall a es ff
-     . (UnliftIO :> es, Emb IO :> es, Monad (Eff ff es))
+    :: forall a es ff c
+     . (UnliftIO :> es, Emb IO :> es, Monad (Eff ff es), Free c ff)
     => Eff ff (Parallel ': es) a
     -> Eff ff es a
 runParallelIO = interpret parallelToIO
@@ -212,24 +212,24 @@ parallelToIO (LiftP2 f a b) =
 {-# INLINE parallelToIO #-}
 
 runPollIO
-    :: forall a es ff
-     . (Emb IO :> es, UnliftIO :> es, Monad (Eff ff es))
+    :: forall a es ff c
+     . (Emb IO :> es, UnliftIO :> es, Monad (Eff ff es), Free c ff)
     => Eff ff (Poll ': es) a
     -> Eff ff es a
 runPollIO = interpret pollToIO
 {-# INLINE runPollIO #-}
 
 runRaceIO
-    :: forall a es ff
-     . (Emb IO :> es, UnliftIO :> es, Monad (Eff ff es))
+    :: forall a es ff c
+     . (Emb IO :> es, UnliftIO :> es, Monad (Eff ff es), Free c ff)
     => Eff ff (Race ': es) a
     -> Eff ff es a
 runRaceIO = interpret raceToIO
 {-# INLINE runRaceIO #-}
 
 runHaltIO
-    :: forall a es ff
-     . (Emb IO :> es, Monad (Eff ff es))
+    :: forall a es ff c
+     . (Emb IO :> es, Monad (Eff ff es), Free c ff)
     => Eff ff (Halt ': es) a
     -> Eff ff es a
 runHaltIO = interpret haltToIO
@@ -274,8 +274,8 @@ haltToIO Halt = liftIO $ forever $ threadDelay maxBound
 {-# INLINE haltToIO #-}
 
 runParallelAsSequential
-    :: forall a es ff
-     . (Applicative (Eff ff es))
+    :: forall a es ff c
+     . (Applicative (Eff ff es), Free c ff)
     => Eff ff (Parallel ': es) a
     -> Eff ff es a
 runParallelAsSequential = interpret parallelToSequential
@@ -286,8 +286,8 @@ parallelToSequential (LiftP2 f a b) = liftA2 f a b
 {-# INLINE parallelToSequential #-}
 
 runForAsParallel
-    :: forall t a es ff
-     . (Parallel :> es, Traversable t, Applicative (Eff ff es))
+    :: forall t a es ff c
+     . (Parallel :> es, Traversable t, Applicative (Eff ff es), Free c ff)
     => Eff ff (For t ': es) a
     -> Eff ff es a
 runForAsParallel = interpret forToParallel
