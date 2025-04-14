@@ -128,7 +128,7 @@ provide
          -> Eff ff (es ++ Provider ff t i es r ': r) a
        )
     -> Eff ff es' (t a)
-provide i f = getConst1 <$> scoped_ (Const i) f
+provide i f = getConst1 <$> scoped_ @'() (Const i) f
 {-# INLINE provide #-}
 
 runProvider_

@@ -29,6 +29,7 @@ import Control.Monad.Writer (MonadWriter, listen, tell)
 import Control.Monad.Writer qualified as Writer
 import Data.Effect (
     Ask (Ask),
+    AskLabel,
     Catch (Catch),
     ChooseH (ChooseH),
     Emb (Emb),
@@ -37,19 +38,22 @@ import Data.Effect (
     Fix (Efix),
     Local (Local),
     State (Get, Put),
+    StateLabel,
     SubJump (Jump, SubFork),
     Tell (Tell),
+    TellLabel,
     Throw (Throw),
+    ThrowLabel,
     UnliftBase (WithRunInBase),
     UnliftIO,
     WriterH (Listen),
  )
 import Data.Effect.OpenUnion (
     At,
+    FindByLabel,
     Has,
     IdentityResolver,
     In,
-    KeyDiscriminator,
     KeyResolver,
     KnownIndex,
     KnownOrder,
@@ -75,7 +79,7 @@ perform = sendFor $ membership @LabelResolver
 {-# INLINE perform #-}
 
 perform' :: forall key e es ff a c. (Has key e es, Free c ff) => e (Eff ff es) a -> Eff ff es a
-perform' = sendFor (membership @KeyResolver @(KeyDiscriminator key)) . Tag
+perform' = sendFor (membership @KeyResolver @(e # key)) . Tag
 {-# INLINE perform' #-}
 
 perform'' :: forall tag e es ff a c. (e # tag :> es, Free c ff) => e (Eff ff es) a -> Eff ff es a
@@ -122,7 +126,7 @@ type (f :: Type -> Type) $ a = f a
 type (h :: (Type -> Type) -> Type -> Type) $$ f = h f
 
 instance
-    (Ask r :> es, Local r :> es, Monad (Eff ff es), Free c ff)
+    (FindByLabel AskLabel (Ask r) es, Local r :> es, Monad (Eff ff es), Free c ff)
     => MonadReader r (Eff ff es)
     where
     ask = perform Ask
@@ -131,7 +135,7 @@ instance
     {-# INLINE local #-}
 
 instance
-    (Tell w :> es, WriterH w :> es, Monoid w, Monad (Eff ff es), Free c ff)
+    (FindByLabel TellLabel (Tell w) es, WriterH w :> es, Monoid w, Monad (Eff ff es), Free c ff)
     => MonadWriter w (Eff ff es)
     where
     tell = perform . Tell
@@ -163,18 +167,18 @@ pass m = do
     pure a
 {-# INLINE pass #-}
 
-instance (State s :> es, Monad (Eff ff es), Free c ff) => MonadState s (Eff ff es) where
+instance (FindByLabel StateLabel (State s) es, Monad (Eff ff es), Free c ff) => MonadState s (Eff ff es) where
     get = perform Get
     put = perform . Put
     {-# INLINE get #-}
     {-# INLINE put #-}
 
 instance
-    ( Ask r :> es
+    ( FindByLabel AskLabel (Ask r) es
     , Local r :> es
-    , Tell w :> es
+    , FindByLabel TellLabel (Tell w) es
     , WriterH w :> es
-    , State s :> es
+    , FindByLabel StateLabel (State s) es
     , Monoid w
     , Monad (Eff ff es)
     , Free c ff
@@ -182,7 +186,7 @@ instance
     => MonadRWS r w s (Eff ff es)
 
 instance
-    (Throw e :> es, Catch e :> es, Monad (Eff ff es), Free c ff)
+    (FindByLabel ThrowLabel (Throw e) es, Catch e :> es, Monad (Eff ff es), Free c ff)
     => MonadError e (Eff ff es)
     where
     throwError = perform . Throw

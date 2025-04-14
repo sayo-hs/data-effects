@@ -20,6 +20,8 @@ import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, L
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.Tag (type (#))
 import Data.Kind (Constraint, Type)
+import Data.Type.Bool (If)
+import Data.Type.Equality (type (==))
 import GHC.TypeLits (ErrorMessage (ShowType, Text, (:$$:), (:<>:)), KnownNat, Symbol, TypeError, natVal, type (+), type (-))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -134,61 +136,75 @@ type Has key e es = MemberBy KeyResolver (KeyDiscriminator key) (e # key) es
 type e `In` es = MemberBy IdentityResolver (IdentityDiscriminator e) e es
 type KnownIndex i es = (KnownNat i, KnownOrder (At i es))
 
+type FindByLabel label e es = MemberBy LabelResolver label e es
+
 type MemberBy resolver dscr e es =
-    ( FindBy resolver dscr (Discriminator resolver (HeadOf es)) e es
+    ( FindBy (Discriminator resolver (HeadOf es) `IsEq` dscr) resolver dscr es e
     , ErrorIfNotFound resolver dscr (Discriminator resolver (HeadOf es)) e es es
     , KnownOrder e
     )
 
+type family IsEq a b where
+    IsEq a a = 'True
+    IsEq _ _ = 'False
+
 class
-    (dscr ~ Discriminator resolver e, dscr' ~ Discriminator resolver (HeadOf r)) =>
-    FindBy resolver dscr dscr' e r
-        | resolver r -> e
+    (foundOnHead ~ (Discriminator resolver (HeadOf r) `IsEq` dscr)) =>
+    FindBy foundOnHead resolver dscr r e
+        | foundOnHead resolver dscr r -> e
     where
     findBy :: Membership e r
 
-instance
-    (dscr ~ Discriminator resolver e, dscr ~ Discriminator resolver e', e ~ e')
-    => FindBy resolver dscr dscr e (e' ': r)
-    where
+instance ((Discriminator resolver e `IsEq` dscr) ~ 'True) => FindBy 'True resolver dscr (e ': r) e where
     findBy = Here
     {-# INLINE findBy #-}
 
 instance
-    {-# OVERLAPPABLE #-}
-    ( dscr ~ Discriminator resolver e
-    , dscr' ~ Discriminator resolver e'
-    , FindBy resolver dscr (Discriminator resolver (HeadOf r)) e r
+    ( FindBy foundOnHead resolver dscr r e
+    , (Discriminator resolver e' `IsEq` dscr) ~ 'False
     )
-    => FindBy resolver dscr dscr' e (e' ': r)
+    => FindBy 'False resolver dscr (e' ': r) e
     where
-    findBy = weakenFor $ findBy @resolver @dscr @(Discriminator resolver (HeadOf r)) @e @r
+    findBy = weakenFor $ findBy @foundOnHead @resolver @dscr @r @e
     {-# INLINE findBy #-}
 
+type FindEffect resolver e es =
+    FindBy
+        (Discriminator resolver (HeadOf es) `IsEq` Discriminator resolver e)
+        resolver
+        (Discriminator resolver e)
+        es
+        e
+
 membership
-    :: forall resolver dscr e es
-     . (FindBy resolver dscr (Discriminator resolver (HeadOf es)) e es)
+    :: forall resolver e es
+     . (FindEffect resolver e es)
     => Membership e es
-membership = findBy @resolver @dscr @(Discriminator resolver (HeadOf es)) @e @es
+membership =
+    findBy @(Discriminator resolver (HeadOf es) `IsEq` Discriminator resolver e)
+        @resolver
+        @(Discriminator resolver e)
+        @es
+        @e
 {-# INLINE membership #-}
 
 labelMembership
     :: forall e es
-     . (FindBy LabelResolver (LabelOf e) (LabelOf (HeadOf es)) e es)
+     . (FindEffect LabelResolver e es)
     => Membership e es
 labelMembership = membership @LabelResolver
 {-# INLINE labelMembership #-}
 
 keyMembership
     :: forall key e es
-     . (FindBy KeyResolver (KeyDiscriminator key) (KeyOf (HeadOf es)) (e # key) es)
+     . (FindEffect KeyResolver (e # key) es)
     => Membership (e # key) es
 keyMembership = membership @KeyResolver
 {-# INLINE keyMembership #-}
 
 identityMembership
     :: forall e es
-     . (FindBy IdentityResolver (IdentityDiscriminator e) (IdentityDiscriminator (HeadOf es)) e es)
+     . (FindEffect IdentityResolver e es)
     => Membership e es
 identityMembership = membership @IdentityResolver
 {-# INLINE identityMembership #-}

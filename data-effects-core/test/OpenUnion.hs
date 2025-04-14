@@ -5,7 +5,7 @@
 module OpenUnion where
 
 import Control.Effect (Eff, Free, perform)
-import Data.Effect (Effect, LabelOf)
+import Data.Effect
 import Data.Effect.OpenUnion (Membership (UnsafeMembership), labelMembership, (:>))
 import Data.Proxy (Proxy (Proxy))
 import GHC.TypeNats (KnownNat, Natural, natVal)
@@ -38,3 +38,6 @@ spec_membership = describe "Open-Union Membership" do
 
     infer1 :: forall x. (KnownNat x) => Membership (B 5 x) '[B 1 2, B 3 4, A 1, B 5 6, A 0] -> Natural
     infer1 _ = natVal @x Proxy
+
+inferCompileTest :: (Throw () :> es, Catch () :> es, Free Monad ff) => Eff ff es a
+inferCompileTest = perform $ Throw mempty

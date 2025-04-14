@@ -1,4 +1,5 @@
 -- SPDX-License-Identifier: MPL-2.0
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 {- |
 Copyright   :  (c) 2025 Sayo contributors
