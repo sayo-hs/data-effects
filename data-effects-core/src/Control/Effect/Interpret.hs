@@ -30,6 +30,7 @@ import Data.Effect.OpenUnion (
     Membership,
     Suffix,
     Union,
+    hfmapUnion,
     identityMembership,
     keyMembership,
     labelMembership,
@@ -167,7 +168,7 @@ preinterposeFor i f = go
   where
     go :: Eff ff es ~> Eff ff es
     go (Eff a) = Eff $ (`runFree` a) \u ->
-        hoist (hfmap go) $ case project i u of
+        hoist (hfmapUnion go) $ case project i u of
             Just e -> unEff $ f e
             Nothing -> liftFree u
 {-# INLINE preinterposeFor #-}
@@ -181,7 +182,7 @@ interpretAll
 interpretAll i = go
   where
     go :: Eff ff es ~> Eff ff es'
-    go = Eff . runFree (unEff . i . hfmap go) . unEff
+    go = Eff . runFree (unEff . i . hfmapUnion go) . unEff
 {-# INLINE interpretAll #-}
 
 iterAllEff
@@ -193,5 +194,5 @@ iterAllEff
 iterAllEff i = go
   where
     go :: Eff ff es ~> f
-    go = runFree (i . hfmap go) . unEff
+    go = runFree (i . hfmapUnion go) . unEff
 {-# INLINE iterAllEff #-}

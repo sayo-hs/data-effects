@@ -54,6 +54,7 @@ import Data.Effect.OpenUnion (
     Has,
     IdentityResolver,
     In,
+    KeyDiscriminator,
     KeyResolver,
     KnownIndex,
     KnownOrder,
@@ -79,7 +80,7 @@ perform = sendFor $ membership @LabelResolver
 {-# INLINE perform #-}
 
 perform' :: forall key e es ff a c. (Has key e es, Free c ff) => e (Eff ff es) a -> Eff ff es a
-perform' = sendFor (membership @KeyResolver @(e # key)) . Tag
+perform' = sendFor (membership @KeyResolver @(KeyDiscriminator key)) . Tag
 {-# INLINE perform' #-}
 
 perform'' :: forall tag e es ff a c. (e # tag :> es, Free c ff) => e (Eff ff es) a -> Eff ff es a

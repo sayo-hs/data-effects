@@ -19,9 +19,11 @@ import Data.Effect.OpenUnion (
     KnownLength,
     KnownOrder,
     Membership,
+    RemoveHOEs,
     Suffix,
     SuffixUnder,
     Union,
+    WeakenHOEs,
     identityMembership,
     keyMembership,
     labelMembership,
@@ -30,6 +32,7 @@ import Data.Effect.OpenUnion (
     prefixFor1,
     suffixFor,
     suffixFor1,
+    weakenHOEs,
     weakens,
     weakensUnder,
     pattern Here,
@@ -57,6 +60,10 @@ raisesUnder = transAll weakensUnder
 raisesUnders :: forall es es' a ff c. (SuffixUnder es es', Free c ff) => Eff ff es a -> Eff ff es' a
 raisesUnders = transAll weakensUnder
 {-# INLINE raisesUnders #-}
+
+onlyFirstOrder :: forall es a ff c. (Free c ff, WeakenHOEs es) => Eff ff (RemoveHOEs es) a -> Eff ff es a
+onlyFirstOrder = transAll weakenHOEs
+{-# INLINE onlyFirstOrder #-}
 
 raisePrefix
     :: forall es' es a ff c

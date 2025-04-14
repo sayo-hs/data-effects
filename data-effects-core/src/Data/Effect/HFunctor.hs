@@ -7,5 +7,7 @@ Maintainer  :  ymdfield@outlook.jp
 -}
 module Data.Effect.HFunctor where
 
-class HFunctor ff where
+import Data.Kind (Type)
+
+class HFunctor (ff :: (Type -> Type) -> Type -> Type) where
     hfmap :: (forall x. f x -> g x) -> ff f a -> ff g a

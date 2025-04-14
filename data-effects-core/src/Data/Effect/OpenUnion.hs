@@ -20,8 +20,6 @@ import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, L
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.Tag (type (#))
 import Data.Kind (Constraint, Type)
-import Data.Type.Bool (If)
-import Data.Type.Equality (type (==))
 import GHC.TypeLits (ErrorMessage (ShowType, Text, (:$$:), (:<>:)), KnownNat, Symbol, TypeError, natVal, type (+), type (-))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -56,7 +54,6 @@ coerceFOEs :: (FOEs es) => Union es f a -> Union es g a
 coerceFOEs = unsafeCoerce
 {-# INLINE coerceFOEs #-}
 
--- fixme: FirstOrder (Union es) if FOEs es
 type instance OrderOf (Union es) = 'HigherOrder
 
 newtype Membership (e :: Effect) (es :: [Effect]) = UnsafeMembership {unMembership :: Int}
@@ -97,9 +94,9 @@ compareMembership (UnsafeMembership m) (UnsafeMembership n)
     | otherwise = Nothing
 
 type family At i es where
-    At 0 '[] = TypeError ('Text "Effect index out of range")
     At 0 (e ': es) = e
     At n (e ': es) = At (n - 1) es
+    At _ '[] = TypeError ('Text "Effect index out of range")
 
 intVal :: forall n. (KnownNat n) => Int
 intVal = fromIntegral $ natVal @n Proxy
@@ -139,76 +136,63 @@ type KnownIndex i es = (KnownNat i, KnownOrder (At i es))
 type FindByLabel label e es = MemberBy LabelResolver label e es
 
 type MemberBy resolver dscr e es =
-    ( FindBy (Discriminator resolver (HeadOf es) `IsEq` dscr) resolver dscr es e
+    ( FindBy resolver dscr (Discriminator resolver (HeadOf es)) e es
     , ErrorIfNotFound resolver dscr (Discriminator resolver (HeadOf es)) e es es
     , KnownOrder e
     )
 
-type family IsEq a b where
-    IsEq a a = 'True
-    IsEq _ _ = 'False
-
 class
-    (foundOnHead ~ (Discriminator resolver (HeadOf r) `IsEq` dscr)) =>
-    FindBy foundOnHead resolver dscr r e
-        | foundOnHead resolver dscr r -> e
+    (dscr ~ Discriminator resolver e, dscr' ~ Discriminator resolver (HeadOf r)) =>
+    FindBy resolver dscr dscr' e r
+        | resolver dscr dscr' r -> e
     where
     findBy :: Membership e r
 
-instance ((Discriminator resolver e `IsEq` dscr) ~ 'True) => FindBy 'True resolver dscr (e ': r) e where
+instance
+    (dscr ~ Discriminator resolver e, dscr ~ Discriminator resolver e', e ~ e')
+    => FindBy resolver dscr dscr e (e' ': r)
+    where
     findBy = Here
     {-# INLINE findBy #-}
 
 instance
-    ( FindBy foundOnHead resolver dscr r e
-    , (Discriminator resolver e' `IsEq` dscr) ~ 'False
+    {-# OVERLAPPABLE #-}
+    ( dscr ~ Discriminator resolver e
+    , dscr' ~ Discriminator resolver e'
+    , FindBy resolver dscr (Discriminator resolver (HeadOf r)) e r
     )
-    => FindBy 'False resolver dscr (e' ': r) e
+    => FindBy resolver dscr dscr' e (e' ': r)
     where
-    findBy = weakenFor $ findBy @foundOnHead @resolver @dscr @r @e
+    findBy = weakenFor $ findBy @resolver @dscr @(Discriminator resolver (HeadOf r)) @e @r
     {-# INLINE findBy #-}
 
-type FindEffect resolver e es =
-    FindBy
-        (Discriminator resolver (HeadOf es) `IsEq` Discriminator resolver e)
-        resolver
-        (Discriminator resolver e)
-        es
-        e
-
 membership
-    :: forall resolver e es
-     . (FindEffect resolver e es)
+    :: forall resolver dscr e es
+     . (FindBy resolver dscr (Discriminator resolver (HeadOf es)) e es)
     => Membership e es
-membership =
-    findBy @(Discriminator resolver (HeadOf es) `IsEq` Discriminator resolver e)
-        @resolver
-        @(Discriminator resolver e)
-        @es
-        @e
+membership = findBy @resolver @dscr @(Discriminator resolver (HeadOf es)) @e @es
 {-# INLINE membership #-}
 
 labelMembership
     :: forall e es
-     . (FindEffect LabelResolver e es)
+     . (FindBy LabelResolver (LabelOf e) (LabelOf (HeadOf es)) e es)
     => Membership e es
 labelMembership = membership @LabelResolver
 {-# INLINE labelMembership #-}
 
 keyMembership
     :: forall key e es
-     . (FindEffect KeyResolver (e # key) es)
+     . (FindBy KeyResolver (KeyDiscriminator key) (KeyOf (HeadOf es)) (e # key) es)
     => Membership (e # key) es
 keyMembership = membership @KeyResolver
 {-# INLINE keyMembership #-}
 
 identityMembership
     :: forall e es
-     . (FindEffect IdentityResolver e es)
+     . (FindBy IdentityResolver (IdentityDiscriminator e) (IdentityDiscriminator (HeadOf es)) e es)
     => Membership e es
 identityMembership = membership @IdentityResolver
 {-# INLINE identityMembership #-}
-
 class
     (dscr ~ Discriminator resolver e, dscr' ~ Discriminator resolver (HeadOf r)) =>
     ErrorIfNotFound resolver dscr dscr' (e :: Effect) (r :: [Effect]) (w :: [Effect])
@@ -387,32 +371,29 @@ type family RemoveHOEs (es :: [Effect]) where
     RemoveHOEs (e ': es) =
         OrderCase (OrderOf e) (e ': RemoveHOEs es) (RemoveHOEs es)
 
-type KnownOrders es = SuffixH es 0 (OrderOfHead es)
+type WeakenHOEs es = WeakenHOEs_ es 0 (OrderOf (HeadOf es))
 
-type family OrderOfHead es where
-    OrderOfHead (e ': es) = OrderOf e
+class (FOEs (RemoveHOEs es), orderOfHead ~ OrderOf (HeadOf es)) => WeakenHOEs_ es i orderOfHead where
+    weakenHOEsFor :: Membership e (RemoveHOEs es) -> Membership e es
 
-class (FOEs (RemoveHOEs es), orderOfHead ~ OrderOfHead es) => SuffixH es i orderOfHead where
-    weakenHFor :: Membership e (RemoveHOEs es) -> Membership e es
+instance (OrderOf (HeadOf '[]) ~ orderOfHead) => WeakenHOEs_ '[] i orderOfHead where
+    weakenHOEsFor = id
+    {-# INLINE weakenHOEsFor #-}
 
-instance (OrderOfHead '[] ~ orderOfHead) => SuffixH '[] i orderOfHead where
-    weakenHFor = id
-    {-# INLINE weakenHFor #-}
-
-instance (FirstOrder e, SuffixH es (i + 1) _orderOfHead) => SuffixH (e ': es) i 'FirstOrder where
-    weakenHFor = coerce $ weakenHFor @es @(i + 1)
-    {-# INLINE weakenHFor #-}
+instance (FirstOrder e, WeakenHOEs_ es (i + 1) _orderOfHead) => WeakenHOEs_ (e ': es) i 'FirstOrder where
+    weakenHOEsFor = coerce $ weakenHOEsFor @es @(i + 1)
+    {-# INLINE weakenHOEsFor #-}
 
 instance
-    (OrderOf e ~ 'HigherOrder, SuffixH es (i + 1) _orderOfHead, FOEs (RemoveHOEs es), KnownNat i)
-    => SuffixH (e ': es) i 'HigherOrder
+    (OrderOf e ~ 'HigherOrder, WeakenHOEs_ es (i + 1) _orderOfHead, FOEs (RemoveHOEs es), KnownNat i)
+    => WeakenHOEs_ (e ': es) i 'HigherOrder
     where
-    weakenHFor (UnsafeMembership n) =
+    weakenHOEsFor (UnsafeMembership n) =
         UnsafeMembership $
             if n < intVal @i
                 then n
-                else unMembership (weakenHFor @es @(i + 1) $ UnsafeMembership n) + 1
-    {-# INLINE weakenHFor #-}
+                else unMembership (weakenHOEsFor @es @(i + 1) $ UnsafeMembership n) + 1
+    {-# INLINE weakenHOEsFor #-}
 
 weaken :: Union es f a -> Union (e ': es) f a
 weaken = mapUnion weakenFor
@@ -426,9 +407,9 @@ weakensUnder :: (SuffixUnder es es') => Union es f a -> Union es' f a
 weakensUnder = mapUnion weakensUnderFor
 {-# INLINE weakensUnder #-}
 
-weakenH :: forall es f a. (KnownOrders es) => Union (RemoveHOEs es) f a -> Union es f a
-weakenH = mapUnion $ weakenHFor @es @0
-{-# INLINE weakenH #-}
+weakenHOEs :: forall es f a. (WeakenHOEs es) => Union (RemoveHOEs es) f a -> Union es f a
+weakenHOEs = mapUnion $ weakenHOEsFor @es @0
+{-# INLINE weakenHOEs #-}
 
 type KnownLength :: forall {k}. [k] -> Constraint
 class KnownLength xs where
