@@ -33,6 +33,8 @@ import Data.Effect.OpenUnion (
     prefixFor,
     prefixFor1,
     suffixFor,
+    weaken,
+    weakenFor,
     weakenHOEs,
     weakens,
     weakensUnder,
@@ -94,6 +96,12 @@ raisePrefix1 = transAll $ mapUnion $ prefixFor1 @fs @x
 subsume :: forall e es a ff c. (e `In` es, Free c ff) => Eff ff (e ': es) a -> Eff ff es a
 subsume = transAll $ inject identityMembership !: id
 {-# INLINE subsume #-}
+
+subsumeUnder :: forall e1 e0 es a ff c. (e1 `In` es, KnownOrder e0, Free c ff) => Eff ff (e0 ': e1 ': es) a -> Eff ff (e0 ': es) a
+subsumeUnder = transAll $ inject Here !: inject (weakenFor identityMembership) !: weaken
+{-# INLINE subsumeUnder #-}
+
+-- todo: generalize subsume by type-class
 
 transform
     :: forall e e' es a ff c
