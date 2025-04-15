@@ -31,6 +31,9 @@ extra-doc-files:
 
 tested-with: GHC == {9.8.2, 9.10.1, 9.12.1}
 
+common warnings
+    ghc-options: -Wall -Wredundant-constraints
+
 source-repository head
     type: git
     location: https://github.com/sayo-hs/data-effects
@@ -38,6 +41,8 @@ source-repository head
     subdir: data-effects-core
 
 library
+    import: warnings
+
     exposed-modules:
         Data.Effect
         -- Data.Effect.OpenUnion
@@ -76,8 +81,9 @@ library
         RecordWildCards,
         DefaultSignatures
 
-
 test-suite test
+    import: warnings
+
     main-is: Driver.hs
     hs-source-dirs: test
     build-depends:
@@ -106,3 +112,4 @@ test-suite test
         FunctionalDependencies,
         RecordWildCards,
         DefaultSignatures
+

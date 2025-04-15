@@ -36,6 +36,9 @@ extra-doc-files:
 
 tested-with: GHC == {9.6.6, 9.8.2, 9.10.1, 9.12.1}
 
+common warnings
+    ghc-options: -Wall -Wredundant-constraints
+
 source-repository head
     type: git
     location: https://github.com/sayo-hs/data-effects
@@ -43,6 +46,8 @@ source-repository head
     subdir: data-effects-th
 
 library
+    import: warnings
+
     exposed-modules:
         Data.Effect.HFunctor.TH
         Data.Effect.HFunctor.TH.Internal
@@ -86,6 +91,8 @@ library
 
 
 test-suite Example
+    import: warnings
+
     other-modules:
         Example
 

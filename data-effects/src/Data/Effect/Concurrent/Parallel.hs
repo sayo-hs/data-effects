@@ -101,7 +101,7 @@ Finally, aggregates the execution results based on the specified function.
 -}
 liftP3
     :: forall a b c d es ff con
-     . (Parallel :> es, Applicative (Eff ff es), Free con ff)
+     . (Parallel :> es, Free con ff)
     => (a -> b -> c -> d)
     -- ^ A function that aggregates the three execution results.
     -> Eff ff es a

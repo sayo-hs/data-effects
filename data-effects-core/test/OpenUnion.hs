@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
--- SPDX-License-Identifier: MPL-2.0
 {-# LANGUAGE QuantifiedConstraints #-}
+
+-- SPDX-License-Identifier: MPL-2.0
 
 module OpenUnion where
 

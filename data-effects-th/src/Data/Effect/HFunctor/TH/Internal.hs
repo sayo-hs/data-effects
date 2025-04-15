@@ -68,6 +68,7 @@ import Data.Effect.TH.Internal (
 import Data.Foldable (foldl')
 import Data.Functor ((<&>))
 import Data.List.Infinite (Infinite, prependList)
+import Data.Maybe (fromMaybe)
 import Data.Text qualified as T
 import Formatting (int, sformat, shown, stext, (%))
 import Language.Haskell.TH (
@@ -193,7 +194,7 @@ deriveHFunctor manualCxt (DataInfo _ name args cons) = do
     pure
         [ InstanceD
             Nothing
-            [cxt]
+            (fromMaybe [cxt] $ decomposeTupleT cxt)
             (ConT ''HFunctor `AppT` foldl' AppT (ConT name) hfArgNames)
             [hfmapDecls, fnInline]
         ]

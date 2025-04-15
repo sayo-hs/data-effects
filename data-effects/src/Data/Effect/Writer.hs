@@ -26,7 +26,7 @@ makeEffectH_' (def & noGenerateLabel & noGenerateOrderInstance) ''WriterH
 -- | 'censor' with pre-applying semantics.
 censorPre
     :: forall w es ff a c
-     . (Tell w `In` es, Monoid w, Free c ff)
+     . (Tell w `In` es, Free c ff)
     => (w -> w)
     -> Eff ff es a
     -> Eff ff es a

@@ -31,7 +31,6 @@ import Data.Effect.OpenUnion (
     prefixFor,
     prefixFor1,
     suffixFor,
-    suffixFor1,
     weakenHOEs,
     weakens,
     weakensUnder,
@@ -75,7 +74,7 @@ raisePrefix = transAll $ mapUnion $ prefixFor @es'
 
 raiseSuffix
     :: forall es' es a ff c
-     . (KnownLength es, Free c ff)
+     . (Free c ff)
     => Eff ff es a
     -> Eff ff (es ++ es') a
 raiseSuffix = transAll $ mapUnion $ suffixFor @es'
@@ -88,14 +87,6 @@ raisePrefix1
     -> Eff ff (Each fs x ++ es) a
 raisePrefix1 = transAll $ mapUnion $ prefixFor1 @fs @x
 {-# INLINE raisePrefix1 #-}
-
-raiseSuffix1
-    :: forall fs x es a ff c
-     . (KnownLength fs, Free c ff)
-    => Eff ff (Each fs x) a
-    -> Eff ff (Each fs x ++ es) a
-raiseSuffix1 = transAll $ mapUnion $ suffixFor1 @fs @x @es
-{-# INLINE raiseSuffix1 #-}
 
 transform
     :: forall e e' es a ff c

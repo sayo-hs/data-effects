@@ -30,6 +30,7 @@ import Control.Monad.Writer qualified as Writer
 import Data.Effect (
     Ask (Ask),
     AskLabel,
+    CC (Jump, SubFork),
     Catch (Catch),
     ChooseH (ChooseH),
     Emb (Emb),
@@ -39,7 +40,6 @@ import Data.Effect (
     Local (Local),
     State (Get, Put),
     StateLabel,
-    SubJump (Jump, SubFork),
     Tell (Tell),
     TellLabel,
     Throw (Throw),
@@ -206,13 +206,13 @@ instance
 
 instance (Empty :> es, ChooseH :> es, Monad (Eff ff es), Free c ff) => MonadPlus (Eff ff es)
 
-instance (SubJump ref :> es, Monad (Eff ff es), Free c ff) => Cont.MonadCont (Eff ff es) where
+instance (CC ref :> es, Monad (Eff ff es), Free c ff) => Cont.MonadCont (Eff ff es) where
     callCC = callCC_
     {-# INLINE callCC #-}
 
 sub
     :: forall ref a b es ff c
-     . (SubJump ref :> es, Monad (Eff ff es), Free c ff)
+     . (CC ref :> es, Monad (Eff ff es), Free c ff)
     => (ref a -> Eff ff es b)
     -> (a -> Eff ff es b)
     -> Eff ff es b
@@ -221,7 +221,7 @@ sub p q = perform SubFork >>= either p q
 
 callCC_
     :: forall ref a b es ff c
-     . (SubJump ref :> es, Monad (Eff ff es), Free c ff)
+     . (CC ref :> es, Monad (Eff ff es), Free c ff)
     => ((a -> Eff ff es b) -> Eff ff es a)
     -> Eff ff es a
 callCC_ f = sub (f . jump) pure
@@ -270,7 +270,7 @@ class (forall f. c (ff f)) => Free c (ff :: (Type -> Type) -> Type -> Type) | ff
 
 convertEff
     :: forall ff gg es a c c'
-     . (Free c ff, Free c' gg, forall r. c (gg r), forall r. c' (ff r))
+     . (Free c ff, Free c' gg, forall r. c (gg r))
     => Eff ff es a
     -> Eff gg es a
 convertEff = go

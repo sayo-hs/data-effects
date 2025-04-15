@@ -3,6 +3,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 -- SPDX-License-Identifier: MPL-2.0
 
@@ -503,10 +504,6 @@ prefixFor (UnsafeMembership n) = UnsafeMembership $ reifyLength @es' + n
 type family Each (fs :: [k -> Effect]) x where
     Each (f ': fs) x = (f x ': Each fs x)
     Each '[] x = '[]
-
-suffixFor1 :: forall fs x es e. Membership e (Each fs x) -> Membership e (Each fs x ++ es)
-suffixFor1 = coerce
-{-# INLINE suffixFor1 #-}
 
 prefixFor1 :: forall fs x es e. (KnownLength fs) => Membership e es -> Membership e (Each fs x ++ es)
 prefixFor1 (UnsafeMembership n) = UnsafeMembership $ reifyLength @fs + n

@@ -21,7 +21,6 @@ import Control.Effect (
     type (~~>),
  )
 import Data.Effect (Emb, getEmb)
-import Data.Effect.HFunctor (hfmap)
 import Data.Effect.OpenUnion (
     Has,
     In,

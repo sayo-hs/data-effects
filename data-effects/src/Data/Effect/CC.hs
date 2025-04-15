@@ -9,23 +9,23 @@ Copyright   :  (c) 2024-2025 Sayo contributors
 License     :  MPL-2.0 (see the LICENSE file)
 Maintainer  :  ymdfield@outlook.jp
 -}
-module Data.Effect.SubJump (
-    module Data.Effect.SubJump,
-    SubJump (..),
+module Data.Effect.CC (
+    module Data.Effect.CC,
+    CC (SubFork, Jump),
     callCC_,
     sub,
 )
 where
 
 import Control.Effect (callCC_, sub)
-import Data.Effect (SubJump (Jump, SubFork))
+import Data.Effect (CC (Jump, SubFork))
 import Data.Function (fix)
 
-makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''SubJump
+makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''CC
 
 callCC
     :: forall a ref es ff c
-     . (SubJump ref :> es, Monad (Eff ff es), Free c ff)
+     . (CC ref :> es, Monad (Eff ff es), Free c ff)
     => ((forall b. a -> Eff ff es b) -> Eff ff es a)
     -> Eff ff es a
 callCC f = sub (\x -> f $ jump x) pure
@@ -33,7 +33,7 @@ callCC f = sub (\x -> f $ jump x) pure
 
 getCC
     :: forall a ref es ff c
-     . (SubJump ref :> es, Monad (Eff ff es), Free c ff)
+     . (CC ref :> es, Monad (Eff ff es), Free c ff)
     => Eff ff es (Eff ff es a)
 getCC = callCC_ $ pure . fix
 {-# INLINE getCC #-}

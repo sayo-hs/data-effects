@@ -268,17 +268,17 @@ instance HFunctor (UnliftBase b) where
     hfmap phi (WithRunInBase f) = WithRunInBase \run -> f $ run . phi
     {-# INLINE hfmap #-}
 
--- * Sub/Jump Effect
+-- * CallCC Effect (Sub/Jump-based)
 
-data SubJump ref :: Effect where
-    SubFork :: SubJump ref f (Either (ref a) a)
-    Jump :: ref a -> a -> SubJump ref f b
+data CC ref :: Effect where
+    SubFork :: CC ref f (Either (ref a) a)
+    Jump :: ref a -> a -> CC ref f b
 
-data SubJumpLabel
-type instance LabelOf (SubJump ref) = SubJumpLabel
-type instance OrderOf (SubJump ref) = 'FirstOrder
-instance FirstOrder (SubJump ref)
-instance HFunctor (SubJump ref) where
+data CCLabel
+type instance LabelOf (CC ref) = CCLabel
+type instance OrderOf (CC ref) = 'FirstOrder
+instance FirstOrder (CC ref)
+instance HFunctor (CC ref) where
     hfmap _ = coerce
     {-# INLINE hfmap #-}
 
@@ -287,6 +287,7 @@ instance HFunctor (SubJump ref) where
 data Shift ans ref :: Effect where
     SubShiftFork :: Shift ans ref f (Either (ref a) a)
     Call :: ref a -> a -> Shift ans ref f ans
+    Abort :: ans -> Shift ans ref f a
 
 data ShiftLabel
 type instance LabelOf (Shift ans ref) = ShiftLabel

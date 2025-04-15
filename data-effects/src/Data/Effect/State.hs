@@ -1,6 +1,8 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
-
 -- SPDX-License-Identifier: MPL-2.0
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# HLINT ignore "Avoid lambda" #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {- |
 Copyright   :  (c) 2023-2025 Sayo contributors
@@ -14,7 +16,10 @@ module Data.Effect.State (
     State (..),
 ) where
 
-import Data.Effect (Ask (Ask), Emb, Local (Local), State (Get, Put))
+import Control.Effect.Interpret (interpose, reinterpret)
+import Data.Effect (Ask (Ask), CC, Emb, Local (Local), State (Get, Put))
+import Data.Effect.CC (callCC)
+import Data.Effect.Reader (ask, runAsk)
 import Data.Functor ((<&>))
 import UnliftIO (newIORef, readIORef, writeIORef)
 
@@ -91,3 +96,39 @@ askToGet
     -> Eff ff es a
 askToGet = interpret \Ask -> get'_
 {-# INLINE askToGet #-}
+
+runStateAsCC
+    :: forall s es a ref ff c
+     . (CC ref :> es, forall f. Monad (ff f), Free c ff)
+    => s
+    -> Eff ff (State s ': es) a
+    -> Eff ff es (s, a)
+runStateAsCC s m = evalStateAsCC s do
+    x <- m
+    s' <- get
+    pure (s', x)
+{-# INLINE runStateAsCC #-}
+
+execStateAsCC
+    :: forall s es a ref ff c
+     . (CC ref :> es, forall f. Monad (ff f), Free c ff)
+    => s
+    -> Eff ff (State s ': es) a
+    -> Eff ff es s
+execStateAsCC s m = evalStateAsCC s $ m *> get
+{-# INLINE execStateAsCC #-}
+
+evalStateAsCC
+    :: forall s es a ref ff c
+     . (CC ref :> es, forall f. Monad (ff f), Free c ff)
+    => s
+    -> Eff ff (State s ': es) a
+    -> Eff ff es a
+evalStateAsCC s0 m =
+    m
+        & reinterpret \case
+            Get -> ask
+            Put s -> callCC \k ->
+                interpose (\Ask -> pure s) $ k ()
+        & runAsk s0
+{-# INLINE evalStateAsCC #-}
