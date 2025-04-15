@@ -10,7 +10,7 @@ Maintainer  :  ymdfield@outlook.jp
 -}
 module Control.Effect.Transform where
 
-import Control.Effect (Eff (..), Free, liftFree, sendFor, type (~>))
+import Control.Effect (Eff (..), Free, hoist, liftFree, send, sendFor, type (~>))
 import Control.Effect.Interpret (interposeFor, interpret, interpretAll, reinterpret)
 import Data.Effect.OpenUnion (
     Each,
@@ -24,7 +24,9 @@ import Data.Effect.OpenUnion (
     SuffixUnder,
     Union,
     WeakenHOEs,
+    hfmapUnion,
     identityMembership,
+    inject,
     keyMembership,
     labelMembership,
     mapUnion,
@@ -34,6 +36,7 @@ import Data.Effect.OpenUnion (
     weakenHOEs,
     weakens,
     weakensUnder,
+    (!:),
     pattern Here,
     type (++),
     type (:>),
@@ -87,6 +90,10 @@ raisePrefix1
     -> Eff ff (Each fs x ++ es) a
 raisePrefix1 = transAll $ mapUnion $ prefixFor1 @fs @x
 {-# INLINE raisePrefix1 #-}
+
+subsume :: forall e es a ff c. (e `In` es, Free c ff) => Eff ff (e ': es) a -> Eff ff es a
+subsume = transAll $ inject identityMembership !: id
+{-# INLINE subsume #-}
 
 transform
     :: forall e e' es a ff c
@@ -177,7 +184,10 @@ transAll
     => (Union es (Eff ff es') ~> Union es' (Eff ff es'))
     -> Eff ff es a
     -> Eff ff es' a
-transAll f = interpretAll $ Eff . liftFree . f
+transAll f = go
+  where
+    go :: Eff ff es ~> Eff ff es'
+    go (Eff a) = Eff $ hoist (f . hfmapUnion go) a
 {-# INLINE transAll #-}
 
 tag
