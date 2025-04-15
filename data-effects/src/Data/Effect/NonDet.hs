@@ -21,9 +21,12 @@ module Data.Effect.NonDet (
 where
 
 import Control.Applicative ((<|>))
+import Control.Effect.Interpret (interprets)
 import Control.Exception (Exception, SomeException)
 import Data.Bool (bool)
-import Data.Effect (Choose (Choose), ChooseH (ChooseH), Emb, Empty (Empty), UnliftIO)
+import Data.Effect (Choose (Choose), ChooseH (ChooseH), Emb, Empty (Empty), Shift, UnliftIO)
+import Data.Effect.OpenUnion (nil, (!:))
+import Data.Effect.Shift (abort, shift)
 import UnliftIO (throwIO, try)
 
 makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''Empty
@@ -71,6 +74,18 @@ choiceH = \case
     x : xs -> pure x <|> choiceH xs
 {-# INLINE choiceH #-}
 
+runNonDetShift
+    :: forall ans a es ref ff c
+     . (Monoid ans, Shift ans ref :> es, forall f. Monad (ff f), Free c ff)
+    => Eff ff (Choose ': Empty ': es) a
+    -> Eff ff es a
+runNonDetShift =
+    interprets $
+        (\Choose -> shift \k' -> liftA2 (<>) (k' True) (k' False))
+            !: (\Empty -> abort mempty)
+            !: nil
+{-# INLINE runNonDetShift #-}
+
 {- |
 Interprets the [NonDet]("Data.Effect.NonDet") effects using IO-level exceptions.
 
@@ -80,18 +95,19 @@ When 'empty' occurs, an v'EmptyException' is thrown, and unless all branches fro
 -}
 runNonDetIO
     :: forall es a ff c
-     . (UnliftIO :> es, Emb IO :> es, forall es'. Monad (Eff ff es'), Free c ff)
+     . (UnliftIO :> es, Emb IO :> es, forall f. Monad (Eff ff f), Free c ff)
     => Eff ff (ChooseH ': Empty ': es) a
     -> Eff ff es (Either SomeException a)
 runNonDetIO m = try do
-    m
-        & interpret
+    let hdl =
             ( \(ChooseH a b) ->
                 try a >>= \case
                     Right x -> pure x
                     Left (_ :: SomeException) -> b
             )
-        & interpret (\Empty -> throwIO EmptyException)
+                !: (\Empty -> throwIO EmptyException)
+                !: nil
+     in interprets hdl m
 {-# INLINE runNonDetIO #-}
 
 -- | Exception thrown when 'empty' occurs in 'runNonDetIO'.
