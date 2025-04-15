@@ -97,38 +97,38 @@ askToGet
 askToGet = interpret \Ask -> get'_
 {-# INLINE askToGet #-}
 
-runStateAsCC
+runStateCC
     :: forall s es a ref ff c
      . (CC ref :> es, forall f. Monad (ff f), Free c ff)
     => s
     -> Eff ff (State s ': es) a
     -> Eff ff es (s, a)
-runStateAsCC s m = evalStateAsCC s do
+runStateCC s m = evalStateCC s do
     x <- m
     s' <- get
     pure (s', x)
-{-# INLINE runStateAsCC #-}
+{-# INLINE runStateCC #-}
 
-execStateAsCC
+execStateCC
     :: forall s es a ref ff c
      . (CC ref :> es, forall f. Monad (ff f), Free c ff)
     => s
     -> Eff ff (State s ': es) a
     -> Eff ff es s
-execStateAsCC s m = evalStateAsCC s $ m *> get
-{-# INLINE execStateAsCC #-}
+execStateCC s m = evalStateCC s $ m *> get
+{-# INLINE execStateCC #-}
 
-evalStateAsCC
+evalStateCC
     :: forall s es a ref ff c
      . (CC ref :> es, forall f. Monad (ff f), Free c ff)
     => s
     -> Eff ff (State s ': es) a
     -> Eff ff es a
-evalStateAsCC s0 m =
+evalStateCC s0 m =
     m
         & reinterpret \case
             Get -> ask
             Put s -> callCC \k ->
                 interpose (\Ask -> pure s) $ k ()
         & runAsk s0
-{-# INLINE evalStateAsCC #-}
+{-# INLINE evalStateCC #-}

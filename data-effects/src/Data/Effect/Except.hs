@@ -88,22 +88,22 @@ runCatchIO
 runCatchIO = interpret \(Catch action hdl) -> IO.catch action hdl
 {-# INLINE runCatchIO #-}
 
-runThrowAsCC
+runThrowCC
     :: forall e es a ref ff c
      . (CC ref :> es, forall f. Monad (ff f), Free c ff)
     => Eff ff (Throw e ': es) a
     -> Eff ff es (Either e a)
-runThrowAsCC m =
+runThrowCC m =
     callCC \exit -> Right <$> m & interpret \(Throw e) -> exit (Left e)
-{-# INLINE runThrowAsCC #-}
+{-# INLINE runThrowCC #-}
 
-runCatchAsCC
+runCatchCC
     :: forall ref e es a ff c
      . (CC ref :> es, Throw e :> es, forall f. Monad (ff f), Free c ff)
     => Eff ff (Catch e ': es) a
     -> Eff ff es a
-runCatchAsCC m =
+runCatchCC m =
     m & interpret \(Catch thing hdl) ->
         callCC \exit ->
             thing & interpose @(Throw e) \(Throw e) -> exit =<< hdl e
-{-# INLINE runCatchAsCC #-}
+{-# INLINE runCatchCC #-}

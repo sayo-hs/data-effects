@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE QuantifiedConstraints #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 -- SPDX-License-Identifier: MPL-2.0
 
