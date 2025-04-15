@@ -1,7 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
@@ -20,6 +19,7 @@ import Data.Data (Proxy (Proxy), (:~:) (Refl))
 import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, LabelOf, OrderCase, OrderOf)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.Tag (type (#))
+import Data.Function ((&))
 import Data.Kind (Constraint, Type)
 import GHC.TypeLits (ErrorMessage (ShowType, Text, (:$$:), (:<>:)), KnownNat, Symbol, TypeError, natVal, type (+), type (-))
 import Unsafe.Coerce (unsafeCoerce)
@@ -326,6 +326,9 @@ hfmapDynUnsafeCoerce order phi e = case order of
 nil :: Union '[] f a -> r
 nil _ = error "Effect system internal error: nil - An empty effect union, which should not be possible to create, has been created."
 
+nilMembership :: Membership e '[] -> r
+nilMembership _ = error "Effect system internal error: nil - An empty effect union membership, which should not be possible to create, has been created."
+
 weakensFor :: forall es es' e. (Suffix es es') => Membership e es -> Membership e es'
 weakensFor (UnsafeMembership n) = UnsafeMembership $ n + prefixLen @es @es'
 {-# INLINE weakensFor #-}
@@ -372,29 +375,44 @@ type family RemoveHOEs (es :: [Effect]) where
     RemoveHOEs (e ': es) =
         OrderCase (OrderOf e) (e ': RemoveHOEs es) (RemoveHOEs es)
 
-type WeakenHOEs es = WeakenHOEs_ es 0 (OrderOf (HeadOf es))
+type WeakenHOEs es = (WeakenHOEs_ es 0 (OrderOf (HeadOf es)), FOEs (RemoveHOEs es))
 
-class (FOEs (RemoveHOEs es), orderOfHead ~ OrderOf (HeadOf es)) => WeakenHOEs_ es i orderOfHead where
-    weakenHOEsFor :: Membership e (RemoveHOEs es) -> Membership e es
+class (orderOfHead ~ OrderOf (HeadOf es)) => WeakenHOEs_ es countF orderOfHead where
+    -- | Example for '[H,F,F,H,H,F,H,F]
+    --
+    -- +----+-------+--------+----------------------+
+    -- | ix | order | countF | shifter accumulation |
+    -- +====+=======+========+======================+
+    -- |  0 |     H |      0 | 01234... -> 12345... |
+    -- |  1 |     F |      0 | 01234... -> 12345... |
+    -- |  2 |     F |      1 | 01234... -> 12345... |
+    -- |  3 |     H |      2 | 01234... -> 12456... |
+    -- |  4 |     H |      2 | 01234... -> 12567... |
+    -- |  5 |     F |      2 | 01234... -> 12567... |
+    -- |  6 |     H |      3 | 01234... -> 12578... |
+    -- |  7 |     F |      3 | 01234... -> 12578... |
+    -- +----+-------+--------+----------------------+
+    foldHoeIndexShifter :: (Int -> Int) -> (Int -> Int)
 
-instance (OrderOf (HeadOf '[]) ~ orderOfHead) => WeakenHOEs_ '[] i orderOfHead where
-    weakenHOEsFor = id
-    {-# INLINE weakenHOEsFor #-}
+instance (OrderOf (HeadOf '[]) ~ orderOfHead) => WeakenHOEs_ '[] countF orderOfHead where
+    foldHoeIndexShifter = id
+    {-# INLINE foldHoeIndexShifter #-}
 
-instance (FirstOrder e, WeakenHOEs_ es (i + 1) _orderOfHead) => WeakenHOEs_ (e ': es) i 'FirstOrder where
-    weakenHOEsFor = coerce $ weakenHOEsFor @es @(i + 1)
-    {-# INLINE weakenHOEsFor #-}
+instance (FirstOrder e, WeakenHOEs_ es (countF + 1) _orderOfHead) => WeakenHOEs_ (e ': es) countF 'FirstOrder where
+    foldHoeIndexShifter = foldHoeIndexShifter @es @(countF + 1)
+    {-# INLINE foldHoeIndexShifter #-}
 
 instance
-    (OrderOf e ~ 'HigherOrder, WeakenHOEs_ es (i + 1) _orderOfHead, FOEs (RemoveHOEs es), KnownNat i)
-    => WeakenHOEs_ (e ': es) i 'HigherOrder
+    (OrderOf e ~ 'HigherOrder, WeakenHOEs_ es countF _orderOfHead, KnownNat countF)
+    => WeakenHOEs_ (e ': es) countF 'HigherOrder
     where
-    weakenHOEsFor (UnsafeMembership n) =
-        UnsafeMembership $
-            if n < intVal @i
-                then n
-                else unMembership (weakenHOEsFor @es @(i + 1) $ UnsafeMembership n) + 1
-    {-# INLINE weakenHOEsFor #-}
+    foldHoeIndexShifter shifterAcc =
+        foldHoeIndexShifter @es @countF \ix ->
+            let shiftedIx = shifterAcc ix
+             in if ix < intVal @countF
+                    then shiftedIx
+                    else shiftedIx + 1
+    {-# INLINE foldHoeIndexShifter #-}
 
 weaken :: Union es f a -> Union (e ': es) f a
 weaken = mapUnion weakenFor
@@ -408,8 +426,12 @@ weakensUnder :: (SuffixUnder es es') => Union es f a -> Union es' f a
 weakensUnder = mapUnion weakensUnderFor
 {-# INLINE weakensUnder #-}
 
+weakenHOEsFor :: forall es e. (WeakenHOEs es) => Membership e (RemoveHOEs es) -> Membership e es
+weakenHOEsFor = UnsafeMembership . foldHoeIndexShifter @es @0 id . unMembership
+{-# INLINE weakenHOEsFor #-}
+
 weakenHOEs :: forall es f a. (WeakenHOEs es) => Union (RemoveHOEs es) f a -> Union es f a
-weakenHOEs = mapUnion $ weakenHOEsFor @es @0
+weakenHOEs = mapUnion weakenHOEsFor
 {-# INLINE weakenHOEs #-}
 
 type KnownLength :: forall {k}. [k] -> Constraint

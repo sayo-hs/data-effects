@@ -60,9 +60,9 @@ raisesUnders :: forall es es' a ff c. (SuffixUnder es es', Free c ff) => Eff ff 
 raisesUnders = transAll weakensUnder
 {-# INLINE raisesUnders #-}
 
-onlyFirstOrder :: forall es a ff c. (Free c ff, WeakenHOEs es) => Eff ff (RemoveHOEs es) a -> Eff ff es a
-onlyFirstOrder = transAll weakenHOEs
-{-# INLINE onlyFirstOrder #-}
+onlyFOEs :: forall es a ff c. (Free c ff, WeakenHOEs es) => Eff ff (RemoveHOEs es) a -> Eff ff es a
+onlyFOEs = transAll weakenHOEs
+{-# INLINE onlyFOEs #-}
 
 raisePrefix
     :: forall es' es a ff c

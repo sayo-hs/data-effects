@@ -1,14 +1,15 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
+{-# OPTIONS_GHC -fconstraint-solver-iterations=16 #-}
 
 -- SPDX-License-Identifier: MPL-2.0
 
 module OpenUnion where
 
 import Control.Effect (Eff, Free, perform)
-import Data.Effect
-import Data.Effect.OpenUnion (Membership (UnsafeMembership), labelMembership, (:>))
+import Data.Effect (Catch, Effect, LabelOf, Throw (Throw))
+import Data.Effect.OpenUnion (Membership (UnsafeMembership), labelMembership, membershipAt, weakenHOEsFor, (:>))
 import Data.Proxy (Proxy (Proxy))
 import GHC.TypeNats (KnownNat, Natural, natVal)
 import Test.Hspec (Spec, describe, it, shouldBe)
@@ -40,6 +41,29 @@ spec_membership = describe "Open-Union Membership" do
 
     infer1 :: forall x. (KnownNat x) => Membership (B 5 x) '[B 1 2, B 3 4, A 1, B 5 6, A 0] -> Natural
     infer1 _ = natVal @x Proxy
+
+type F = Throw ()
+type H = Catch ()
+
+spec_onlyFOEs :: Spec
+spec_onlyFOEs = describe "onlyFOEs index shift" do
+    it "'[<F>, F , F , F ] -> '[ H ,<F>, F , H , H , F , H , F ]" $
+        shiftIx ix0 `shouldBe` UnsafeMembership 1
+    it "'[ F ,<F>, F , F ] -> '[ H , F ,<F>, H , H , F , H , F ]" $
+        shiftIx ix1 `shouldBe` UnsafeMembership 2
+    it "'[ F , F ,<F>, F ] -> '[ H , F , F , H , H ,<F>, H , F ]" $
+        shiftIx ix2 `shouldBe` UnsafeMembership 5
+    it "'[ F , F , F ,<F>] -> '[ H , F , F , H , H , F , H ,<F>]" $
+        shiftIx ix3 `shouldBe` UnsafeMembership 7
+  where
+    shiftIx :: Membership e '[F, F, F, F] -> Membership e '[H, F, F, H, H, F, H, F]
+    shiftIx = weakenHOEsFor
+
+    ix0, ix1, ix2, ix3 :: Membership F '[F, F, F, F]
+    ix0 = membershipAt @0
+    ix1 = membershipAt @1
+    ix2 = membershipAt @2
+    ix3 = membershipAt @3
 
 inferCompileTest :: (Throw () :> es, Catch () :> es, Free Monad ff) => Eff ff es a
 inferCompileTest = perform $ Throw mempty

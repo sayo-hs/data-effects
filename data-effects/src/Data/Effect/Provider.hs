@@ -44,7 +44,7 @@ newtype ScopeC ff t i fs r s a
     = ScopeC {unScopeC :: Eff ff (Each fs s ++ Scoped ff t i fs r ': r) a}
 
 -- | An effect to introduce a new local scope that provides the effect @e@.
-type Scoped_ ff t i e es = Scope t i (Const1 (ScopeC_ ff t i e es))
+type Scoped_ ff t i es r = Scope t i (Const1 (ScopeC_ ff t i es r))
 
 newtype ScopeC_ ff t i es r a
     = ScopeC_ {unScopeC_ :: Eff ff (es ++ Scoped_ ff t i es r ': r) a}
