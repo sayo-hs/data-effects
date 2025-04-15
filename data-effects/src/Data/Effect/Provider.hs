@@ -69,7 +69,7 @@ runScoped run = loop
 {-# INLINE runScoped #-}
 
 scoped
-    :: forall s t i a es' es r ff c
+    :: forall t i s a es' es r ff c
      . (Scoped ff t i es r :> es', Free c ff)
     => i s
     -> ( Eff ff es' ~> Eff ff (Each es s ++ Scoped ff t i es r ': r)
@@ -97,7 +97,7 @@ runScoped_ run = loop
 {-# INLINE runScoped_ #-}
 
 scoped_
-    :: forall s t i a es' es r ff c
+    :: forall t i s a es' es r ff c
      . (Scoped_ ff t i es r :> es', Free c ff)
     => i s
     -> ( Eff ff es' ~> Eff ff (es ++ Scoped_ ff t i es r ': r)
@@ -128,7 +128,7 @@ provide
          -> Eff ff (es ++ Provider ff t i es r ': r) a
        )
     -> Eff ff es' (t a)
-provide i f = getConst1 <$> scoped_ @'() (Const i) f
+provide i f = getConst1 <$> scoped_ @_ @_ @'() (Const i) f
 {-# INLINE provide #-}
 
 runProvider_
