@@ -19,7 +19,6 @@ import Data.Data (Proxy (Proxy), (:~:) (Refl))
 import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, LabelOf, OrderCase, OrderOf)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.Tag (type (#))
-import Data.Function ((&))
 import Data.Kind (Constraint, Type)
 import GHC.TypeLits (ErrorMessage (ShowType, Text, (:$$:), (:<>:)), KnownNat, Symbol, TypeError, natVal, type (+), type (-))
 import Unsafe.Coerce (unsafeCoerce)
@@ -336,11 +335,11 @@ weakensFor (UnsafeMembership n) = UnsafeMembership $ n + prefixLen @es @es'
 class Suffix (es :: [Effect]) (es' :: [Effect]) where
     prefixLen :: Int
 
-instance {-# INCOHERENT #-} Suffix es es where
+instance Suffix es es where
     prefixLen = 0
     {-# INLINE prefixLen #-}
 
-instance (Suffix es es') => Suffix es (e ': es') where
+instance {-# INCOHERENT #-} (Suffix es es') => Suffix es (e ': es') where
     prefixLen = prefixLen @es @es' + 1
     {-# INLINE prefixLen #-}
 
@@ -348,14 +347,14 @@ class SuffixUnder (es :: [Effect]) (es' :: [Effect]) where
     prefixLenUnder :: Int
     offset :: Int
 
-instance {-# INCOHERENT #-} (Suffix es es') => SuffixUnder es es' where
+instance (Suffix es es') => SuffixUnder es es' where
     prefixLenUnder = prefixLen @es @es'
     offset = 0
 
     {-# INLINE prefixLenUnder #-}
     {-# INLINE offset #-}
 
-instance (SuffixUnder es es') => SuffixUnder (e ': es) (e ': es') where
+instance {-# INCOHERENT #-} (SuffixUnder es es') => SuffixUnder (e ': es) (e ': es') where
     prefixLenUnder = prefixLenUnder @es @es'
     offset = offset @es @es' + 1
 

@@ -10,8 +10,8 @@ Maintainer  :  ymdfield@outlook.jp
 -}
 module Control.Effect.Transform where
 
-import Control.Effect (Eff (..), Free, hoist, liftFree, send, sendFor, type (~>))
-import Control.Effect.Interpret (interposeFor, interpret, interpretAll, reinterpret)
+import Control.Effect (Eff (..), Free, hoist, sendFor, type (~>))
+import Control.Effect.Interpret (interposeFor, interpret, reinterpret)
 import Data.Effect.OpenUnion (
     Each,
     Has,
