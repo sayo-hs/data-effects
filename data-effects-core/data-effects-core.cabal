@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               data-effects-core
-version:            0.4.0.0
+version:            0.4.0.1
 
 -- A short (one-line) description of the package.
 synopsis: A basic framework for effect systems based on effects represented by GADTs.
