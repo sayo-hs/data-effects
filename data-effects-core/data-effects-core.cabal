@@ -62,10 +62,10 @@ library
     build-depends:
         base                          >= 4.16.4 && < 4.22,
         mtl                           >= 2.2.2 && < 2.4,
-        kan-extensions,
-        free,
-        unliftio,
-        primitive,
+        free >= 5.2 && < 5.3,
+        kan-extensions >= 5.2.6 && < 5.3,
+        primitive >= 0.9.1 && < 0.10,
+        unliftio >= 0.2.25 && < 0.3,
 
     hs-source-dirs:   src
     ghc-options:      -Wall
