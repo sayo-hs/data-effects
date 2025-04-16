@@ -20,7 +20,7 @@ import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, L
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.Tag (type (#))
 import Data.Kind (Constraint, Type)
-import GHC.TypeLits (ErrorMessage (ShowType, Text, (:$$:), (:<>:)), KnownNat, Symbol, TypeError, natVal, type (+), type (-))
+import GHC.TypeLits (ErrorMessage (ShowType, Text, (:$$:), (:<>:)), KnownNat, Natural, Symbol, TypeError, natVal, type (+), type (-))
 import Unsafe.Coerce (unsafeCoerce)
 
 data Union (es :: [Effect]) (f :: Type -> Type) (a :: Type) where
@@ -376,19 +376,26 @@ type family RemoveHOEs (es :: [Effect]) where
 
 type WeakenHOEs es = (WeakenHOEs_ es 0 (OrderOf (HeadOf es)), FOEs (RemoveHOEs es))
 
-class (orderOfHead ~ OrderOf (HeadOf es)) => WeakenHOEs_ es countF orderOfHead where
+class (orderOfHead ~ OrderOf (HeadOf es)) => WeakenHOEs_ es (countF :: Natural) orderOfHead where
     -- | Example for '[H,F,F,H,H,F,H,F]
     --
     -- +----+-------+--------+----------------------+
     -- | ix | order | countF | shifter accumulation |
     -- +====+=======+========+======================+
     -- |  0 |     H |      0 | 01234... -> 12345... |
+    -- +----+-------+--------+----------------------+
     -- |  1 |     F |      0 | 01234... -> 12345... |
+    -- +----+-------+--------+----------------------+
     -- |  2 |     F |      1 | 01234... -> 12345... |
+    -- +----+-------+--------+----------------------+
     -- |  3 |     H |      2 | 01234... -> 12456... |
+    -- +----+-------+--------+----------------------+
     -- |  4 |     H |      2 | 01234... -> 12567... |
+    -- +----+-------+--------+----------------------+
     -- |  5 |     F |      2 | 01234... -> 12567... |
+    -- +----+-------+--------+----------------------+
     -- |  6 |     H |      3 | 01234... -> 12578... |
+    -- +----+-------+--------+----------------------+
     -- |  7 |     F |      3 | 01234... -> 12578... |
     -- +----+-------+--------+----------------------+
     foldHoeIndexShifter :: (Int -> Int) -> (Int -> Int)

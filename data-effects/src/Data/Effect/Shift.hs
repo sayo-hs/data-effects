@@ -10,11 +10,15 @@ Maintainer  :  ymdfield@outlook.jp
 module Data.Effect.Shift where
 
 import Control.Monad ((<=<))
-import Data.Effect (CC (Jump, SubFork), Shift)
+import Data.Effect (CC (Jump, SubFork))
 import Data.Function (fix)
 import Data.Functor.Contravariant (Op (Op))
 
-makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''Shift
+data Shift ans ref :: Effect where
+    SubShiftFork :: Shift ans ref f (Either (ref a) a)
+    Call :: ref a -> a -> Shift ans ref f ans
+    Abort :: ans -> Shift ans ref f a
+makeEffectF ''Shift
 
 subShift
     :: forall a b es ans ref ff c

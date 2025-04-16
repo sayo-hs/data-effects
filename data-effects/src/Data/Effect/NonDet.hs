@@ -28,9 +28,9 @@ import Control.Applicative ((<|>))
 import Control.Effect.Interpret (interprets)
 import Control.Exception (Exception, SomeException)
 import Data.Bool (bool)
-import Data.Effect (Choose (Choose), ChooseH (ChooseH), Emb, Empty (Empty), Shift, UnliftIO)
+import Data.Effect (Choose (Choose), ChooseH (ChooseH), Emb, Empty (Empty), UnliftIO)
 import Data.Effect.OpenUnion (nil, (!:))
-import Data.Effect.Shift (abort, shift)
+import Data.Effect.Shift (Shift, abort, shift)
 import UnliftIO (throwIO, try)
 
 makeEffectF_' (def & noGenerateLabel & noGenerateOrderInstance) ''Empty
@@ -85,7 +85,7 @@ runNonDetShift
     -> Eff ff es a
 runNonDetShift =
     interprets $
-        (\Choose -> shift \k' -> liftA2 (<>) (k' True) (k' False))
+        (\Choose -> shift \k' -> liftA2 (<>) (k' False) (k' True))
             !: (\Empty -> abort mempty)
             !: nil
 {-# INLINE runNonDetShift #-}

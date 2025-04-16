@@ -37,13 +37,13 @@ type instance LabelOf (Scope t i b) = ScopeLabel t i
 
 newtype Const1 f x (a :: Type) = Const1 {getConst1 :: f a}
 
--- | An effect to introduce a new local scope that provides the scope-parametrized effect @e@.
+-- | An effect to introduce a new local scope that provides the scope-parametrized effect @es@.
 type Scoped ff t i es r = Scope t i (ScopeC ff t i es r)
 
 newtype ScopeC ff t i fs r s a
     = ScopeC {unScopeC :: Eff ff (Each fs s ++ Scoped ff t i fs r ': r) a}
 
--- | An effect to introduce a new local scope that provides the effect @e@.
+-- | An effect to introduce a new local scope that provides the effect @es@.
 type Scoped_ ff t i es r = Scope t i (Const1 (ScopeC_ ff t i es r))
 
 newtype ScopeC_ ff t i es r a
