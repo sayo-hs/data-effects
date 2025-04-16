@@ -17,9 +17,7 @@ module Data.Effect.Except (
 )
 where
 
-import Control.Effect.Interpret (interpose)
-import Data.Effect (CC, Catch (Catch), Emb, Throw (Throw), UnliftIO)
-import Data.Effect.CC (callCC)
+import Data.Effect (Catch (Catch), Emb, Throw (Throw), UnliftIO)
 import UnliftIO (Exception, throwIO)
 import UnliftIO qualified as IO
 
@@ -87,23 +85,3 @@ runCatchIO
     -> Eff ff es a
 runCatchIO = interpret \(Catch action hdl) -> IO.catch action hdl
 {-# INLINE runCatchIO #-}
-
-runThrowCC
-    :: forall e es a ref ff c
-     . (CC ref :> es, forall f. Monad (ff f), Free c ff)
-    => Eff ff (Throw e ': es) a
-    -> Eff ff es (Either e a)
-runThrowCC m =
-    callCC \exit -> Right <$> m & interpret \(Throw e) -> exit (Left e)
-{-# INLINE runThrowCC #-}
-
-runCatchCC
-    :: forall ref e es a ff c
-     . (CC ref :> es, Throw e :> es, forall f. Monad (ff f), Free c ff)
-    => Eff ff (Catch e ': es) a
-    -> Eff ff es a
-runCatchCC m =
-    m & interpret \(Catch thing hdl) ->
-        callCC \exit ->
-            thing & interpose @(Throw e) \(Throw e) -> exit =<< hdl e
-{-# INLINE runCatchCC #-}
