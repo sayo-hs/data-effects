@@ -215,7 +215,7 @@ genHOE = do
     (conf, _, _, _, EffectInfo{..}) <- ask
     let eData = foldl AppT (ConT eName) (map (VarT . tyVarName) eParamVars)
     when (doesGenerateOrderInstance conf) do
-        [d|type instance OrderOf $(pure eData) = HigherOrder|] & lift & lift >>= tell
+        [d|type instance OrderOf $(pure eData) = 'HigherOrder|] & lift & lift >>= tell
 
 genPerformers :: EffectConf -> EffectInfo -> Q [Dec]
 genPerformers EffectConf{..} EffectInfo{..} = do
