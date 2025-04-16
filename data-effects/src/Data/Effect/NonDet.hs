@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -20,6 +21,9 @@ module Data.Effect.NonDet (
 )
 where
 
+#if ( __GLASGOW_HASKELL__ < 906 )
+import Control.Applicative (liftA2)
+#endif
 import Control.Applicative ((<|>))
 import Control.Effect.Interpret (interprets)
 import Control.Exception (Exception, SomeException)
