@@ -9,7 +9,7 @@ synopsis: A basic framework for effect systems based on effects represented by G
 description:
     A basic framework for a Haskell effect system library based on GADTs-based effect representations
     with a style that separates first-order effects and higher-order effects.
-    .
+
     This library set was created by being separated from
     the [Heftia](https://hackage.haskell.org/package/heftia) extensible effects library.
 
