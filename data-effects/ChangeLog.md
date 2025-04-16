@@ -17,3 +17,9 @@
 
 ## 0.3.0.1 -- 2024-11-03
 * Fixed build error for GHC 9.4.1.
+
+## 0.4.0.0 -- 2025-04-16
+
+* Adopt to the new v4 interface.
+    * Unified first-order and higher-order effect interfaces.
+    * Added a generic `Eff` carrier type.

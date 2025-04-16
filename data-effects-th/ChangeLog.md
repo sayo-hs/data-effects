@@ -11,3 +11,9 @@
 ## 0.2.0.0 -- 2024-10-10
 * Support for the core version upgrade to 0.2.
     * Support for GHC 9.8.2.
+
+## 0.4.0.0 -- 2025-04-16
+
+* Adopt to the new v4 interface.
+    * Unified first-order and higher-order effect interfaces.
+    * Added a generic `Eff` carrier type.
