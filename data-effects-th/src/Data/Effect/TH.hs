@@ -32,6 +32,7 @@ module Data.Effect.TH (
     noGeneratePerformerSignature,
     noGenerateLabel,
     noGenerateOrderInstance,
+    Infinite ((:<)),
 ) where
 
 import Control.Monad.Reader (ask, runReaderT)
@@ -63,6 +64,7 @@ import Data.Effect.TH.Internal (
     taggedPerformerConf,
  )
 import Data.Function ((&))
+import Data.List.Infinite (Infinite ((:<)))
 import Language.Haskell.TH (Dec, Name, Q, Type (TupleT))
 
 makeEffectF :: Name -> Q [Dec]
