@@ -189,12 +189,12 @@ data Catch e :: Effect where
         -> Catch e f a
 
 data CatchLabel
-type instance LabelOf (Catch w) = CatchLabel
-type instance OrderOf (Catch w) = 'HigherOrder
-instance HFunctor (Catch w) where
+type instance LabelOf (Catch e) = CatchLabel
+type instance OrderOf (Catch e) = 'HigherOrder
+instance HFunctor (Catch e) where
     hfmap phi (Catch a hdl) = Catch (phi a) (phi . hdl)
     {-# INLINE hfmap #-}
-instance PolyHFunctor (Catch w)
+instance PolyHFunctor (Catch e)
 
 -- * Non-Determinism Effects
 
@@ -285,7 +285,7 @@ instance HFunctor (UnliftBase b) where
     hfmap phi (WithRunInBase f) = WithRunInBase \run -> f $ run . phi
     {-# INLINE hfmap #-}
 
--- The Unlift effect is not a higher-order polynomial functor.
+-- The Unlift effect is not polynomial.
 
 -- * CallCC Effect (Sub/Jump-based)
 
