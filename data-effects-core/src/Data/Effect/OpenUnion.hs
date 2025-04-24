@@ -47,13 +47,13 @@ hfmapUnion phi u@(UnsafeUnion n e order koi) =
 {-# INLINE hfmapUnion #-}
 
 -- | The list @es@ consists only of first-order effects.
-class FOEs es
+class FOEs (es :: [Effect])
 
 instance FOEs '[]
 instance (FirstOrder e, FOEs es) => FOEs (e ': es)
 
 -- | The list @es@ consists only of polynomial effects.
-class PolyHFunctors es
+class PolyHFunctors (es :: [Effect])
 
 instance PolyHFunctors '[]
 instance (PolyHFunctor e, PolyHFunctors es) => PolyHFunctors (e ': es)
