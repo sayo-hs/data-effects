@@ -53,6 +53,7 @@ Maintainer  :  ymdfield@outlook.jp
 module Data.Effect.HFunctor.TH.Internal where
 
 import Control.Monad (replicateM, zipWithM)
+import Data.Effect (PolyHFunctor)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.TH.Internal (
     ConInfo (ConInfo),
@@ -108,7 +109,7 @@ deriveHFunctor manualCxt (DataInfo _ name args cons) = do
         hfArgNames = map (VarT . tyVarName) hfArgs
 
         -- The algorithm is based on: https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/derive-functor
-        hfmapClause :: ConInfo -> Q Clause
+        hfmapClause :: ConInfo -> Q (Bool, Clause)
         hfmapClause ConInfo{..} = do
             let f = case conGadtReturnType of
                     Nothing -> last initArgs
@@ -117,24 +118,23 @@ deriveHFunctor manualCxt (DataInfo _ name args cons) = do
                         _ `AppT` (VarT n `SigT` _) `AppT` _ -> PlainTV n ()
                         _ -> error $ "Encounted unknown structure: " ++ pprint t
 
-                hfmapE :: TH.Type -> Exp -> Q Exp
+                hfmapE :: TH.Type -> Exp -> Q (Bool, Exp)
                 hfmapE tk
-                    | fNotOccurs t = pure
+                    | fNotOccurs t = pure . (True,)
                     | otherwise = \x -> case t of
-                        VarT n `AppT` a | n == tyVarName f && fNotOccurs a -> pure $ mapFn `AppE` x
+                        VarT n `AppT` a | n == tyVarName f && fNotOccurs a -> pure (True, mapFn `AppE` x)
                         ArrowT `AppT` c `AppT` d ->
-                            wrapLam \y -> hfmapE d . (x `AppE`) =<< cohfmapE c y
+                            (False,) <$> wrapLam \y -> fmap snd . hfmapE d . (x `AppE`) =<< cohfmapE c y
                         g `AppT` a
                             | fNotOccurs g ->
-                                ((VarE 'fmap `AppE`) <$> wrapLam (hfmapE a)) <&> (`AppE` x)
+                                (True,) <$> (((VarE 'fmap `AppE`) <$> wrapLam (fmap snd . hfmapE a)) <&> (`AppE` x))
                         ff `AppT` g `AppT` a
                             | fNotOccurs ff && fNotOccurs a ->
-                                ((VarE 'hfmap `AppE`) <$> wrapLam (hfmapE $ g `AppT` a)) <&> (`AppE` x)
-                        -- todo: tuple support
+                                (True,) <$> (((VarE 'hfmap `AppE`) <$> wrapLam (fmap snd . hfmapE (g `AppT` a))) <&> (`AppE` x))
                         ForallT _ _ a -> hfmapE a x
                         _ ->
-                            case mapTupleE hfmapE t x of
-                                Just e -> e
+                            case mapTupleE ((fmap snd .) . hfmapE) t x of
+                                Just e -> (True,) <$> e
                                 Nothing -> fail $ "Encounted unsupported structure: " ++ pprint t
                   where
                     t = unkindType tk
@@ -147,7 +147,7 @@ deriveHFunctor manualCxt (DataInfo _ name args cons) = do
                             | n == tyVarName f && fNotOccurs a ->
                                 fail $ "Functor type variable occurs in contravariant position: " ++ pprint t
                         ArrowT `AppT` c `AppT` d ->
-                            wrapLam \y -> cohfmapE d . (x `AppE`) =<< hfmapE c y
+                            wrapLam \y -> (cohfmapE d . (x `AppE`)) . snd =<< hfmapE c y
                         g `AppT` a
                             | fNotOccurs g ->
                                 ((VarE 'fmap `AppE`) <$> wrapLam (cohfmapE a)) <&> (`AppE` x)
@@ -166,8 +166,9 @@ deriveHFunctor manualCxt (DataInfo _ name args cons) = do
 
             vars <- replicateM (length conArgs) (newName "x")
             mappedArgs <- zipWithM hfmapE (map snd conArgs) (map VarE vars)
-            let body = foldl' AppE (ConE conName) mappedArgs
-            pure $ Clause [VarP mapFnName, ConP conName [] (map VarP vars)] (NormalB body) []
+            let body = foldl' AppE (ConE conName) (map snd mappedArgs)
+                isPolynomial = all fst mappedArgs
+            pure (isPolynomial, Clause [VarP mapFnName, ConP conName [] (map VarP vars)] (NormalB body) [])
 
     cxt <-
         manualCxt $
@@ -188,16 +189,25 @@ deriveHFunctor manualCxt (DataInfo _ name args cons) = do
                             (T.intercalate ", " $ map ((\t -> "‘" <> t <> "’") . T.pack . nameBase . tyVarName) hfArgs)
                     )
 
-    hfmapDecls <- FunD 'hfmap <$> mapM hfmapClause cons
-    let fnInline = PragmaD (InlineP 'hfmap Inline FunLike AllPhases)
+    hfmapClauses <- mapM hfmapClause cons
+    let hfmapDecls = FunD 'hfmap $ map snd hfmapClauses
+        fnInline = PragmaD (InlineP 'hfmap Inline FunLike AllPhases)
+        isPolynomial = all fst hfmapClauses
+        h = foldl' AppT (ConT name) hfArgNames
 
-    pure
-        [ InstanceD
+    pure $
+        InstanceD
             Nothing
             (fromMaybe [cxt] $ decomposeTupleT cxt)
-            (ConT ''HFunctor `AppT` foldl' AppT (ConT name) hfArgNames)
+            (ConT ''HFunctor `AppT` h)
             [hfmapDecls, fnInline]
-        ]
+            : [ InstanceD
+                Nothing
+                []
+                (ConT ''PolyHFunctor `AppT` h)
+                []
+              | isPolynomial
+              ]
 
 wrapLam :: (Exp -> Q Exp) -> Q Exp
 wrapLam f = do

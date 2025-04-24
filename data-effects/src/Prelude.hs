@@ -21,6 +21,5 @@ import Data.Effect.HFunctor.TH
 import Data.Effect.OpenUnion (Has, In, type (:>))
 import Data.Effect.TH
 import Data.Kind (Type)
-import Data.List.Infinite (Infinite ((:<)))
 
 import "base" Prelude

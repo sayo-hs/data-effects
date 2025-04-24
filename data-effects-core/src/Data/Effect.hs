@@ -35,6 +35,9 @@ class
     ) =>
     FirstOrder (e :: Effect)
 
+-- | A higher-order polynomial functor.
+class PolyHFunctor e
+
 -- * Nop Effect
 
 -- | A effect with no operations.
