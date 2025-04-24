@@ -15,10 +15,28 @@ in the @effectful@ package.
 -}
 module Data.Effect.Provider where
 
-import Control.Effect.Transform (raise, raisePrefix, raisePrefix1)
-import Data.Effect.OpenUnion (Each, KnownLength, PolyHFunctors, type (++))
+import Control.Effect (emb)
+import Control.Effect.Transform (raise, raisePrefix, raisePrefix1, transAll)
+import Data.Effect (Emb, UnliftBase)
+import Data.Effect.OpenUnion (
+    Each,
+    KnownLength,
+    RemoveExps,
+    WeakenExps,
+    prefixFor,
+    prefixFor1,
+    splitUnion,
+    splitUnion1,
+    suffixFor,
+    weakenExpsFor,
+    (!:>),
+    pattern Here,
+    type (++),
+ )
+import Data.Effect.Unlift (withRunInBase)
 import Data.Functor.Const (Const (Const))
 import Data.Functor.Identity (Identity (Identity), runIdentity)
+import Data.Type.Equality (type (:~:) (Refl))
 
 -- | An effect to introduce a new local scope that provides effect context @b s@.
 data Scope t i b :: Effect where
@@ -70,16 +88,33 @@ runScoped run = loop
 {-# INLINE runScoped #-}
 
 runRegionScoped
-    :: forall t i a es r ff c
-     . (PolyHFunctors r, KnownLength es, Free c ff)
+    :: forall b t i a es r ff c
+     . (WeakenExps r, UnliftBase b :> r, Emb b :> RemoveExps r, KnownLength es, Free c ff)
     => ( forall s x
           . i s
-         -> Eff ff (Each es s ++ Scoped ff t i es r ': r) x
-         -> Eff ff (Scoped ff t i es r ': r) (t s x)
+         -> Eff ff (Each es s ++ Scoped ff t i es (RemoveExps r) ': r) x
+         -> Eff ff (Scoped ff t i es (RemoveExps r) ': r) (t s x)
        )
-    -> Eff ff (Scoped ff t i es r ': r) a
+    -> Eff ff (Scoped ff t i es (RemoveExps r) ': r) a
     -> Eff ff r a
-runRegionScoped = runScoped
+runRegionScoped runScope = loop
+  where
+    loop :: Eff ff (Scoped ff t i es (RemoveExps r) ': r) ~> Eff ff r
+    loop a = withRunInBase @b \runInBase ->
+        runInBase $
+            a & interpret \(Scope (i :: i s) f) ->
+                loop
+                    . runScope i
+                    . transAll
+                        ( splitUnion1 @es @s @(Scoped ff t i es (RemoveExps r) ': RemoveExps r)
+                            (suffixFor @(Scoped ff t i es (RemoveExps r) ': r))
+                            ( prefixFor1 @es @s @(Scoped ff t i es (RemoveExps r) ': r)
+                                . ((\Refl -> Here) !:> weakenExpsFor)
+                            )
+                        )
+                    . unScopeC
+                    $ f
+                    $ ScopeC . raisePrefix1 @es @s @(Scoped ff t i es (RemoveExps r) ': RemoveExps r) . emb . runInBase
 {-# INLINE runRegionScoped #-}
 
 scoped
@@ -111,16 +146,34 @@ runScoped_ run = loop
 {-# INLINE runScoped_ #-}
 
 runRegionScoped_
-    :: forall t i a es r ff c
-     . (PolyHFunctors r, KnownLength es, Free c ff)
+    :: forall b t i a es r ff c
+     . (WeakenExps r, UnliftBase b :> r, Emb b :> RemoveExps r, KnownLength es, Free c ff)
     => ( forall p x
           . i p
-         -> Eff ff (es ++ Scoped_ ff t i es r ': r) x
-         -> Eff ff (Scoped_ ff t i es r ': r) (t p x)
+         -> Eff ff (es ++ Scoped_ ff t i es (RemoveExps r) ': r) x
+         -> Eff ff (Scoped_ ff t i es (RemoveExps r) ': r) (t p x)
        )
-    -> Eff ff (Scoped_ ff t i es r ': r) a
+    -> Eff ff (Scoped_ ff t i es (RemoveExps r) ': r) a
     -> Eff ff r a
-runRegionScoped_ = runScoped_
+runRegionScoped_ runScope = loop
+  where
+    loop :: Eff ff (Scoped_ ff t i es (RemoveExps r) ': r) ~> Eff ff r
+    loop a = withRunInBase @b \runInBase ->
+        runInBase $
+            a & interpret \(Scope i f) ->
+                loop
+                    . runScope i
+                    . transAll
+                        ( splitUnion @es @(Scoped_ ff t i es (RemoveExps r) ': RemoveExps r)
+                            (suffixFor @(Scoped_ ff t i es (RemoveExps r) ': r))
+                            ( prefixFor @es @(Scoped_ ff t i es (RemoveExps r) ': r)
+                                . ((\Refl -> Here) !:> weakenExpsFor)
+                            )
+                        )
+                    . unScopeC_
+                    . getConst1
+                    $ f
+                    $ Const1 . ScopeC_ . raisePrefix @es @(Scoped_ ff t i es (RemoveExps r) ': RemoveExps r) . emb . runInBase
 {-# INLINE runRegionScoped_ #-}
 
 scoped_
@@ -148,16 +201,22 @@ runProvider run = runScoped_ \(Const i) a -> Const1 <$> run i a
 {-# INLINE runProvider #-}
 
 runRegionProvider
-    :: forall t i a es r ff c
-     . (PolyHFunctors r, forall es'. Functor (Eff ff es'), KnownLength es, Free c ff)
+    :: forall b t i a es r ff c
+     . ( WeakenExps r
+       , UnliftBase b :> r
+       , Emb b :> RemoveExps r
+       , forall es'. Functor (Eff ff es')
+       , KnownLength es
+       , Free c ff
+       )
     => ( forall x
           . i
-         -> Eff ff (es ++ Provider ff t i es r ': r) x
-         -> Eff ff (Provider ff t i es r ': r) (t x)
+         -> Eff ff (es ++ Provider ff t i es (RemoveExps r) ': r) x
+         -> Eff ff (Provider ff t i es (RemoveExps r) ': r) (t x)
        )
-    -> Eff ff (Provider ff t i es r ': r) a
+    -> Eff ff (Provider ff t i es (RemoveExps r) ': r) a
     -> Eff ff r a
-runRegionProvider = runProvider
+runRegionProvider run = runRegionScoped_ @b \(Const i) a -> Const1 <$> run i a
 {-# INLINE runRegionProvider #-}
 
 provide
@@ -185,16 +244,22 @@ runProvider_ run = runProvider \i a -> Identity <$> run i a
 {-# INLINE runProvider_ #-}
 
 runRegionProvider_
-    :: forall i a es r ff c
-     . (PolyHFunctors r, forall es'. Functor (Eff ff es'), KnownLength es, Free c ff)
+    :: forall b i a es r ff c
+     . ( WeakenExps r
+       , UnliftBase b :> r
+       , Emb b :> RemoveExps r
+       , forall es'. Functor (Eff ff es')
+       , KnownLength es
+       , Free c ff
+       )
     => ( forall x
           . i
-         -> Eff ff (es ++ Provider ff Identity i es r ': r) x
-         -> Eff ff (Provider ff Identity i es r ': r) x
+         -> Eff ff (es ++ Provider ff Identity i es (RemoveExps r) ': r) x
+         -> Eff ff (Provider ff Identity i es (RemoveExps r) ': r) x
        )
-    -> Eff ff (Provider ff Identity i es r ': r) a
+    -> Eff ff (Provider ff Identity i es (RemoveExps r) ': r) a
     -> Eff ff r a
-runRegionProvider_ = runProvider_
+runRegionProvider_ run = runRegionProvider @b \i a -> Identity <$> run i a
 {-# INLINE runRegionProvider_ #-}
 
 provide_
@@ -221,15 +286,21 @@ runProvider__ run = runProvider_ \() -> run
 {-# INLINE runProvider__ #-}
 
 runRegionProvider__
-    :: forall a es r ff c
-     . (PolyHFunctors r, forall es'. Functor (Eff ff es'), KnownLength es, Free c ff)
-    => ( forall x
-          . Eff ff (es ++ Provider ff Identity () es r ': r) x
-         -> Eff ff (Provider ff Identity () es r ': r) x
+    :: forall b a es r ff c
+     . ( WeakenExps r
+       , UnliftBase b :> r
+       , Emb b :> RemoveExps r
+       , forall es'. Functor (Eff ff es')
+       , KnownLength es
+       , Free c ff
        )
-    -> Eff ff (Provider ff Identity () es r ': r) a
+    => ( forall x
+          . Eff ff (es ++ Provider ff Identity () es (RemoveExps r) ': r) x
+         -> Eff ff (Provider ff Identity () es (RemoveExps r) ': r) x
+       )
+    -> Eff ff (Provider ff Identity () es (RemoveExps r) ': r) a
     -> Eff ff r a
-runRegionProvider__ = runProvider__
+runRegionProvider__ run = runRegionProvider_ @b \() -> run
 {-# INLINE runRegionProvider__ #-}
 
 provide__

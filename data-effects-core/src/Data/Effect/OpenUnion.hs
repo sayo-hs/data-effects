@@ -77,7 +77,12 @@ pattern There i <- ((UnsafeMembership . (`subtract` 1) &&& (/= 0)) . unMembershi
         There (UnsafeMembership n) = UnsafeMembership (n + 1)
 {-# INLINE There #-}
 
-{-# COMPLETE Here, There #-}
+infixr 5 !:>
+(!:>) :: forall e e' es r. ((e :~: e') -> r) -> (Membership e es -> r) -> Membership e (e' ': es) -> r
+(f !:> g) (UnsafeMembership n)
+    | n == 0 = f $ unsafeCoerce Refl
+    | otherwise = g $ UnsafeMembership $ n - 1
+{-# INLINE (!:>) #-}
 
 weakenFor :: Membership e es -> Membership e (e' ': es)
 weakenFor (UnsafeMembership n) = UnsafeMembership $ n + 1
@@ -553,6 +558,26 @@ mergeUnion = \case
     Right u -> mapUnion (prefixFor @es) u
 {-# INLINE mergeUnion #-}
 
+splitUnion1
+    :: forall fs x es es' f a
+     . (KnownLength fs)
+    => (forall e. Membership e (Each fs x) -> Membership e es')
+    -> (forall e. Membership e es -> Membership e es')
+    -> Union (Each fs x ++ es) f a
+    -> Union es' f a
+splitUnion1 injL injR = mapUnion $ splitFor1 @fs @x @es injL injR
+{-# INLINE splitUnion1 #-}
+
+mergeUnion1
+    :: forall fs x es f a
+     . (KnownLength fs)
+    => Either (Union (Each fs x) f a) (Union es f a)
+    -> Union (Each fs x ++ es) f a
+mergeUnion1 = \case
+    Left u -> mapUnion (suffixFor @es) u
+    Right u -> mapUnion (prefixFor1 @fs @x) u
+{-# INLINE mergeUnion1 #-}
+
 splitFor
     :: forall es es' e r
      . (KnownLength es)
@@ -566,6 +591,20 @@ splitFor f g (UnsafeMembership n)
   where
     l = reifyLength @es
 {-# INLINE splitFor #-}
+
+splitFor1
+    :: forall fs x es e r
+     . (KnownLength fs)
+    => (Membership e (Each fs x) -> r)
+    -> (Membership e es -> r)
+    -> Membership e (Each fs x ++ es)
+    -> r
+splitFor1 f g (UnsafeMembership n)
+    | n < l = f $ UnsafeMembership n
+    | otherwise = g $ UnsafeMembership $ n - l
+  where
+    l = reifyLength @fs
+{-# INLINE splitFor1 #-}
 
 suffixFor :: forall es' es e. Membership e es -> Membership e (es ++ es')
 suffixFor = coerce
