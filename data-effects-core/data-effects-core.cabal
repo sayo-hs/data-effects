@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               data-effects-core
-version:            0.4.0.2
+version:            0.4.1.0
 
 -- A short (one-line) description of the package.
 synopsis: A basic framework for effect systems based on effects represented by GADTs.
@@ -37,7 +37,7 @@ common warnings
 source-repository head
     type: git
     location: https://github.com/sayo-hs/data-effects
-    tag: v0.4.0.2
+    tag: v0.4.1.0
     subdir: data-effects-core
 
 library
