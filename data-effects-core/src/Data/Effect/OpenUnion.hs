@@ -16,7 +16,7 @@ module Data.Effect.OpenUnion where
 import Control.Arrow ((&&&))
 import Data.Coerce (coerce)
 import Data.Data (Proxy (Proxy), (:~:) (Refl))
-import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, LabelOf, OrderCase, OrderOf)
+import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, LabelOf, OrderCase, OrderOf, PolyHFunctor)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.Tag (type (#))
 import Data.Kind (Constraint, Type)
@@ -46,9 +46,17 @@ hfmapUnion phi u@(UnsafeUnion n e order koi) =
         HigherOrder -> UnsafeUnion n e HigherOrder (phi . koi)
 {-# INLINE hfmapUnion #-}
 
+-- | The list @es@ consists only of first-order effects.
 class FOEs es
+
 instance FOEs '[]
 instance (FirstOrder e, FOEs es) => FOEs (e ': es)
+
+-- | The list @es@ consists only of polynomial effects.
+class PolyHFunctors es
+
+instance PolyHFunctors '[]
+instance (PolyHFunctor e, PolyHFunctors es) => PolyHFunctors (e ': es)
 
 coerceFOEs :: (FOEs es) => Union es f a -> Union es g a
 coerceFOEs = unsafeCoerce

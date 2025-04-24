@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 -- SPDX-License-Identifier: MPL-2.0
 
@@ -15,7 +16,7 @@ in the @effectful@ package.
 module Data.Effect.Provider where
 
 import Control.Effect.Transform (raise, raisePrefix, raisePrefix1)
-import Data.Effect.OpenUnion (Each, KnownLength, type (++))
+import Data.Effect.OpenUnion (Each, KnownLength, PolyHFunctors, type (++))
 import Data.Functor.Const (Const (Const))
 import Data.Functor.Identity (Identity (Identity), runIdentity)
 
@@ -68,6 +69,19 @@ runScoped run = loop
         loop $ run i (unScopeC $ f $ ScopeC . raisePrefix1 @es @s . raise @(Scoped ff t i es r))
 {-# INLINE runScoped #-}
 
+runRegionScoped
+    :: forall t i a es r ff c
+     . (PolyHFunctors r, KnownLength es, Free c ff)
+    => ( forall s x
+          . i s
+         -> Eff ff (Each es s ++ Scoped ff t i es r ': r) x
+         -> Eff ff (Scoped ff t i es r ': r) (t s x)
+       )
+    -> Eff ff (Scoped ff t i es r ': r) a
+    -> Eff ff r a
+runRegionScoped = runScoped
+{-# INLINE runRegionScoped #-}
+
 scoped
     :: forall t i s a es' es r ff c
      . (Scoped ff t i es r :> es', Free c ff)
@@ -96,6 +110,19 @@ runScoped_ run = loop
         loop $ run i (unScopeC_ . getConst1 $ f $ Const1 . ScopeC_ . raisePrefix @es . raise @(Scoped_ ff t i es r))
 {-# INLINE runScoped_ #-}
 
+runRegionScoped_
+    :: forall t i a es r ff c
+     . (PolyHFunctors r, KnownLength es, Free c ff)
+    => ( forall p x
+          . i p
+         -> Eff ff (es ++ Scoped_ ff t i es r ': r) x
+         -> Eff ff (Scoped_ ff t i es r ': r) (t p x)
+       )
+    -> Eff ff (Scoped_ ff t i es r ': r) a
+    -> Eff ff r a
+runRegionScoped_ = runScoped_
+{-# INLINE runRegionScoped_ #-}
+
 scoped_
     :: forall t i s a es' es r ff c
      . (Scoped_ ff t i es r :> es', Free c ff)
@@ -119,6 +146,19 @@ runProvider
     -> Eff ff r a
 runProvider run = runScoped_ \(Const i) a -> Const1 <$> run i a
 {-# INLINE runProvider #-}
+
+runRegionProvider
+    :: forall t i a es r ff c
+     . (PolyHFunctors r, forall es'. Functor (Eff ff es'), KnownLength es, Free c ff)
+    => ( forall x
+          . i
+         -> Eff ff (es ++ Provider ff t i es r ': r) x
+         -> Eff ff (Provider ff t i es r ': r) (t x)
+       )
+    -> Eff ff (Provider ff t i es r ': r) a
+    -> Eff ff r a
+runRegionProvider = runProvider
+{-# INLINE runRegionProvider #-}
 
 provide
     :: forall t i a es' es r ff c
@@ -144,6 +184,19 @@ runProvider_
 runProvider_ run = runProvider \i a -> Identity <$> run i a
 {-# INLINE runProvider_ #-}
 
+runRegionProvider_
+    :: forall i a es r ff c
+     . (PolyHFunctors r, forall es'. Functor (Eff ff es'), KnownLength es, Free c ff)
+    => ( forall x
+          . i
+         -> Eff ff (es ++ Provider ff Identity i es r ': r) x
+         -> Eff ff (Provider ff Identity i es r ': r) x
+       )
+    -> Eff ff (Provider ff Identity i es r ': r) a
+    -> Eff ff r a
+runRegionProvider_ = runProvider_
+{-# INLINE runRegionProvider_ #-}
+
 provide_
     :: forall i a es' es r ff c
      . (Provider ff Identity i es r :> es', forall es''. Functor (Eff ff es''), Free c ff)
@@ -166,6 +219,18 @@ runProvider__
     -> Eff ff r a
 runProvider__ run = runProvider_ \() -> run
 {-# INLINE runProvider__ #-}
+
+runRegionProvider__
+    :: forall a es r ff c
+     . (PolyHFunctors r, forall es'. Functor (Eff ff es'), KnownLength es, Free c ff)
+    => ( forall x
+          . Eff ff (es ++ Provider ff Identity () es r ': r) x
+         -> Eff ff (Provider ff Identity () es r ': r) x
+       )
+    -> Eff ff (Provider ff Identity () es r ': r) a
+    -> Eff ff r a
+runRegionProvider__ = runProvider__
+{-# INLINE runRegionProvider__ #-}
 
 provide__
     :: forall a es' es r ff c

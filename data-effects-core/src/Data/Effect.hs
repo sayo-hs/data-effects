@@ -36,7 +36,7 @@ class
     FirstOrder (e :: Effect)
 
 -- | A higher-order polynomial functor.
-class PolyHFunctor e
+class PolyHFunctor (e :: Effect)
 
 -- * Nop Effect
 
@@ -50,6 +50,7 @@ type instance OrderOf Nop = 'FirstOrder
 instance HFunctor Nop where
     hfmap _ = \case {}
     {-# INLINE hfmap #-}
+instance PolyHFunctor Nop
 
 -- * Embedding Effect
 
@@ -64,6 +65,7 @@ type instance OrderOf (Emb e) = 'FirstOrder
 instance HFunctor (Emb e) where
     hfmap _ = coerce
     {-# INLINE hfmap #-}
+instance PolyHFunctor (Emb e)
 
 newtype Unemb e a = Unemb {getUnemb :: forall f. e f a}
 
@@ -81,6 +83,7 @@ instance FirstOrder (Ask r)
 instance HFunctor (Ask r) where
     hfmap _ = coerce
     {-# INLINE hfmap #-}
+instance PolyHFunctor (Ask r)
 
 -- | An effect that locally modifies the value held in the environment.
 data Local r :: Effect where
@@ -98,6 +101,7 @@ type instance OrderOf (Local r) = 'HigherOrder
 instance HFunctor (Local r) where
     hfmap phi (Local f a) = Local f (phi a)
     {-# INLINE hfmap #-}
+instance PolyHFunctor (Local r)
 
 -- * State Effect
 
@@ -115,6 +119,7 @@ instance FirstOrder (State s)
 instance HFunctor (State s) where
     hfmap _ = coerce
     {-# INLINE hfmap #-}
+instance PolyHFunctor (State s)
 
 -- * Writer Effects
 
@@ -130,6 +135,7 @@ instance FirstOrder (Tell w)
 instance HFunctor (Tell w) where
     hfmap _ = coerce
     {-# INLINE hfmap #-}
+instance PolyHFunctor (Tell w)
 
 -- | An effect that performs local operations on accumulations in the context on a per-scope basis.
 data WriterH w :: Effect where
@@ -154,6 +160,7 @@ instance HFunctor (WriterH w) where
         Listen a -> Listen $ phi a
         Censor f a -> Censor f (phi a)
     {-# INLINE hfmap #-}
+instance PolyHFunctor (WriterH w)
 
 -- * Exception Effects
 
@@ -169,6 +176,7 @@ instance FirstOrder (Throw e)
 instance HFunctor (Throw e) where
     hfmap _ = coerce
     {-# INLINE hfmap #-}
+instance PolyHFunctor (Throw e)
 
 -- | An effect to catch exceptions.
 data Catch e :: Effect where
@@ -186,6 +194,7 @@ type instance OrderOf (Catch w) = 'HigherOrder
 instance HFunctor (Catch w) where
     hfmap phi (Catch a hdl) = Catch (phi a) (phi . hdl)
     {-# INLINE hfmap #-}
+instance PolyHFunctor (Catch w)
 
 -- * Non-Determinism Effects
 
@@ -201,6 +210,7 @@ instance FirstOrder Empty
 instance HFunctor Empty where
     hfmap _ = coerce
     {-# INLINE hfmap #-}
+instance PolyHFunctor Empty
 
 -- | An effect that splits the computation into two branches.
 data Choose :: Effect where
@@ -215,6 +225,7 @@ instance FirstOrder Choose
 instance HFunctor Choose where
     hfmap _ = coerce
     {-# INLINE hfmap #-}
+instance PolyHFunctor Choose
 
 {- |
 An effect that executes two branches as scopes.
@@ -231,6 +242,7 @@ type instance OrderOf ChooseH = 'HigherOrder
 instance HFunctor ChooseH where
     hfmap phi (ChooseH a b) = ChooseH (phi a) (phi b)
     {-# INLINE hfmap #-}
+instance PolyHFunctor ChooseH
 
 -- * Fail Effect
 
@@ -244,6 +256,7 @@ instance FirstOrder Fail
 instance HFunctor Fail where
     hfmap _ = coerce
     {-# INLINE hfmap #-}
+instance PolyHFunctor Fail
 
 -- * Fix Effect
 
@@ -256,6 +269,7 @@ type instance OrderOf Fix = 'HigherOrder
 instance HFunctor Fix where
     hfmap phi (Efix f) = Efix $ phi . f
     {-# INLINE hfmap #-}
+instance PolyHFunctor Fix
 
 -- * Unlift Effect
 
@@ -271,6 +285,8 @@ instance HFunctor (UnliftBase b) where
     hfmap phi (WithRunInBase f) = WithRunInBase \run -> f $ run . phi
     {-# INLINE hfmap #-}
 
+-- The Unlift effect is not a higher-order polynomial functor.
+
 -- * CallCC Effect (Sub/Jump-based)
 
 data CC ref :: Effect where
@@ -284,3 +300,4 @@ instance FirstOrder (CC ref)
 instance HFunctor (CC ref) where
     hfmap _ = coerce
     {-# INLINE hfmap #-}
+instance PolyHFunctor (CC ref)
