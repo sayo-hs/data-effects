@@ -53,7 +53,7 @@ Maintainer  :  ymdfield@outlook.jp
 module Data.Effect.HFunctor.TH.Internal where
 
 import Control.Monad (replicateM, zipWithM)
-import Data.Effect (PolyHFunctor)
+import Data.Effect (EffectForm (Exponential, Polynomial), FormOf, PolyHFunctor)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.TH.Internal (
     ConInfo (ConInfo),
@@ -195,19 +195,23 @@ deriveHFunctor manualCxt (DataInfo _ name args cons) = do
         isPolynomial = all fst hfmapClauses
         h = foldl' AppT (ConT name) hfArgNames
 
+    formOf <-
+        if isPolynomial
+            then
+                [d|
+                    type instance FormOf $(pure h) = 'Polynomial
+
+                    instance PolyHFunctor $(pure h)
+                    |]
+            else [d|type instance FormOf $(pure h) = 'Exponential|]
+
     pure $
         InstanceD
             Nothing
             (fromMaybe [cxt] $ decomposeTupleT cxt)
             (ConT ''HFunctor `AppT` h)
             [hfmapDecls, fnInline]
-            : [ InstanceD
-                Nothing
-                []
-                (ConT ''PolyHFunctor `AppT` h)
-                []
-              | isPolynomial
-              ]
+            : formOf
 
 wrapLam :: (Exp -> Q Exp) -> Q Exp
 wrapLam f = do

@@ -8,8 +8,8 @@
 module OpenUnion where
 
 import Control.Effect (Eff, Free, perform)
-import Data.Effect (Catch, Effect, LabelOf, Throw (Throw))
-import Data.Effect.OpenUnion (Membership (UnsafeMembership), labelMembership, membershipAt, weakenHOEsFor, (:>))
+import Data.Effect (Catch, Effect, LabelOf, Throw (Throw), UnliftIO)
+import Data.Effect.OpenUnion (Membership (UnsafeMembership), labelMembership, membershipAt, weakenExpsFor, weakenHOEsFor, (:>))
 import Data.Proxy (Proxy (Proxy))
 import GHC.TypeNats (KnownNat, Natural, natVal)
 import Test.Hspec (Spec, describe, it, shouldBe)
@@ -60,6 +60,29 @@ spec_onlyFOEs = describe "onlyFOEs index shift" do
     shiftIx = weakenHOEsFor
 
     ix0, ix1, ix2, ix3 :: Membership F '[F, F, F, F]
+    ix0 = membershipAt @0
+    ix1 = membershipAt @1
+    ix2 = membershipAt @2
+    ix3 = membershipAt @3
+
+type P = Catch ()
+type E = UnliftIO
+
+spec_onlyPolys :: Spec
+spec_onlyPolys = describe "onlyPolys index shift" do
+    it "'[<P>, P , P , P ] -> '[ E ,<P>, P , E , E , P , E , P ]" $
+        shiftIx ix0 `shouldBe` UnsafeMembership 1
+    it "'[ P ,<P>, P , P ] -> '[ E , P ,<P>, E , E , P , E , P ]" $
+        shiftIx ix1 `shouldBe` UnsafeMembership 2
+    it "'[ P , P ,<P>, P ] -> '[ E , P , P , E , E ,<P>, E , P ]" $
+        shiftIx ix2 `shouldBe` UnsafeMembership 5
+    it "'[ P , P , P ,<P>] -> '[ E , P , P , E , E , P , E ,<P>]" $
+        shiftIx ix3 `shouldBe` UnsafeMembership 7
+  where
+    shiftIx :: Membership e '[P, P, P, P] -> Membership e '[E, P, P, E, E, P, E, P]
+    shiftIx = weakenExpsFor
+
+    ix0, ix1, ix2, ix3 :: Membership P '[P, P, P, P]
     ix0 = membershipAt @0
     ix1 = membershipAt @1
     ix2 = membershipAt @2

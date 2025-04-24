@@ -16,7 +16,7 @@ module Data.Effect.OpenUnion where
 import Control.Arrow ((&&&))
 import Data.Coerce (coerce)
 import Data.Data (Proxy (Proxy), (:~:) (Refl))
-import Data.Effect (Effect, EffectOrder (FirstOrder, HigherOrder), FirstOrder, LabelOf, OrderCase, OrderOf, PolyHFunctor)
+import Data.Effect (Effect, EffectForm (Exponential, Polynomial), EffectOrder (FirstOrder, HigherOrder), FirstOrder, FormCase, FormOf, LabelOf, OrderCase, OrderOf, PolyHFunctor)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.Tag (type (#))
 import Data.Kind (Constraint, Type)
@@ -428,6 +428,36 @@ instance
                     else shiftedIx + 1
     {-# INLINE foldHoeIndexShifter #-}
 
+type family RemoveExps (es :: [Effect]) where
+    RemoveExps '[] = '[]
+    RemoveExps (e ': es) =
+        FormCase (FormOf e) (e ': RemoveExps es) (RemoveExps es)
+
+type WeakenExps es = (WeakenExps_ es 0 (FormOf (HeadOf es)), PolyHFunctors (RemoveExps es))
+
+class (formOfHead ~ FormOf (HeadOf es)) => WeakenExps_ es (countP :: Natural) formOfHead where
+    foldExpIndexShifter :: (Int -> Int) -> (Int -> Int)
+
+instance (FormOf (HeadOf '[]) ~ formOfHead) => WeakenExps_ '[] countP formOfHead where
+    foldExpIndexShifter = id
+    {-# INLINE foldExpIndexShifter #-}
+
+instance (PolyHFunctor e, WeakenExps_ es (countP + 1) _formOfHead) => WeakenExps_ (e ': es) countP 'Polynomial where
+    foldExpIndexShifter = foldExpIndexShifter @es @(countP + 1)
+    {-# INLINE foldExpIndexShifter #-}
+
+instance
+    (FormOf e ~ 'Exponential, WeakenExps_ es countP _formOfHead, KnownNat countP)
+    => WeakenExps_ (e ': es) countP 'Exponential
+    where
+    foldExpIndexShifter shifterAcc =
+        foldExpIndexShifter @es @countP \ix ->
+            let shiftedIx = shifterAcc ix
+             in if ix < intVal @countP
+                    then shiftedIx
+                    else shiftedIx + 1
+    {-# INLINE foldExpIndexShifter #-}
+
 weaken :: Union es f a -> Union (e ': es) f a
 weaken = mapUnion weakenFor
 {-# INLINE weaken #-}
@@ -447,6 +477,14 @@ weakenHOEsFor = UnsafeMembership . foldHoeIndexShifter @es @0 id . unMembership
 weakenHOEs :: forall es f a. (WeakenHOEs es) => Union (RemoveHOEs es) f a -> Union es f a
 weakenHOEs = mapUnion weakenHOEsFor
 {-# INLINE weakenHOEs #-}
+
+weakenExpsFor :: forall es e. (WeakenExps es) => Membership e (RemoveExps es) -> Membership e es
+weakenExpsFor = UnsafeMembership . foldExpIndexShifter @es @0 id . unMembership
+{-# INLINE weakenExpsFor #-}
+
+weakenExps :: forall es f a. (WeakenExps es) => Union (RemoveExps es) f a -> Union es f a
+weakenExps = mapUnion weakenExpsFor
+{-# INLINE weakenExps #-}
 
 type KnownLength :: forall {k}. [k] -> Constraint
 class KnownLength xs where
