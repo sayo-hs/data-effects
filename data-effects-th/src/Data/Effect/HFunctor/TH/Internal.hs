@@ -71,7 +71,6 @@ import Data.Functor ((<&>))
 import Data.List.Infinite (Infinite, prependList)
 import Data.Maybe (fromMaybe)
 import Data.Text qualified as T
-import Formatting (int, sformat, shown, stext, (%))
 import Language.Haskell.TH (
     Body (NormalB),
     Clause (Clause),
@@ -175,18 +174,13 @@ deriveHFunctor manualCxt (DataInfo _ name args cons) = do
             map (pure . tyVarType) hfArgs
                 `prependList` error
                     ( T.unpack $
-                        sformat
-                            ( "Too many data type arguments in use. The number of usable type arguments in the data type ‘"
-                                % shown
-                                % "’ to be derived is "
-                                % int
-                                % ". ("
-                                % stext
-                                % ")"
-                            )
-                            name
-                            (length hfArgs)
-                            (T.intercalate ", " $ map ((\t -> "‘" <> t <> "’") . T.pack . nameBase . tyVarName) hfArgs)
+                        "Too many data type arguments in use. The number of usable type arguments in the data type ‘"
+                            <> T.pack (nameBase name)
+                            <> "’ to be derived is "
+                            <> T.pack (show $ length hfArgs)
+                            <> ". ("
+                            <> T.intercalate ", " (map ((\t -> "‘" <> t <> "’") . T.pack . nameBase . tyVarName) hfArgs)
+                            <> ")"
                     )
 
     hfmapClauses <- mapM hfmapClause cons
