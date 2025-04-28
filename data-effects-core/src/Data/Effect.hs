@@ -44,8 +44,35 @@ class
     ) =>
     FirstOrder (e :: Effect)
 
--- | A higher-order polynomial functor.
+{- | A higher-order polynomial functor.
+
+Prevents resources from escaping the scope through unlift operations.
+-}
 class (FormOf e ~ 'Polynomial) => PolyHFunctor (e :: Effect)
+
+{- | Enables algebraic handling even in the presence of higher-order effects.
+In such cases, the scope of higher-order effects behaves according to a semantics similar to @mtl@,
+where it may or may not become transactional depending on the order of the effect stack.
+
+This follows the "weave" approach described in the *Effect Handlers in Scope* paper,
+and is the method used in libraries such as @fused-effects@ and @polysemy@.
+
+https://doi.org/10.1145/2633357.2633358
+-}
+class Weave (e :: Effect) where
+    -- | The @weave@ method from the *Effect Handlers in Scope* paper.
+    --
+    --   https://doi.org/10.1145/2633357.2633358
+    --
+    --   To accommodate the effect representation used by @data-effects@ (which is generally not a @Functor@),
+    --   the types have been transformed based on a Church encoding of @Coyoneda@.
+    weave
+        :: (Functor ctx)
+        => ctx ()
+        -> (forall x. ctx (m x) -> n (ctx x))
+        -> (forall x. e n x -> (x -> ctx a) -> r)
+        -> e m a
+        -> r
 
 -- * Nop Effect
 

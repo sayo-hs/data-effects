@@ -16,7 +16,7 @@ module Data.Effect.OpenUnion where
 import Control.Arrow ((&&&))
 import Data.Coerce (coerce)
 import Data.Data (Proxy (Proxy), (:~:) (Refl))
-import Data.Effect (Effect, EffectForm (Exponential, Polynomial), EffectOrder (FirstOrder, HigherOrder), FirstOrder, FormCase, FormOf, LabelOf, OrderCase, OrderOf, PolyHFunctor)
+import Data.Effect (Effect, EffectForm (Exponential, Polynomial), EffectOrder (FirstOrder, HigherOrder), FirstOrder, FormCase, FormOf, LabelOf, OrderCase, OrderOf, PolyHFunctor, Weave, weave)
 import Data.Effect.HFunctor (HFunctor, hfmap)
 import Data.Effect.Tag (type (#))
 import Data.Kind (Constraint, Type)
@@ -57,6 +57,32 @@ class PolyHFunctors (es :: [Effect])
 
 instance PolyHFunctors '[]
 instance (PolyHFunctor e, PolyHFunctors es) => PolyHFunctors (e ': es)
+
+-- | The list @es@ consists only of weavable effects.
+class (Weave (Union es)) => Weaves (es :: [Effect])
+
+instance Weaves '[]
+instance (Weave e, Weaves es, KnownOrder e) => Weaves (e ': es)
+
+weaveUnion
+    :: (Weaves es, Functor ctx)
+    => ctx ()
+    -> (forall x. ctx (m x) -> n (ctx x))
+    -> (forall x. Union es n x -> (x -> ctx a) -> r)
+    -> Union es m a
+    -> r
+weaveUnion = weave
+{-# INLINE weaveUnion #-}
+
+instance Weave (Union '[]) where
+    weave _ _ _ = nil
+    {-# INLINE weave #-}
+
+instance (Weave e, Weave (Union es), KnownOrder e) => Weave (Union (e ': es)) where
+    weave ctx distrib f =
+        weave ctx distrib (f . inject Here)
+            !: weave ctx distrib (f . weaken)
+    {-# INLINE weave #-}
 
 coerceFOEs :: (FOEs es) => Union es f a -> Union es g a
 coerceFOEs = unsafeCoerce
