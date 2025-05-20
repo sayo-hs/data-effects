@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
@@ -23,6 +24,7 @@ import Data.Kind (Constraint, Type)
 import GHC.TypeLits (ErrorMessage (ShowType, Text, (:$$:), (:<>:)), KnownNat, Natural, Symbol, TypeError, natVal, type (+), type (-))
 import Unsafe.Coerce (unsafeCoerce)
 
+type role Union representational representational nominal
 data Union (es :: [Effect]) (f :: Type -> Type) (a :: Type) where
     UnsafeUnion
         :: {-# UNPACK #-} !Int
@@ -90,6 +92,7 @@ coerceFOEs = unsafeCoerce
 
 type instance OrderOf (Union es) = 'HigherOrder
 
+type role Membership representational representational
 newtype Membership (e :: Effect) (es :: [Effect]) = UnsafeMembership {unMembership :: Int}
     deriving stock (Eq, Show)
 
