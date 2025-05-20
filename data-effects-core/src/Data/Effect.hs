@@ -54,13 +54,13 @@ class (FormOf e ~ 'Polynomial) => PolyHFunctor (e :: Effect)
 In such cases, the scope of higher-order effects behaves according to a semantics similar to @mtl@,
 where it may or may not become transactional depending on the order of the effect stack.
 
-This follows the "weave" approach described in the *Effect Handlers in Scope* paper,
+This follows the "weave" approach described in the "Effect Handlers in Scope" paper,
 and is the method used in libraries such as @fused-effects@ and @polysemy@.
 
 https://doi.org/10.1145/2633357.2633358
 -}
 class Weave (e :: Effect) where
-    -- | The @weave@ method from the *Effect Handlers in Scope* paper.
+    -- | The @weave@ method from the "Effect Handlers in Scope" paper.
     --
     --   https://doi.org/10.1145/2633357.2633358
     --
