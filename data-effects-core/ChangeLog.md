@@ -15,3 +15,8 @@
 * The new v4 interface.
     * Unified first-order and higher-order effect interfaces.
     * Added a generic `Eff` carrier type.
+
+## 0.4.3.0 -- 2025-05-21
+
+* Add type classes for weaving
+* Fix the missing type role specification in `Data.Effect.OpenUnion`
