@@ -368,7 +368,7 @@ nil :: Union '[] f a -> r
 nil _ = error "Effect system internal error: nil - An empty effect union, which should not be possible to create, has been created."
 
 nilMembership :: Membership e '[] -> r
-nilMembership _ = error "Effect system internal error: nil - An empty effect union membership, which should not be possible to create, has been created."
+nilMembership _ = error "Effect system internal error: nilMmebership - An empty effect union membership, which should not be possible to create, has been created."
 
 weakensFor :: forall es es' e. (Suffix es es') => Membership e es -> Membership e es'
 weakensFor (UnsafeMembership n) = UnsafeMembership $ n + prefixLen @es @es'
